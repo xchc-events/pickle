@@ -4,9 +4,11 @@ services:
       context: .
       dockerfile: Dockerfile
     volumes:
-      - ../..:/workspaces:cached
+      # Mount the repo itself, so the container does not depend on what the
+      # checkout directory happens to be called.
+      - ..:/workspace:cached
       # Keep node_modules inside the container — native deps differ from macOS.
-      - node_modules:/workspaces/PickleEvents/node_modules
+      - node_modules:/workspace/node_modules
     command: sleep infinity
     environment:
       DATABASE_URL: postgresql://pickle:pickle@db:5432/pickle?schema=public

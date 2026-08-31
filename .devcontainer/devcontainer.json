@@ -2,7 +2,7 @@
   "name": "PicklePicklePickle",
   "dockerComposeFile": "docker-compose.yml",
   "service": "app",
-  "workspaceFolder": "/workspaces/PickleEvents",
+  "workspaceFolder": "/workspace",
   "features": {
     "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
   },
