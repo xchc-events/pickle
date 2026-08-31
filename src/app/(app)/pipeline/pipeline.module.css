@@ -1,0 +1,342 @@
+/* Pipeline. Densities are the prototype's own — this is deliberately a dense
+   tool, so nothing here is loosened for breathing room. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+/* --- filter row ----------------------------------------------------- */
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 28px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  flex-wrap: wrap;
+}
+
+.chip {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 11px;
+  border: 1px solid var(--color-neutral-800);
+  background: transparent;
+  color: var(--color-neutral-400);
+}
+
+.chip:hover {
+  color: var(--color-neutral-100);
+}
+
+.chipOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent-100);
+}
+
+.chipDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-divider);
+  margin: 0 4px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+}
+
+.sort:hover {
+  color: var(--color-neutral-200);
+}
+
+/* --- the matrix ----------------------------------------------------- */
+
+.body {
+  padding: 0 28px 44px;
+}
+
+.scroller {
+  overflow-x: auto;
+}
+
+.matrix {
+  min-width: 1050px;
+}
+
+.headRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 14px 0 9px;
+}
+
+.headEvent,
+.headRight {
+  flex: none;
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-neutral-700);
+}
+
+.headEvent {
+  width: 234px;
+}
+
+.headRight {
+  width: 196px;
+  text-align: right;
+}
+
+.headStage {
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--color-neutral-500);
+  text-align: center;
+}
+
+.headCount {
+  color: var(--color-neutral-700);
+}
+
+.track {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 9px 0 9px 10px;
+  border-top: 1px solid var(--color-divider);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.row:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+/* The left edge carries the risk colour, so a flagged event reads down the
+   column without needing to be read. */
+.row.warn {
+  box-shadow: inset 2px 0 0 var(--st-warn);
+}
+
+.row.stop {
+  box-shadow: inset 2px 0 0 var(--st-stop);
+}
+
+.name {
+  flex: none;
+  width: 224px;
+  min-width: 0;
+}
+
+.eventName {
+  display: block;
+  font-size: 13.5px;
+  color: var(--color-neutral-100);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warn .metaRisk {
+  color: var(--st-warn);
+}
+
+.stop .metaRisk {
+  color: var(--st-stop);
+}
+
+.cell {
+  height: 26px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  border: 1px solid transparent;
+}
+
+.done {
+  background: var(--color-accent-900);
+  border-color: var(--color-accent-800);
+  color: var(--color-accent-500);
+}
+
+.current {
+  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-100);
+}
+
+.ahead {
+  background: transparent;
+  border: 1px dashed var(--color-neutral-800);
+  color: transparent;
+}
+
+.warn .cellRisk {
+  background: color-mix(in srgb, var(--st-warn) 24%, transparent);
+  border-color: var(--st-warn);
+  color: var(--st-warn);
+}
+
+.stop .cellRisk {
+  background: color-mix(in srgb, var(--st-stop) 24%, transparent);
+  border-color: var(--st-stop);
+  color: var(--st-stop);
+}
+
+.right {
+  flex: none;
+  width: 196px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 11px;
+}
+
+.figures {
+  text-align: right;
+}
+
+.days {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  line-height: 1.1;
+  color: var(--color-neutral-100);
+}
+
+.proj {
+  display: block;
+  font-size: 10.5px;
+}
+
+.good {
+  color: var(--st-good);
+}
+
+.muted {
+  color: var(--color-neutral-600);
+}
+
+.dim {
+  color: var(--color-neutral-700);
+}
+
+/* Holds the column when an event has no external coordinator. */
+.avatarGap {
+  flex: none;
+  width: 23px;
+}
+
+.empty {
+  padding: 26px 0;
+  font-size: 12.5px;
+  color: var(--color-neutral-600);
+}
+
+/* --- below the matrix ----------------------------------------------- */
+
+.metrics {
+  margin-top: 24px;
+}
+
+.labour {
+  margin-top: 26px;
+}
+
+.labourRows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.labourRow {
+  display: grid;
+  grid-template-columns: 178px 1fr 62px 70px;
+  gap: 12px;
+  align-items: center;
+}
+
+.labourLabel {
+  font-size: 12px;
+  color: var(--color-neutral-300);
+}
+
+.bar {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--color-neutral-900);
+  overflow: hidden;
+  display: block;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent-600);
+}
+
+.labourValue {
+  font-size: 11.5px;
+  text-align: right;
+  color: var(--color-neutral-200);
+}
+
+.labourCost {
+  font-size: 11.5px;
+  text-align: right;
+  color: var(--color-neutral-500);
+}

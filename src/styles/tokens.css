@@ -67,10 +67,10 @@
   --st-stop-dim: oklch(0.3 0.07 25);
 
   /* --- type --------------------------------------------------------- */
-  --font-heading: 'Inter', system-ui, sans-serif;
+  --font-heading: var(--font-inter), 'Inter', system-ui, sans-serif;
   /* Headings are never bolder than 500. */
   --font-heading-weight: 500;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-body: var(--font-inter), 'Inter', system-ui, sans-serif;
 
   /* --- space, radius, elevation ------------------------------------- */
   --space-1: 2.8px;

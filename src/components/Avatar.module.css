@@ -1,0 +1,26 @@
+.avatar {
+  flex: none;
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-family: var(--font-heading);
+  background: var(--color-neutral-800);
+  color: var(--color-neutral-300);
+}
+
+.accent {
+  background: var(--color-accent-800);
+  color: var(--color-accent-200);
+}
+
+/* An external coordinator is drawn as an outline, never a filled avatar —
+   they are not venue staff. */
+.external {
+  background: transparent;
+  border: 1px dashed var(--color-accent-600);
+  color: var(--color-accent-300);
+}
