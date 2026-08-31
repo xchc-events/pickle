@@ -47,6 +47,10 @@ jobs:
       - name: Migrations apply cleanly to an empty database
         run: npx prisma migrate deploy
 
+      - name: Migrations match the schema
+        # Catches a schema.prisma edit that never got a migration generated.
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck

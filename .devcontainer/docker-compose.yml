@@ -16,11 +16,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    network_mode: service:db
 
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    # Published so host tooling — and anyone not using the devcontainer — can
+    # reach the same database at localhost:5432.
+    ports:
+      - '5432:5432'
     volumes:
       - postgres:/var/lib/postgresql/data
     environment:

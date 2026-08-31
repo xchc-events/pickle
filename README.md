@@ -10,16 +10,16 @@ One record of an event, one record of a person, one record of an hour.
 "Reopen in Container". Postgres, Node, `gh` and the migrations are all set up
 for you.
 
-**Without it:**
+**Without it** — you still need Postgres, and the same compose file will give
+you one on `localhost:5432`:
 
 ```bash
+docker compose -f .devcontainer/docker-compose.yml up -d db
 cp .env.example .env      # then fill in AUTH_SECRET: npx auth secret
 npm ci
 npm run db:migrate
 npm run dev
 ```
-
-You need Postgres on `:5432` matching the `DATABASE_URL` in `.env.example`.
 
 ## Before you open a PR
 
