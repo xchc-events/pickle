@@ -1,0 +1,19 @@
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: 12px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0;
+}
+
+.note {
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+}

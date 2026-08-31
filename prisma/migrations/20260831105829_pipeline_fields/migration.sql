@@ -1,0 +1,11 @@
+-- CreateEnum
+CREATE TYPE "RiskKind" AS ENUM ('WARN', 'STOP');
+
+-- AlterTable
+ALTER TABLE "Event" ADD COLUMN     "format" TEXT NOT NULL DEFAULT 'DJs',
+ADD COLUMN     "riskKind" "RiskKind" NOT NULL DEFAULT 'WARN',
+ADD COLUMN     "riskNote" TEXT,
+ADD COLUMN     "stageEnteredAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+-- AddForeignKey
+ALTER TABLE "Event" ADD CONSTRAINT "Event_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "Person"("id") ON DELETE SET NULL ON UPDATE CASCADE;

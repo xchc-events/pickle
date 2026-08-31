@@ -1,0 +1,35 @@
+.wrap {
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 14vh 24px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.title {
+  font-size: 27px;
+  letter-spacing: -0.02em;
+  margin: 8px 0 0;
+}
+
+.body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-neutral-400);
+  margin: 0;
+  text-wrap: pretty;
+}
+
+.link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-accent-300);
+}
+
+.link:hover {
+  color: var(--color-accent-100);
+}

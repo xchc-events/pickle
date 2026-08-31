@@ -1,68 +1,44 @@
-import Image from 'next/image'
-import styles from './page.module.css'
+import { redirect } from 'next/navigation'
+import { currentUser } from '@/lib/session'
+import { modulesFor } from '@/lib/permissions'
+import { BUILT_MODULES, MODULES, ROLE_LABEL } from '@/lib/constants'
+import { Brand } from '@/components/Brand'
+import { signOut } from './actions'
+import styles from './landing.module.css'
 
-export default function Home() {
+/**
+ * Where a signed-in user lands. Pipeline is the only module built so far, and
+ * not every role can see it — Bar & duty manager cannot — so this decides
+ * rather than sending everyone to a 404.
+ */
+export default async function Index() {
+  const user = await currentUser()
+  if (!user) redirect('/sign-in')
+
+  const modules = await modulesFor(user)
+  const built = modules.filter((m) => BUILT_MODULES.includes(m))
+  if (built.includes('pipeline')) redirect('/pipeline')
+  if (built.length) redirect(`/${built[0]}`)
+
+  const labels = modules
+    .map((k) => MODULES.find((m) => m.key === k)?.label)
+    .filter(Boolean)
+    .join(', ')
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{' '}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{' '}
-            or the{' '}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{' '}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className={styles.wrap}>
+      <Brand />
+      <h1 className={styles.title}>Nothing you can see is built yet</h1>
+      <p className={styles.body}>
+        You are signed in as {user.name} — {ROLE_LABEL[user.roleKey]}. That role can see{' '}
+        {labels || 'no modules'}, and of those, none have been built. Pipeline is the module that
+        exists today.
+      </p>
+      <form action={signOut}>
+        <button type="submit" className={styles.link}>
+          Sign in as someone else
+        </button>
+      </form>
+    </main>
   )
 }

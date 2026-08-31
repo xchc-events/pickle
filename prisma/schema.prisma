@@ -29,6 +29,7 @@ model Person {
   active   Boolean @default(true)
 
   user         User?
+  ownedEvents  Event[]       @relation("EventOwner")
   shifts       Shift[]
   hourEntries  HourEntry[]
   availability Availability?
@@ -137,6 +138,12 @@ enum BookingModel {
   CURATOR
 }
 
+/// Severity of the reason an event is flagged on the pipeline.
+enum RiskKind {
+  WARN
+  STOP
+}
+
 enum Licence {
   NOT_REQUIRED
   REQUIRED
@@ -153,16 +160,28 @@ model Event {
   spaceId   String
   space     Space    @relation(fields: [spaceId], references: [id])
   kind      String
+  /// Display label on the pipeline — "Live music", "DJs", "Cabaret", "DJs + live".
+  /// `kind` drives behaviour; `format` is what the room is told it is.
+  format    String  @default("DJs")
   ownerId   String?
+  owner     Person? @relation("EventOwner", fields: [ownerId], references: [id])
   /// Set when an outside promoter brings the show. Scopes portal access.
   promoter  String?
   internal  Boolean  @default(false)
 
   /// 0 enquiry … 7 settled. Transitions are gated — see src/lib/gates.ts.
   stage     Int          @default(0)
+  /// When the event entered its current stage. Days-in-stage derives from
+  /// this — it is never stored, so it cannot go stale.
+  stageEnteredAt DateTime @default(now())
   concluded Boolean      @default(false)
   model     BookingModel @default(CURATOR)
   licence   Licence      @default(NOT_REQUIRED)
+
+  /// Why this event is flagged, in the coordinator's own words. Null means
+  /// not at risk. The wording is shown verbatim on the pipeline row.
+  riskNote  String?
+  riskKind  RiskKind     @default(WARN)
 
   // --- ticketing inputs. Every tier derives from `std`. ---
   /// Standard price. sub = round(std * 0.8), sup = round(std * 1.2).
