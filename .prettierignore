@@ -1,0 +1,7 @@
+.next/
+node_modules/
+src/generated/
+package-lock.json
+docs/design-handoff/
+public/
+coverage/

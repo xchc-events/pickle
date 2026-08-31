@@ -1,0 +1,347 @@
+// PicklePicklePickle — starting schema.
+//
+// The central claim of this product: one record of an event, one record of a
+// person, one record of an hour. Every figure shown anywhere resolves back to
+// hours logged against events and prices set on the event record.
+//
+// This schema covers the spine (people, events, hours, money, audit). The
+// remaining modules — ticketing detail, assets, promo spread, tech presets —
+// hang off Event and are added as those modules are built.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- people ---
+
+/// One record of a person. Renaming here changes them on every shift,
+/// timesheet, run sheet and bar view at once — that is the point.
+model Person {
+  id       String  @id @default(cuid())
+  name     String
+  initials String  @unique
+  email    String? @unique
+  active   Boolean @default(true)
+
+  user         User?
+  shifts       Shift[]
+  hourEntries  HourEntry[]
+  availability Availability?
+  activity     Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  COORDINATOR
+  DESIGN
+  TECH
+  BAR
+  ADMIN
+  /// External coordinator — outside the venue. Sees only their own events.
+  PROMOTER
+}
+
+/// Auth.js account. Permissions are enforced server-side off `role`; the
+/// sidebar hiding a module is a convenience, never the control.
+model User {
+  id       String  @id @default(cuid())
+  email    String  @unique
+  name     String?
+  image    String?
+  role     Role    @default(COORDINATOR)
+  /// Set for PROMOTER users — scopes every query to this promoter's events.
+  promoter String?
+  active   Boolean @default(true)
+
+  personId String? @unique
+  person   Person? @relation(fields: [personId], references: [id])
+
+  emailVerified DateTime?
+  accounts      Account[]
+  sessions      Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+/// Weekly hour cap, volunteer hours, and yes/no day-period preferences
+/// keyed "Fri-eve", "Mon-day". Roster assignment is checked against this.
+model Availability {
+  id        String   @id @default(cuid())
+  personId  String   @unique
+  person    Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  weekly    Float    @default(0)
+  volunteer Float    @default(0)
+  yes       String[] @default([])
+  no        String[] @default([])
+}
+
+/// Which modules each role can see. Mutated live from Admin.
+model ModulePermission {
+  role   Role
+  module String
+
+  @@id([role, module])
+}
+
+// ---------------------------------------------------------------- events ---
+
+model Space {
+  id       String  @id @default(cuid())
+  name     String  @unique
+  capacity Int
+  events   Event[]
+}
+
+enum BookingModel {
+  DRY
+  CURATOR
+}
+
+enum Licence {
+  NOT_REQUIRED
+  REQUIRED
+  APPLIED_FOR
+  CONFIRMED
+  DENIED
+}
+
+/// The hub. Everything hangs off this record.
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  spaceId   String
+  space     Space    @relation(fields: [spaceId], references: [id])
+  kind      String
+  ownerId   String?
+  /// Set when an outside promoter brings the show. Scopes portal access.
+  promoter  String?
+  internal  Boolean  @default(false)
+
+  /// 0 enquiry … 7 settled. Transitions are gated — see src/lib/gates.ts.
+  stage     Int          @default(0)
+  concluded Boolean      @default(false)
+  model     BookingModel @default(CURATOR)
+  licence   Licence      @default(NOT_REQUIRED)
+
+  // --- ticketing inputs. Every tier derives from `std`. ---
+  /// Standard price. sub = round(std * 0.8), sup = round(std * 1.2).
+  std       Float @default(0)
+  door      Float @default(0)
+  /// [supporter, standard, subsidised, door] proportions. Must sum to 1.
+  mix       Float[] @default([0.15, 0.5, 0.2, 0.15])
+  /// Attendance by scenario: [quiet, likely, great].
+  att       Int[]   @default([0, 0, 0])
+  /// Which scenario the projection currently uses: 0 | 1 | 2.
+  scen      Int     @default(1)
+  sold      Int     @default(0)
+
+  // --- cost inputs ---
+  barHead   Float  @default(0)
+  barClose  String?
+  gear      Float  @default(0)
+  adv       Float  @default(0)
+  /// "wheke" triggers the Wheke Sound sliding-scale fee.
+  sound     String?
+  /// Crew count and tokens per head, for the comps line.
+  crew      Int    @default(0)
+  tok       Int    @default(0)
+  /// Share of surplus that goes to their people. 0–1.
+  split     Float  @default(0)
+
+  artists   EventArtist[]
+  shifts    Shift[]
+  tasks     Task[]
+  addons    Addon[]
+  activity  Activity[]
+  hours     HourEntry[]
+  review    FinanceReview?
+  actual    Actual?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stage])
+  @@index([date])
+  @@index([promoter])
+}
+
+enum ArtistStatus {
+  ENQUIRED
+  PENCILLED
+  CONFIRMED
+  DECLINED
+}
+
+model EventArtist {
+  id      String       @id @default(cuid())
+  eventId String
+  event   Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name    String
+  status  ArtistStatus @default(ENQUIRED)
+  /// Fee floor and ceiling, agreed before the event can advance.
+  low     Float        @default(0)
+  high    Float        @default(0)
+  /// promo pics, bio, EPK, hospitality rider, tech rider.
+  files   Json         @default("{}")
+  paid    Boolean      @default(false)
+  order   Int          @default(0)
+}
+
+enum ShiftState {
+  OPEN
+  ASKED
+  ASSIGNED
+  DONE
+}
+
+/// Roster ↔ Hours is two-way: assigning a shift creates the hours;
+/// editing the hours reflects back here.
+model Shift {
+  id       String     @id @default(cuid())
+  eventId  String
+  event    Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  role     String
+  hours    Float
+  /// Offset in hours from doors, negative for set-up.
+  start    Float      @default(0)
+  personId String?
+  person   Person?    @relation(fields: [personId], references: [id])
+  state    ShiftState @default(OPEN)
+  asked    Int        @default(0)
+
+  hourEntry HourEntry?
+}
+
+model Task {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name    String
+  est     Float  @default(0)
+  actual  Float?
+}
+
+enum AddonKind {
+  GEAR
+  LABOUR
+}
+
+/// Tech rig presets append gear costs *and* labour hours, both of which flow
+/// straight into the finance model.
+model Addon {
+  id      String    @id @default(cuid())
+  eventId String
+  event   Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  kind    AddonKind
+  name    String
+  cost    Float?
+  hours   Float?
+}
+
+/// One record of an hour. Every wage figure resolves back to these.
+model HourEntry {
+  id       String  @id @default(cuid())
+  personId String
+  person   Person  @relation(fields: [personId], references: [id])
+  eventId  String?
+  event    Event?  @relation(fields: [eventId], references: [id])
+  shiftId  String? @unique
+  shift    Shift?  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  hours    Float
+  note     String?
+  paid     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([personId])
+  @@index([eventId])
+}
+
+// ----------------------------------------------------------------- money ---
+
+enum ReviewState {
+  PENDING
+  APPROVED
+  FLAGGED
+}
+
+/// Sits before the deposit on dry hire, and at booking-confirmed on the
+/// curator model. Red-flagging requires a reason.
+model FinanceReview {
+  id      String      @id @default(cuid())
+  eventId String      @unique
+  event   Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  state   ReviewState @default(PENDING)
+  note    String?
+  by      String?
+  when    DateTime?
+}
+
+/// Once an event concludes, actuals replace projections.
+model Actual {
+  id         String @id @default(cuid())
+  eventId    String @unique
+  event      Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets    Int    @default(0)
+  ticketRev  Float  @default(0)
+  barTake    Float  @default(0)
+  barProfit  Float  @default(0)
+}
+
+// ----------------------------------------------------------------- audit ---
+
+/// Append-only. Every mutation writes here; nothing updates or deletes.
+/// This is the audit trail — enforce insert-only at the database role level.
+model Activity {
+  id       String   @id @default(cuid())
+  eventId  String
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  personId String?
+  person   Person?  @relation(fields: [personId], references: [id])
+  who      String
+  text     String
+  at       DateTime @default(now())
+
+  @@index([eventId, at])
+}

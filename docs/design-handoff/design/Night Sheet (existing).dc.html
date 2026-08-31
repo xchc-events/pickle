@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="_ds/nocturne-db91a1de-6cc8-4c60-b21c-87615c226e6a/styles.css">
+  <script src="_ds/nocturne-db91a1de-6cc8-4c60-b21c-87615c226e6a/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: var(--color-bg); }
+    input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</helmet>
+
+<div style="background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); min-height: 100vh; padding: 0;">
+
+  <div style="max-width: 1400px; margin: 0 auto; padding: 0 28px;">
+
+    <header style="padding: 56px 0 26px; max-width: 780px;">
+      <div style="font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-accent); margin-bottom: 20px;">Exchange Christchurch &middot; Event modelling</div>
+      <h1 style="font-size: 46px; line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 18px;">Model your night before you book it.</h1>
+      <p style="font-size: 16px; line-height: 1.6; color: var(--color-neutral-400); margin: 0 0 14px; text-wrap: pretty;">Venues are closing all over Aotearoa. The Curator model is our answer &mdash; we share the risk and the reward, so a quiet night doesn't sink either of us and a good one pays everybody properly. Less a transaction, more all of us making epic music and art together.</p>
+      <p style="font-size: 17px; line-height: 1.6; color: var(--color-neutral-300); margin: 0; text-wrap: pretty;">Right now you're modelling <strong style="color: var(--color-accent-300); font-weight: 500;">{{ story.a }}</strong>, {{ story.b }} <strong style="color: var(--color-accent-300); font-weight: 500;">{{ story.c }}</strong>{{ story.d }} <strong style="color: var(--color-accent-300); font-weight: 500;">{{ story.e }}</strong>{{ story.f }}</p>
+    </header>
+
+    <div style="height: 1px; background: linear-gradient(to right, transparent, var(--color-divider) 48px, var(--color-divider) calc(100% - 48px), transparent); margin-bottom: 28px;"></div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
+
+      <!-- ============ RAIL ============ -->
+      <nav style="flex: 0 1 176px; min-width: 150px; position: sticky; top: 18px; display: flex; flex-direction: column; gap: 1px;">
+        <sc-for list="{{ rail }}" as="r" hint-placeholder-count="9">
+          <button type="button" data-m="{{ r.match }}" onClick="{{ goSection }}" style="cursor: pointer; font-family: var(--font-body); text-align: left; background: {{ r.bg }}; border: 0; border-left: 2px solid {{ r.bar }}; border-radius: 0 6px 6px 0; padding: 7px 11px; color: var(--color-text); display: flex; flex-direction: column; gap: 1px;">
+            <span style="font-size: 12.5px; color: {{ r.fg }};">{{ r.title }}</span>
+            <span style="font-size: 11px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums;">{{ r.value }}</span>
+          </button>
+        </sc-for>
+      </nav>
+
+      <!-- ============ CONTROLS ============ -->
+      <div data-controls="1" style="flex: 1 1 460px; min-width: 300px; display: flex; flex-direction: column; gap: 34px;">
+
+        <section>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px;">
+            <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">How we work together</h2>
+            <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+            <sc-for list="{{ modes }}" as="m" hint-placeholder-count="2">
+              <button type="button" data-k="{{ m.key }}" onClick="{{ pickMode }}" style="text-align: left; cursor: pointer; font-family: var(--font-body); background: {{ m.bg }}; border: 1px solid {{ m.bc }}; border-radius: var(--radius-md); padding: 14px 16px; color: var(--color-text); display: flex; flex-direction: column; gap: 5px;">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-family: var(--font-heading); font-weight: 500; font-size: 17px; color: {{ m.fg }};">{{ m.label }}</span>
+                  <span class="tag tag-accent" style="display: {{ m.tagShow }};">recommended</span>
+                </span>
+                <span style="font-size: 13px; line-height: 1.45; color: var(--color-neutral-400);">{{ m.sub }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <p style="font-size: 13.5px; line-height: 1.6; color: var(--color-neutral-400); margin: 12px 0 0; max-width: 66ch;">{{ modeNote }}</p>
+        </section>
+
+        <section>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px;">
+            <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Which night</h2>
+            <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+            <sc-for list="{{ nights }}" as="n" hint-placeholder-count="7">
+              <button type="button" data-k="{{ n.key }}" onClick="{{ pickNight }}" title="{{ n.title }}" style="cursor: pointer; font-family: var(--font-body); background: {{ n.bg }}; border: 1px solid {{ n.bc }}; border-radius: var(--radius-md); padding: 10px 4px 9px; color: var(--color-text); display: flex; flex-direction: column; align-items: center; gap: 3px;">
+                <span style="font-family: var(--font-heading); font-size: 14px; color: {{ n.fg }};">{{ n.short }}</span>
+                <span style="font-size: 11px; color: var(--color-neutral-500);">{{ n.sub }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <p style="font-size: 14px; line-height: 1.65; color: var(--color-neutral-400); margin: 12px 0 0; max-width: 66ch; text-wrap: pretty;">A <strong style="color: var(--color-neutral-200); font-weight: 500;">{{ nn.label }}</strong> {{ nn.verb }} <strong style="color: var(--color-accent-300); font-weight: 500;">{{ nn.amount }}</strong>{{ nn.tail }} {{ nn.extra }}</p>
+        </section>
+
+        <section>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px;">
+            <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Your event</h2>
+            <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px; margin-bottom: 14px;">
+            <sc-for list="{{ formats }}" as="f" hint-placeholder-count="4">
+              <button type="button" data-k="{{ f.key }}" onClick="{{ pickFormat }}" style="cursor: pointer; font-family: var(--font-body); text-align: left; background: {{ f.bg }}; border: 1px solid {{ f.bc }}; border-radius: var(--radius-md); padding: 9px 12px; color: {{ f.fg }}; font-size: 13.5px; display: flex; justify-content: space-between; gap: 8px; align-items: center;">
+                <span>{{ f.label }}</span><span style="font-size: 11px; color: var(--color-neutral-500);">{{ f.cap }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px;">
+            <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="3">
+              <button type="button" data-k="{{ t.key }}" onClick="{{ toggleExtra }}" style="cursor: pointer; font-family: var(--font-body); text-align: left; background: {{ t.bg }}; border: 1px solid {{ t.bc }}; border-radius: var(--radius-md); padding: 10px 12px; color: var(--color-text); display: flex; gap: 10px; align-items: flex-start;">
+                <span style="flex: none; width: 15px; height: 15px; margin-top: 2px; border-radius: 4px; border: 1.5px solid {{ t.mc }}; background: {{ t.mb }}; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--color-bg);">{{ t.mark }}</span>
+                <span style="display: flex; flex-direction: column; gap: 2px;">
+                  <span style="font-size: 13.5px;">{{ t.label }}</span>
+                  <span style="font-size: 11.5px; line-height: 1.4; color: var(--color-neutral-500);">{{ t.desc }}</span>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+          <textarea onInput="{{ onDesc }}" class="input" rows="2" placeholder="Describe the night &mdash; who's playing, the vibe, anything we should know" style="margin-top: 10px; min-height: 62px; font-size: 13.5px;"></textarea>
+        </section>
+
+        <section>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+            <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Doors, bar and close</h2>
+            <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+            <span style="font-size: 13px; color: var(--color-neutral-300); font-variant-numeric: tabular-nums;">{{ timeSummary }}</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 22px;">Drag the three markers. We hold an unusual licence &mdash; people can stay until 5am after the bar closes.</p>
+
+          <div onPointerDown="{{ timeDown }}" style="position: relative; height: 66px; cursor: grab; touch-action: none; user-select: none;">
+            <div style="position: absolute; left: 0; right: 0; top: 22px; height: 22px; border-radius: 6px; background: var(--color-neutral-900); border: 1px solid var(--color-divider);"></div>
+            <div style="position: absolute; top: 22px; height: 22px; left: {{ tb.lateL }}; width: {{ tb.lateW }}; background: repeating-linear-gradient(45deg, transparent, transparent 5px, color-mix(in srgb, var(--color-accent) 14%, transparent) 5px, color-mix(in srgb, var(--color-accent) 14%, transparent) 10px);"></div>
+            <div style="position: absolute; top: 22px; height: 22px; left: {{ tb.evL }}; width: {{ tb.evW }}; border-radius: 6px; background: color-mix(in srgb, var(--color-neutral-100) 9%, transparent);"></div>
+            <div style="position: absolute; top: 22px; height: 22px; left: {{ tb.alcL }}; width: {{ tb.alcW }}; border-radius: 6px; background: color-mix(in srgb, var(--color-accent) 30%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent);"></div>
+            <sc-for list="{{ tb.ticks }}" as="k" hint-placeholder-count="6">
+              <div style="position: absolute; top: 46px; left: {{ k.left }}; transform: translateX(-50%); font-size: 10.5px; color: var(--color-neutral-600);">{{ k.label }}</div>
+            </sc-for>
+            <sc-for list="{{ tb.handles }}" as="h" hint-placeholder-count="3">
+              <div style="position: absolute; top: {{ h.top }}; left: {{ h.left }}; width: 0; display: {{ h.show }}; flex-direction: column; align-items: {{ h.align }};">
+                <div style="font-size: 10.5px; color: {{ h.color }}; white-space: nowrap; margin-bottom: 2px; transform: {{ h.tx }};">{{ h.label }}</div>
+                <div style="width: 3px; height: {{ h.stick }}; border-radius: 2px; background: {{ h.color }}; box-shadow: 0 0 0 3px var(--color-bg); margin-left: -1.5px;"></div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px;">
+            <button type="button" onClick="{{ toggleAlc }}" style="cursor: pointer; font-family: var(--font-body); font-size: 13px; background: {{ alc.bg }}; border: 1px solid {{ alc.bc }}; color: var(--color-text); border-radius: var(--radius-md); padding: 7px 12px;">{{ alc.label }}</button>
+            <span style="font-size: 12.5px; color: {{ lic.color }}; line-height: 1.4;">{{ lic.text }}</span>
+          </div>
+        </section>
+
+        <sc-if value="{{ isCurator }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 34px;">
+
+            <section>
+              <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+                <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Tickets</h2>
+                <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+                <span style="font-size: 13px; color: var(--color-neutral-300);">avg {{ avgTicket }}</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 16px;">All four tiers sell at once and people pick their own. Set the prices, then drag the bar to say who buys what.</p>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 18px;">
+                <sc-for list="{{ tiers }}" as="t" hint-placeholder-count="4">
+                  <div style="border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 9px 11px; display: flex; flex-direction: column; gap: 4px; border-top: 2px solid {{ t.color }};">
+                    <span style="font-size: 11.5px; color: var(--color-neutral-400);">{{ t.label }}</span>
+                    <span style="display: flex; align-items: center; gap: 2px;">
+                      <span style="font-size: 15px; color: var(--color-neutral-500);">$</span>
+                      <input type="number" data-k="{{ t.key }}" onInput="{{ onNum }}" value="{{ t.val }}" style="width: 100%; background: transparent; border: 0; color: var(--color-text); font: inherit; font-size: 19px; font-family: var(--font-heading); padding: 0;">
+                    </span>
+                    <span style="font-size: 11px; color: var(--color-neutral-600);">{{ t.share }} of sales</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div onPointerDown="{{ mixDown }}" style="position: relative; height: 44px; cursor: ew-resize; touch-action: none; user-select: none;">
+                <div style="position: absolute; inset: 0 0 18px; display: flex; border-radius: 6px; overflow: hidden;">
+                  <sc-for list="{{ mixSegs }}" as="m" hint-placeholder-count="4">
+                    <div style="width: {{ m.width }}; background: {{ m.color }}; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--color-bg); font-family: var(--font-heading);">{{ m.pct }}</div>
+                  </sc-for>
+                </div>
+                <sc-for list="{{ mixSegs }}" as="m" hint-placeholder-count="4">
+                  <div style="position: absolute; bottom: 0; left: {{ m.mid }}; transform: translateX(-50%); font-size: 10.5px; color: var(--color-neutral-500); white-space: nowrap;">{{ m.label }}</div>
+                </sc-for>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+                <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Who turns up</h2>
+                <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+                <span style="font-size: 13px; color: var(--color-neutral-300);">{{ attSummary }}</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 22px;">Three honest guesses &mdash; a bad night, a normal night, a great night. The sheet runs all three.</p>
+
+              <div onPointerDown="{{ attDown }}" style="position: relative; height: 62px; cursor: grab; touch-action: none; user-select: none;">
+                <div style="position: absolute; left: 0; right: 0; top: 20px; height: 20px; border-radius: 6px; background: var(--color-neutral-900); border: 1px solid var(--color-divider);"></div>
+                <div style="position: absolute; top: 20px; height: 20px; left: {{ ab.left }}; width: {{ ab.width }}; border-radius: 6px; background: color-mix(in srgb, var(--color-accent) 22%, transparent);"></div>
+                <sc-for list="{{ ab.handles }}" as="h" hint-placeholder-count="3">
+                  <div style="position: absolute; top: {{ h.top }}; left: {{ h.left }}; width: 0; display: flex; flex-direction: column; align-items: {{ h.align }};">
+                    <div style="font-size: 10.5px; color: {{ h.color }}; white-space: nowrap; margin-bottom: 2px; transform: {{ h.tx }};">{{ h.label }}</div>
+                    <div style="width: 3px; height: {{ h.stick }}; border-radius: 2px; background: {{ h.color }}; box-shadow: 0 0 0 3px var(--color-bg); margin-left: -1.5px;"></div>
+                  </div>
+                </sc-for>
+                <div style="position: absolute; bottom: -2px; right: 0; font-size: 10.5px; color: var(--color-neutral-600);">{{ ab.capLabel }}</div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 12px; border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 10px 14px; margin-top: 6px;">
+                <span style="font-size: 13px; color: var(--color-neutral-400); flex: 1;">Bar spend per head <span style="color: var(--color-neutral-600);">(GST incl.)</span></span>
+                <button type="button" data-k="barHead" data-d="-2" onClick="{{ onStep }}" style="cursor: pointer; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 15px; line-height: 1;">&minus;</button>
+                <span style="font-family: var(--font-heading); font-size: 18px; min-width: 46px; text-align: center;">{{ barHead }}</span>
+                <button type="button" data-k="barHead" data-d="2" onClick="{{ onStep }}" style="cursor: pointer; width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 15px; line-height: 1;">+</button>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+                <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Costs before anyone is paid</h2>
+                <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+                <span style="font-size: 13px; color: var(--color-neutral-300);">{{ nonLabour }}</span>
+              </div>
+              <p style="font-size: 13.5px; line-height: 1.6; color: var(--color-neutral-400); margin: 0 0 16px; max-width: 66ch; text-wrap: pretty;">This night carries <strong style="color: var(--color-accent-300); font-weight: 500;">{{ cn.covers }}</strong> of the {{ cn.base }}/week cost base &mdash; rent, power, insurance, the basics. Gear and promotion come off the top too, so <strong style="color: var(--color-accent-300); font-weight: 500;">{{ cn.total }}</strong> is gone before anybody is paid.</p>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px;">
+                <sc-for list="{{ costFields }}" as="c" hint-placeholder-count="4">
+                  <label style="border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 8px 11px; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 11.5px; color: var(--color-neutral-500);">{{ c.label }}</span>
+                    <span style="display: flex; align-items: center; gap: 2px;">
+                      <span style="font-size: 14px; color: var(--color-neutral-500);">$</span>
+                      <input type="number" data-k="{{ c.key }}" onInput="{{ onNum }}" value="{{ c.val }}" style="width: 100%; background: transparent; border: 0; color: var(--color-text); font: inherit; font-size: 16px; font-family: var(--font-heading); padding: 0;">
+                    </span>
+                  </label>
+                </sc-for>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px;">
+                <span style="font-size: 12.5px; color: var(--color-neutral-500);">Crew &amp; guest drink comps:</span>
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <button type="button" data-k="crewN" data-d="-1" onClick="{{ onStep }}" style="cursor: pointer; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 14px; line-height: 1;">&minus;</button>
+                  <span style="font-size: 13px; min-width: 76px; text-align: center;">{{ crewNTxt }}</span>
+                  <button type="button" data-k="crewN" data-d="1" onClick="{{ onStep }}" style="cursor: pointer; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 14px; line-height: 1;">+</button>
+                </span>
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <button type="button" data-k="tok" data-d="-1" onClick="{{ onStep }}" style="cursor: pointer; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 14px; line-height: 1;">&minus;</button>
+                  <span style="font-size: 13px; min-width: 96px; text-align: center;">{{ tokTxt }}</span>
+                  <button type="button" data-k="tok" data-d="1" onClick="{{ onStep }}" style="cursor: pointer; width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--color-divider); background: transparent; color: var(--color-text); font-size: 14px; line-height: 1;">+</button>
+                </span>
+                <span style="font-size: 12.5px; color: var(--color-neutral-400);">= {{ compsTxt }} at stock cost</span>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+                <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Your people</h2>
+                <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+                <span style="font-size: 13px; color: var(--color-neutral-300);">{{ paSummary }}</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 12px;">Everyone has a floor and a ceiling. Pay slides between them with the door.</p>
+              <div style="overflow-x: auto;">
+                <table class="table" style="min-width: 480px;">
+                  <thead><tr>
+                    <th>Promoter / artist</th><th style="text-align: right;">Low</th><th style="text-align: right;">High</th>
+                    <th style="text-align: right;">Paid {{ scenLabel }}</th><th></th>
+                  </tr></thead>
+                  <tbody>
+                    <sc-for list="{{ paRows }}" as="r" hint-placeholder-count="5">
+                      <tr>
+                        <td><input data-i="{{ r.i }}" data-f="name" onInput="{{ onPa }}" value="{{ r.name }}" style="width: 100%; background: transparent; border: 0; border-bottom: 1px dashed var(--color-neutral-800); color: var(--color-text); font: inherit; font-size: 13.5px; padding: 2px 0;"></td>
+                        <td style="text-align: right;"><input type="number" data-i="{{ r.i }}" data-f="low" onInput="{{ onPa }}" value="{{ r.low }}" style="width: 62px; text-align: right; background: transparent; border: 0; border-bottom: 1px dashed var(--color-neutral-800); color: var(--color-neutral-300); font: inherit; font-size: 13.5px; padding: 2px 0;"></td>
+                        <td style="text-align: right;"><input type="number" data-i="{{ r.i }}" data-f="high" onInput="{{ onPa }}" value="{{ r.high }}" style="width: 62px; text-align: right; background: transparent; border: 0; border-bottom: 1px dashed var(--color-neutral-800); color: var(--color-neutral-300); font: inherit; font-size: 13.5px; padding: 2px 0;"></td>
+                        <td style="text-align: right; font-variant-numeric: tabular-nums; color: {{ r.payColor }};">{{ r.pay }}</td>
+                        <td style="text-align: right;"><button type="button" data-i="{{ r.i }}" onClick="{{ delPa }}" style="cursor: pointer; background: transparent; border: 0; color: var(--color-neutral-600); font-size: 15px; line-height: 1;">&times;</button></td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 10px;">
+                <button type="button" class="btn btn-secondary" data-k="promoter" onClick="{{ addPa }}">+ Promoter</button>
+                <button type="button" class="btn btn-secondary" data-k="artist" onClick="{{ addPa }}">+ Artist</button>
+              </div>
+            </section>
+
+            <section>
+              <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+                <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Our people</h2>
+                <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+                <span style="font-size: 13px; color: var(--color-neutral-300);">{{ crewSummary }}</span>
+              </div>
+              <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 12px;">Rostered automatically from your timings, format and expected numbers &mdash; capped at {{ rateTxt }}/hr, paid from the same pool as your crew.</p>
+              <button type="button" onClick="{{ toggleCrew }}" class="btn btn-ghost" style="padding-left: 0;">{{ crewToggleLabel }}</button>
+              <sc-if value="{{ showCrew }}" hint-placeholder-val="{{ false }}">
+                <div style="overflow-x: auto; margin-top: 8px;">
+                  <table class="table" style="min-width: 480px;">
+                    <thead><tr>
+                      <th>Role</th><th style="text-align: right;">People</th><th style="text-align: right;">Hrs each</th>
+                      <th style="text-align: right;">Paid {{ scenLabel }}</th><th></th>
+                    </tr></thead>
+                    <tbody>
+                      <sc-for list="{{ crewRows }}" as="r" hint-placeholder-count="8">
+                        <tr style="opacity: {{ r.op }};">
+                          <td>
+                            <span style="display: flex; align-items: center; gap: 7px;">
+                              <span style="font-size: 13.5px;" title="{{ r.why }}">{{ r.name }}</span>
+                              <span class="tag tag-neutral" style="display: {{ r.autoShow }}; font-size: 9.5px; padding: 1px 6px;">auto</span>
+                            </span>
+                          </td>
+                          <td style="text-align: right; font-size: 13.5px; color: var(--color-neutral-400);">{{ r.people }}</td>
+                          <td style="text-align: right; font-size: 13.5px; color: var(--color-neutral-400);">{{ r.hours }}</td>
+                          <td style="text-align: right; font-variant-numeric: tabular-nums;">{{ r.pay }}</td>
+                          <td style="text-align: right;"><button type="button" data-i="{{ r.i }}" onClick="{{ delCrew }}" style="cursor: pointer; background: transparent; border: 0; color: var(--color-neutral-700); font-size: 15px; line-height: 1; display: {{ r.delShow }};">&times;</button></td>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+              </sc-if>
+            </section>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isDry }}" hint-placeholder-val="{{ false }}">
+          <section>
+            <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+              <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Balance your deal</h2>
+              <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+            </div>
+            <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 0 0 20px; max-width: 66ch;">Pay it as a flat hire fee, or commit to a minimum bar spend, or any mix. Bar spend returns about 40% to us after stock and staffing, so it takes more of it to reach the same place.</p>
+            <div onPointerDown="{{ dryDown }}" style="position: relative; height: 58px; cursor: ew-resize; touch-action: none; user-select: none;">
+              <div style="position: absolute; inset: 16px 0 20px; display: flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-divider);">
+                <div style="width: {{ dry.hirePct }}; background: color-mix(in srgb, var(--color-accent) 45%, transparent);"></div>
+                <div style="flex: 1; background: color-mix(in srgb, var(--color-neutral-100) 12%, transparent);"></div>
+              </div>
+              <div style="position: absolute; top: 10px; left: {{ dry.hirePct }}; transform: translateX(-50%); width: 3px; height: 28px; border-radius: 2px; background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-bg);"></div>
+              <div style="position: absolute; bottom: 0; left: 0; font-size: 11px; color: var(--color-neutral-500);">&larr; all hire fee</div>
+              <div style="position: absolute; bottom: 0; right: 0; font-size: 11px; color: var(--color-neutral-500);">all bar spend &rarr;</div>
+            </div>
+
+            <div style="display: flex; align-items: flex-start; gap: 16px; margin-top: 10px;">
+              <div style="flex: 1 1 0; min-width: 0;">
+                <div style="font-size: 11.5px; color: var(--color-neutral-500); margin-bottom: 2px;">Venue hire fee</div>
+                <div style="font-family: var(--font-heading); font-size: 26px; line-height: 1.1; color: var(--color-accent);">{{ dry.hire }}</div>
+                <div style="font-size: 11px; color: var(--color-neutral-600); margin-top: 2px;">Invoiced before the event</div>
+              </div>
+              <div style="flex: 1 1 0; min-width: 0; text-align: center; border-left: 1px solid var(--color-divider); border-right: 1px solid var(--color-divider); padding: 0 12px;">
+                <div style="font-size: 11.5px; color: var(--color-neutral-500); margin-bottom: 2px;">Together that returns</div>
+                <div style="font-family: var(--font-heading); font-size: 26px; line-height: 1.1;">{{ dry.effective }}</div>
+                <div style="font-size: 11px; color: var(--color-neutral-500); margin-top: 4px; line-height: 1.5;">{{ dry.sumLine }}<br><span style="color: var(--color-neutral-600);">{{ dry.targetLine }}</span></div>
+              </div>
+              <div style="flex: 1 1 0; min-width: 0; text-align: right;">
+                <div style="font-size: 11.5px; color: var(--color-neutral-500); margin-bottom: 2px;">Minimum bar spend</div>
+                <div style="font-family: var(--font-heading); font-size: 26px; line-height: 1.1;">{{ dry.bar }}</div>
+                <div style="font-size: 11px; color: var(--color-neutral-600); margin-top: 2px;">Guests spend it, or you top up</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button type="button" class="btn btn-secondary" data-p="0" onClick="{{ dryPreset }}">Hire fee only</button>
+              <button type="button" class="btn btn-secondary" data-p="50" onClick="{{ dryPreset }}">Even split</button>
+              <button type="button" class="btn btn-secondary" data-p="100" onClick="{{ dryPreset }}">Bar spend only</button>
+            </div>
+            <p style="font-size: 12.5px; color: var(--color-neutral-500); margin: 16px 0 0; max-width: 66ch;">Included: exclusive use for your window, house PA and lighting rig, a duty manager on site, and our licensed bar. You bring promotion, door, production and artists.</p>
+          </section>
+        </sc-if>
+
+        <section>
+          <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px;">
+            <h2 style="font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-accent); margin: 0;">Send it to us</h2>
+            <div style="flex: 1; height: 1px; background: var(--color-divider);"></div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Event name</span><input class="input" data-k="event" onInput="{{ onBook }}" placeholder="Basement Sessions vol. 4"></label>
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Your name</span><input class="input" data-k="name" onInput="{{ onBook }}" placeholder="Who's running it"></label>
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Email or phone</span><input class="input" data-k="contact" onInput="{{ onBook }}" placeholder="How we reach you"></label>
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Preferred date</span><input class="input" type="date" data-k="date1" onInput="{{ onBook }}"></label>
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Alternate</span><input class="input" type="date" data-k="date2" onInput="{{ onBook }}"></label>
+            <label class="field"><span style="display: block; font-size: 12px; margin-bottom: 5px; color: var(--color-neutral-400);">Second alternate</span><input class="input" type="date" data-k="date3" onInput="{{ onBook }}"></label>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center;">
+            <button type="button" class="btn btn-primary" onClick="{{ submit }}">Submit enquiry</button>
+            <button type="button" class="btn btn-secondary" onClick="{{ download }}">Download as PDF</button>
+            <button type="button" class="btn btn-secondary" onClick="{{ copy }}">Copy details</button>
+            <span style="font-size: 12.5px; color: var(--color-accent-300);">{{ status }}</span>
+          </div>
+          <p style="font-size: 11.5px; color: var(--color-neutral-600); margin: 18px 0 80px; max-width: 70ch; line-height: 1.55;">Indicative planning figures only, based on XCHC's ledger averages for the 13 months to 31 July 2026. Not a quote, and not financial or legal advice. Nothing is saved until you press submit.</p>
+        </section>
+      </div>
+
+      <!-- ============ LIVE SHEET ============ -->
+      <aside data-sheet="1" style="flex: 1 1 340px; min-width: 300px; position: sticky; top: 18px;">
+        <div style="background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); overflow: hidden;">
+          <div style="padding: 16px 18px 14px; border-bottom: 1px solid var(--color-divider);">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px;">
+              <span style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-accent);">The night sheet</span>
+              <span style="font-size: 11.5px; color: var(--color-neutral-500);">{{ sheetSub }}</span>
+            </div>
+            <div style="display: {{ dockScenShow }}; gap: 4px;">
+              <sc-for list="{{ scenBtns }}" as="b" hint-placeholder-count="3">
+                <button type="button" data-i="{{ b.i }}" onClick="{{ pickScen }}" style="flex: 1; cursor: pointer; font-family: var(--font-body); font-size: 12.5px; padding: 6px 4px; border-radius: 6px; border: 1px solid {{ b.bc }}; background: {{ b.bg }}; color: {{ b.fg }};">{{ b.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="padding: 18px;">
+            <div style="font-size: 12px; color: var(--color-neutral-500); margin-bottom: 4px;">{{ heroLabel }}</div>
+            <div style="font-family: var(--font-heading); font-size: 42px; line-height: 1; letter-spacing: -0.02em; color: {{ heroColor }};">{{ heroNum }}</div>
+            <div style="font-size: 12.5px; color: var(--color-neutral-400); margin-top: 6px; line-height: 1.45;">{{ heroSub }}</div>
+
+            <div style="height: 1px; background: var(--color-divider); margin: 16px 0 14px;"></div>
+
+            <sc-for list="{{ sheetRows }}" as="r" hint-placeholder-count="9">
+              <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: {{ r.pad }}; border-top: {{ r.rule }};">
+                <span style="font-size: {{ r.size }}; color: {{ r.labelColor }};">{{ r.label }}</span>
+                <span style="font-family: var(--font-heading); font-size: {{ r.size }}; font-variant-numeric: tabular-nums; color: {{ r.color }};">{{ r.value }}</span>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ isCurator }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-divider);">
+                <div style="font-size: 11.5px; color: var(--color-neutral-500); margin-bottom: 8px;">Does everyone get paid in full?</div>
+                <sc-for list="{{ payBars }}" as="p" hint-placeholder-count="2">
+                  <div style="margin-bottom: 9px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
+                      <span style="color: var(--color-neutral-400);">{{ p.label }}</span>
+                      <span style="color: {{ p.color }};">{{ p.pct }}</span>
+                    </div>
+                    <div style="height: 5px; border-radius: 3px; background: var(--color-neutral-900); overflow: hidden;">
+                      <div style="height: 100%; width: {{ p.width }}; background: {{ p.color }};"></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <p style="font-size: 11.5px; color: var(--color-neutral-500); margin: 10px 0 0; line-height: 1.5;">{{ payNote }}</p>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; padding: 14px 16px; border: 1px solid var(--color-divider); border-radius: var(--radius-md);">
+          <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-neutral-500); margin-bottom: 10px;">What it costs to keep the doors open</div>
+          <div style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin-bottom: 10px;">
+            <sc-for list="{{ budget }}" as="b" hint-placeholder-count="4">
+              <div style="flex: {{ b.flex }}; background: {{ b.color }};"></div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ budget }}" as="b" hint-placeholder-count="4">
+            <div style="display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; padding: 2px 0; color: var(--color-neutral-400);">
+              <span>{{ b.label }}</span><span style="color: var(--color-neutral-300); font-variant-numeric: tabular-nums;">{{ b.amount }}</span>
+            </div>
+          </sc-for>
+          <p style="font-size: 11.5px; color: var(--color-neutral-600); margin: 10px 0 0; line-height: 1.5;">About $20,000 a month goes out before a single event happens. Every booking chips in against it.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div style="position: sticky; bottom: 0; display: {{ dockShow }}; background: color-mix(in srgb, var(--color-bg) 92%, transparent); backdrop-filter: blur(8px); border-top: 1px solid var(--color-divider);">
+    <div style="max-width: 1400px; margin: 0 auto; padding: 9px 28px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+      <span style="font-size: 11.5px; color: var(--color-neutral-500); flex: 1 1 130px; min-width: 0;">{{ dockLine }}</span>
+      <span style="display: {{ dockScenShow }}; gap: 3px;">
+        <sc-for list="{{ scenBtns }}" as="b" hint-placeholder-count="3">
+          <button type="button" data-i="{{ b.i }}" onClick="{{ pickScen }}" style="cursor: pointer; font-family: var(--font-body); font-size: 11.5px; padding: 4px 9px; border-radius: 5px; border: 1px solid {{ b.bc }}; background: {{ b.bg }}; color: {{ b.fg }};">{{ b.short }}</button>
+        </sc-for>
+      </span>
+      <span style="display: flex; align-items: baseline; gap: 7px;">
+        <span style="font-size: 11.5px; color: var(--color-neutral-500);">{{ dockLabel }}</span>
+        <span style="font-family: var(--font-heading); font-size: 17px; color: var(--color-accent); font-variant-numeric: tabular-nums;">{{ dockNum }}</span>
+      </span>
+      <button type="button" onClick="{{ jumpSheet }}" class="btn btn-secondary" style="font-size: 11.5px; padding: 4px 9px;">Full sheet</button>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startModel&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;curator&quot;,&quot;dry&quot;],&quot;default&quot;:&quot;curator&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Behaviour&quot;}}">
+class Component extends DCLogic {
+  state = { ready: false, scen: 1, showCrew: false, status: '', active: '' };
+
+  componentDidMount() {
+    import(new URL('xchc-engine.js', document.baseURI).href).then(E => {
+      this.E = E;
+      this.s = E.createState();
+      this.s.mode = this.props.startModel === 'dry' ? 'dry' : 'curator';
+      this.setState({ ready: true });
+    });
+    this.onScroll = () => {
+      if (this.tick) return;
+      this.tick = requestAnimationFrame(() => {
+        this.tick = null;
+        const hs = [...document.querySelectorAll('[data-controls] h2')];
+        let act = '';
+        hs.forEach(h => { if (h.getBoundingClientRect().top < 140) act = h.textContent.trim(); });
+        if (act !== this.state.active) this.setState({ active: act });
+      });
+    };
+    window.addEventListener('scroll', this.onScroll, { passive: true });
+    /* The sheet keeps its own flex line at narrow widths, where sticky has
+       nothing to travel through — detect that and fall back to a slim dock. */
+    /* Measured horizontally on purpose: vertical offsets on a sticky element
+       report its painted position, so any top-based test reads scroll rather
+       than wrapping. Side by side the sheet starts to the RIGHT of the
+       controls; wrapped, both start at the row's left edge. */
+    this.onResize = () => {
+      const c = document.querySelector('[data-controls]'), a = document.querySelector('[data-sheet]');
+      if (!c || !a) return;
+      const wrapped = a.offsetLeft <= c.offsetLeft;
+      if (wrapped !== this.state.wrapped) this.setState({ wrapped });
+    };
+    window.addEventListener('resize', this.onResize);
+    [100, 600, 1600].forEach(ms => setTimeout(this.onResize, ms));
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this.onScroll);
+    window.removeEventListener('resize', this.onResize);
+  }
+  jumpSheet = () => {
+    const a = document.querySelector('[data-sheet]');
+    if (a) window.scrollTo({ top: window.scrollY + a.getBoundingClientRect().top - 20, behavior: 'smooth' });
+  };
+
+  goSection = e => {
+    const m = e.currentTarget.dataset.m;
+    const h = [...document.querySelectorAll('[data-controls] h2')].filter(x => x.textContent.trim() === m)[0];
+    if (h) window.scrollTo({ top: window.scrollY + h.getBoundingClientRect().top - 28, behavior: 'smooth' });
+  };
+
+  bump() { this.forceUpdate(); }
+
+  /* ---- generic drag ---- */
+  drag(e, apply) {
+    const el = e.currentTarget, rect = el.getBoundingClientRect();
+    const frac = cx => Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+    let handle = apply(frac(e.clientX), null);
+    const move = ev => { apply(frac(ev.clientX), handle); };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
+  timeDown = e => {
+    const E = this.E, t = this.s.time, max = E.CFG.endMax;
+    this.drag(e, (f, h) => {
+      const v = Math.round(f * max / E.CFG.timeStep) * E.CFG.timeStep;
+      if (h === null) {
+        const keys = t.alcohol ? ['open', 'alcEnd', 'end'] : ['open', 'end'];
+        h = keys.map(k => [k, Math.abs(t[k] - v)]).sort((a, b) => a[1] - b[1])[0][0];
+      }
+      t[h] = v;
+      E.normaliseTimes(this.s, h);
+      this.bump();
+      return h;
+    });
+  };
+
+  attDown = e => {
+    const E = this.E, d = E.cur(this.s), cap = E.capacity(this.s);
+    this.drag(e, (f, h) => {
+      const v = Math.max(0, Math.min(cap, Math.round(f * cap / 5) * 5));
+      if (h === null) h = d.att.map((a, i) => [i, Math.abs(a - v)]).sort((a, b) => a[1] - b[1])[0][0];
+      d.att[h] = v;
+      d.att[0] = Math.min(d.att[0], d.att[1], d.att[2]);
+      d.att[2] = Math.max(d.att[0], d.att[1], d.att[2]);
+      d.att[1] = Math.max(d.att[0], Math.min(d.att[2], d.att[1]));
+      this.bump();
+      return h;
+    });
+  };
+
+  mixDown = e => {
+    const d = this.E.cur(this.s);
+    this.drag(e, (f, h) => {
+      const cum = [d.mix[0], d.mix[0] + d.mix[1], d.mix[0] + d.mix[1] + d.mix[2]];
+      if (h === null) h = cum.map((c, i) => [i, Math.abs(c - f)]).sort((a, b) => a[1] - b[1])[0][0];
+      const lo = h === 0 ? 0 : cum[h - 1], hi = h === 2 ? 1 : cum[h + 1];
+      cum[h] = Math.max(lo, Math.min(hi, Math.round(f * 100) / 100));
+      d.mix = [cum[0], cum[1] - cum[0], cum[2] - cum[1], 1 - cum[2]].map(v => Math.max(0, v));
+      this.bump();
+      return h;
+    });
+  };
+
+  dryDown = e => {
+    const E = this.E, c = E.dryCalc(this.s);
+    this.drag(e, f => {
+      const hire = Math.round(c.maxHire * (1 - f) / E.CFG.hireStep) * E.CFG.hireStep;
+      this.s.dryHire = hire;
+      this.bump();
+      return 0;
+    });
+  };
+
+  /* ---- discrete inputs ---- */
+  pickMode = e => { this.s.mode = e.currentTarget.dataset.k; this.bump(); };
+  pickNight = e => { this.s.nightKey = e.currentTarget.dataset.k; this.s.dryHire = null; this.bump(); };
+  pickFormat = e => {
+    this.s.ev.type = e.currentTarget.dataset.k;
+    this.E.clampAttendance(this.s);
+    this.bump();
+  };
+  toggleExtra = e => { const k = e.currentTarget.dataset.k; this.s.ev[k] = !this.s.ev[k]; this.bump(); };
+  toggleAlc = () => {
+    this.s.time.alcohol = !this.s.time.alcohol;
+    this.E.normaliseTimes(this.s, 'alc');
+    this.bump();
+  };
+  toggleCrew = () => this.setState({ showCrew: !this.state.showCrew });
+  pickScen = e => this.setState({ scen: +e.currentTarget.dataset.i });
+  onDesc = e => { this.s.ev.desc = e.target.value; };
+  onBook = e => { this.s.booking[e.target.dataset.k] = e.target.value; };
+  dryPreset = e => {
+    const c = this.E.dryCalc(this.s), p = +e.currentTarget.dataset.p;
+    this.s.dryHire = Math.round(c.maxHire * (1 - p / 100) / this.E.CFG.hireStep) * this.E.CFG.hireStep;
+    this.bump();
+  };
+
+  onNum = e => {
+    const d = this.E.cur(this.s), k = e.target.dataset.k, v = Math.max(0, +e.target.value || 0);
+    if (k.slice(0, 2) === 'tk') d.tk[+k[2]] = v; else d[k] = v;
+    this.bump();
+  };
+  onStep = e => {
+    const d = this.E.cur(this.s), k = e.currentTarget.dataset.k, delta = +e.currentTarget.dataset.d;
+    d[k] = Math.max(0, d[k] + delta);
+    this.bump();
+  };
+  onPa = e => {
+    const d = this.E.cur(this.s), i = +e.target.dataset.i, f = e.target.dataset.f;
+    d.pa[i][f] = f === 'name' ? e.target.value : Math.max(0, +e.target.value || 0);
+    this.bump();
+  };
+  addPa = e => {
+    const d = this.E.cur(this.s), kind = e.currentTarget.dataset.k;
+    const label = kind === 'promoter' ? 'Promoter' : 'Artist';
+    const n = d.pa.filter(r => r.name.indexOf(label) === 0).length + 1;
+    d.pa.push({ name: label + ' ' + n, low: 50, high: 200 });
+    this.bump();
+  };
+  delPa = e => { this.E.cur(this.s).pa.splice(+e.currentTarget.dataset.i, 1); this.bump(); };
+  delCrew = e => {
+    const c = this.E.curCalc(this.s), i = +e.currentTarget.dataset.i;
+    this.E.cur(this.s).crew.splice(i - c.nAuto, 1);
+    this.bump();
+  };
+
+  /* ---- output ---- */
+  copy = () => {
+    navigator.clipboard.writeText(this.E.summaryText(this.s))
+      .then(() => this.setState({ status: 'Copied to your clipboard.' }))
+      .catch(() => this.setState({ status: 'Copy failed — select and copy manually.' }));
+  };
+  download = () => this.setState({ status: 'PDF export runs on the live site.' });
+  submit = () => {
+    const b = this.s.booking;
+    const missing = [['event', 'event name'], ['name', 'your name'], ['contact', 'contact'], ['date1', 'preferred date']]
+      .filter(f => !b[f[0]]).map(f => f[1]);
+    this.setState({ status: missing.length ? 'Still needed: ' + missing.join(', ') + '.' : 'Sent to events@xchc.co.nz — we reply within two working days.' });
+  };
+
+  renderVals() {
+    const E = this.E;
+    if (!this.state.ready) return { ready: false };
+    const s = this.s, CFG = E.CFG, money = E.money;
+    const isCurator = s.mode === 'curator', isDry = !isCurator;
+    const d = E.cur(s), n = E.night(s), cap = E.capacity(s);
+    const si = this.state.scen;
+    const c = E.curCalc(s), sc = c.scen[si];
+    const dry = E.dryCalc(s);
+    const accent = 'var(--color-accent)', dim = 'var(--color-neutral-500)';
+    const on = sel => ({
+      bg: sel ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+      bc: sel ? accent : 'var(--color-divider)',
+      fg: sel ? accent : 'var(--color-text)'
+    });
+
+    const modes = [
+      { key: 'curator', label: 'Curator', tagShow: 'inline-flex',
+        sub: 'We share the risk and the reward. Everyone gets paid from the same pool.', ...on(isCurator) },
+      { key: 'dry', label: 'Dry hire', tagShow: 'none',
+        sub: 'Total control, all the downside. Flat fee whether ten people come or two hundred.', ...on(isDry) }
+    ];
+    const modeNote = isCurator
+      ? 'If the night is quiet we both earn less; if it goes well we both do better. All of us working together rather than us selling you a room.'
+      : 'Under dry hire you wear the whole downside: the fee is owed whether or not the night sells, and you top up any shortfall on the minimum bar spend. Both figures are set high on purpose to buffer that risk — the Curator model is almost always the better deal.';
+
+    const nights = E.NIGHTS.map(x => ({
+      key: x.key, short: x.short,
+      sub: isDry ? money(x.dry) : E.pct(x.cov),
+      title: isDry ? x.label + ': ' + money(x.dry) + ' to earn' : x.label + ': carries ' + E.pct(x.cov) + ' of the week',
+      ...on(x.key === s.nightKey)
+    }));
+    const nn = isDry
+      ? { label: n.label, verb: 'has to bring in', amount: money(n.dry), tail: '.',
+          extra: n.dry < CFG.dryBreakEven ? 'That is below what the night costs us — a used room beats an empty one.' : '' }
+      : { label: n.label, verb: 'carries ' + E.pct(n.cov) + ' of the weekly cost base —', amount: money(n.cov * CFG.weeklyCostBase), tail: '.',
+          extra: 'The shares add to more than 100% on purpose: only two or three nights a week actually run, so each one has to carry more. Book a week night and it is far cheaper for you.' };
+
+    const formats = Object.keys(E.EV_TYPES).map(k => ({
+      key: k, label: E.EV_TYPES[k].label, cap: CFG[E.EV_TYPES[k].cap] + ' cap', ...on(k === s.ev.type)
+    }));
+    const toggles = [
+      { key: 'lighting', label: 'Lighting operator', desc: 'A dedicated op on the house rig all night.' },
+      { key: 'vj', label: 'VJ', desc: 'Visuals operator for the whole event.' },
+      { key: 'ownSound', label: 'Own sound tech', desc: 'We skip the XCHC engineer; the system is yours to run.' }
+    ].map(t => {
+      const sel = !!s.ev[t.key];
+      return { ...t, mark: sel ? '\u2713' : '', mc: sel ? accent : 'var(--color-neutral-700)',
+        mb: sel ? accent : 'transparent',
+        bg: sel ? 'color-mix(in srgb, var(--color-accent) 8%, transparent)' : 'transparent',
+        bc: sel ? 'color-mix(in srgb, var(--color-accent) 55%, transparent)' : 'var(--color-divider)' };
+    });
+
+    const t = s.time, span = CFG.endMax;
+    const x = v => (v / span * 100).toFixed(2) + '%';
+    /* Labels alternate between two rows so neighbouring handles never collide,
+       and hug the ends of the track instead of overflowing them. */
+    const stagger = (h, frac) => ({
+      ...h,
+      top: h.row ? '0px' : '15px',
+      stick: h.row ? '45px' : '30px',
+      align: 'center',
+      tx: frac > 0.88 ? 'translateX(-50%)' : (frac < 0.12 ? 'translateX(50%)' : 'none')
+    });
+    const tb = {
+      evL: x(t.open), evW: (((t.end - t.open) / span) * 100).toFixed(2) + '%',
+      alcL: x(t.open), alcW: (t.alcohol ? ((t.alcEnd - t.open) / span) * 100 : 0).toFixed(2) + '%',
+      lateL: x(CFG.midnight), lateW: (((span - CFG.midnight) / span) * 100).toFixed(2) + '%',
+      ticks: [0, 120, 240, 360, 480, 600, 720].map(v => ({ left: x(v), label: E.fmtT(v) })),
+      handles: [
+        { left: x(t.open), label: 'doors ' + E.fmtT(t.open), color: 'var(--color-neutral-300)', show: 'flex', row: 0, v: t.open },
+        { left: x(t.alcEnd), label: 'bar closes ' + E.fmtT(t.alcEnd), color: accent, show: t.alcohol ? 'flex' : 'none', row: 1, v: t.alcEnd },
+        { left: x(t.end), label: 'out ' + E.fmtT(t.end), color: 'var(--color-neutral-300)', show: 'flex', row: 0, v: t.end }
+      ].map(h => stagger(h, h.v / span))
+    };
+    const licNeeded = E.extLicenceNeeded(s);
+    const lic = licNeeded
+      ? { text: 'Past midnight: extended licence, ' + money(CFG.extLicenceFee) + ', ' + CFG.extLicenceLeadDays + ' days notice recommended — never guaranteed.', color: 'var(--color-accent-300)' }
+      : { text: t.alcohol ? 'Standard licence. No extra cost, no lead time.' : 'No alcohol service — we still roster bar staff for food and soft drinks.', color: dim };
+
+    const tierMeta = [['Subsidised', 'var(--color-accent-700)'], ['Standard', 'var(--color-accent-500)'],
+      ['Supporter', 'var(--color-accent-400)'], ['Door', 'var(--color-neutral-500)']];
+    const tiers = tierMeta.map((m, i) => ({
+      key: 'tk' + i, label: m[0], color: m[1], val: d.tk[i], share: E.pct(d.mix[i])
+    }));
+    let acc = 0;
+    const mixSegs = d.mix.map((m, i) => {
+      const left = acc; acc += m;
+      return { width: (m * 100).toFixed(2) + '%', mid: ((left + m / 2) * 100).toFixed(2) + '%',
+        color: tierMeta[i][1], label: tierMeta[i][0], pct: m > 0.06 ? E.pct(m) : '' };
+    });
+
+    const ab = {
+      left: (d.att[0] / cap * 100).toFixed(2) + '%',
+      width: ((d.att[2] - d.att[0]) / cap * 100).toFixed(2) + '%',
+      capLabel: 'room holds ' + cap,
+      handles: [
+        { left: (d.att[0] / cap * 100).toFixed(2) + '%', label: 'quiet ' + d.att[0], color: 'var(--color-neutral-400)', row: 0, v: d.att[0] },
+        { left: (d.att[1] / cap * 100).toFixed(2) + '%', label: 'likely ' + d.att[1], color: accent, row: 1, v: d.att[1] },
+        { left: (d.att[2] / cap * 100).toFixed(2) + '%', label: 'packed ' + d.att[2], color: 'var(--color-neutral-400)', row: 0, v: d.att[2] }
+      ].map(h => stagger(h, h.v / cap))
+    };
+
+    const costFields = [
+      { key: 'sound', label: 'Extra sound hire', val: d.sound },
+      { key: 'light', label: 'Lighting hire', val: d.light },
+      { key: 'other', label: 'Other gear & decor', val: d.other },
+      { key: 'adv', label: 'Advertising', val: d.adv }
+    ];
+
+    const paRows = d.pa.map((r, i) => ({
+      i, name: r.name, low: r.low, high: r.high,
+      pay: money(sc.paRows[i]),
+      payColor: sc.paRows[i] >= r.high - 0.5 ? accent : 'var(--color-neutral-300)'
+    }));
+    const crewRows = c.crewList.map((r, i) => ({
+      i, name: r.name, people: r.people, hours: r.hours, why: r.why || '',
+      pay: money(sc.crewRows[i]),
+      autoShow: r.auto ? 'inline-flex' : 'none',
+      delShow: r.auto ? 'none' : 'inline',
+      op: r.people * r.hours > 0 ? 1 : 0.4
+    }));
+
+    const scenBtns = ['Quiet night', 'Likely', 'Packed'].map((label, i) => ({
+      i, label, short: ['Quiet', 'Likely', 'Packed'][i], ...on(i === si)
+    }));
+    const scenLabel = ['(quiet)', '(likely)', '(packed)'][si];
+
+    let sheetRows, heroLabel, heroNum, heroSub, heroColor, sheetSub;
+    const R = (label, value, o) => ({ label, value, pad: '4px 0', rule: 'none',
+      size: '13px', color: 'var(--color-neutral-300)', labelColor: 'var(--color-neutral-500)', ...(o || {}) });
+    const total = { pad: '9px 0 4px', rule: '1px solid var(--color-divider)', size: '14.5px', color: 'var(--color-text)', labelColor: 'var(--color-neutral-300)' };
+
+    if (isCurator) {
+      sheetSub = n.label + ' · ' + sc.att + ' people';
+      heroLabel = 'Distributable profit — the pool everyone is paid from';
+      heroNum = money(sc.profit);
+      heroColor = sc.profit >= 0 ? accent : 'var(--color-neutral-300)';
+      heroSub = sc.profit >= 0
+        ? 'Split between your crew and ours, in proportion. Anything left builds the venue\u2019s savings.'
+        : 'This night loses money — it draws on the savings fund. Try a week night, or trim costs.';
+      sheetRows = [
+        R('Ticket income (ex GST)', money(sc.tNet)),
+        R('Bar gross profit', money(sc.bGP)),
+        R('Total revenue', money(sc.rev), total),
+        R('This night\u2019s share of the week', '\u2212 ' + money(c.covers)),
+        R('Gear & promotion', '\u2212 ' + money(c.equip)),
+        R('Crew comps' + (c.licence ? ' & licence' : ''), '\u2212 ' + money(c.comps + c.licence)),
+        R('Distributable profit', money(sc.profit), total),
+        R('Promoters & artists', money(sc.paPaid), { color: 'var(--color-accent-300)' }),
+        R('XCHC crew', money(sc.crewPaid), { color: 'var(--color-accent-300)' }),
+        R('XCHC savings', money(sc.savings), total)
+      ];
+    } else {
+      sheetSub = n.label + ' · dry hire';
+      heroLabel = 'This night needs to earn XCHC';
+      heroNum = money(dry.target);
+      heroColor = accent;
+      heroSub = 'Made up of the hire fee you pay us, plus about 40% of whatever your guests spend at the bar.';
+      sheetRows = [
+        R('Venue hire fee', money(dry.hire), { color: 'var(--color-text)' }),
+        R('Invoiced before the event', '', { size: '11.5px', labelColor: 'var(--color-neutral-600)' }),
+        R('Minimum bar spend', money(dry.barSpend), { color: 'var(--color-text)' }),
+        R('Your guests spend it, or you top up', '', { size: '11.5px', labelColor: 'var(--color-neutral-600)' }),
+        R('Returns to us', money(dry.barProfit)),
+        R('Extended licence', dry.licence ? money(dry.licence) : '—'),
+        R('Payable to XCHC up front', money(dry.payable), total)
+      ];
+    }
+
+    const payBars = [
+      { label: 'Promoters & artists', got: sc.paPaid, want: c.paHigh },
+      { label: 'XCHC crew', got: sc.crewPaid, want: c.crewHrs * CFG.internalRate }
+    ].map(p => {
+      const f = p.want > 0 ? Math.min(1, p.got / p.want) : 0;
+      return { label: p.label, pct: E.pct(f), width: (f * 100).toFixed(1) + '%',
+        color: f > 0.99 ? accent : (f > 0.6 ? 'var(--color-accent-500)' : 'var(--color-neutral-500)') };
+    });
+    const full = sc.paPaid >= c.paHigh - 0.5 && sc.crewPaid >= c.crewHrs * CFG.internalRate - 0.5;
+    const payNote = full
+      ? 'Everyone is paid in full at this level, and the rest goes to the venue\u2019s savings.'
+      : 'Not enough in the pool to cover both claims, so both scale down together — nobody is paid ahead of anybody else.';
+
+    const scenWord = ['quiet', 'likely', 'packed'][si];
+    const evWord = { dj: 'DJ night', live: 'live music night', djlive: 'DJs + live night', seated: 'seated show' }[s.ev.type];
+    const story = isCurator
+      ? { a: 'a ' + n.label + ' ' + evWord, b: 'running', c: E.fmtT(t.open) + ' to ' + E.fmtT(t.end),
+          d: '. On a ' + scenWord + ' night that is', e: sc.att + ' people',
+          f: ', ' + money(sc.rev) + ' in, and ' + money(sc.profit) + ' to share between your crew and ours.' }
+      : { a: 'a ' + n.label + ' dry hire', b: 'running', c: E.fmtT(t.open) + ' to ' + E.fmtT(t.end),
+          d: '. You pay', e: money(dry.payable) + ' up front',
+          f: ', plus a ' + money(dry.barSpend) + ' minimum bar spend, whether ten people come or two hundred.' };
+
+    const rail = (isCurator
+      ? [['How we work together', 'The deal', isCurator ? 'Curator' : 'Dry hire'],
+         ['Which night', 'The night', n.short + ' · ' + E.pct(n.cov)],
+         ['Your event', 'The event', E.EV_TYPES[s.ev.type].label],
+         ['Doors, bar and close', 'Timing', E.fmtT(t.open) + '–' + E.fmtT(t.end)],
+         ['Tickets', 'Tickets', money(c.avgTicket, 2) + ' avg'],
+         ['Who turns up', 'The door', sc.att + ' people'],
+         ['Costs before anyone is paid', 'Costs', money(c.nonLabour)],
+         ['Your people', 'Your crew', money(sc.paPaid)],
+         ['Our people', 'Our crew', money(sc.crewPaid)],
+         ['Send it to us', 'Send it', 'enquiry']]
+      : [['How we work together', 'The deal', 'Dry hire'],
+         ['Which night', 'The night', n.short + ' · ' + money(n.dry)],
+         ['Your event', 'The event', E.EV_TYPES[s.ev.type].label],
+         ['Doors, bar and close', 'Timing', E.fmtT(t.open) + '–' + E.fmtT(t.end)],
+         ['Balance your deal', 'Your deal', money(dry.hire) + ' + ' + money(dry.barSpend)],
+         ['Send it to us', 'Send it', 'enquiry']]
+    ).map(r => {
+      const act = this.state.active === r[0];
+      return { match: r[0], title: r[1], value: r[2],
+        bar: act ? accent : 'var(--color-neutral-900)',
+        bg: act ? 'color-mix(in srgb, var(--color-accent) 9%, transparent)' : 'transparent',
+        fg: act ? accent : 'var(--color-text)' };
+    });
+
+    const budgetTotal = E.sum(CFG.budget.map(b => b.amount));
+    const budgetColors = ['var(--color-accent-500)', 'var(--color-accent-700)', 'var(--color-neutral-600)', 'var(--color-neutral-800)'];
+    const budget = CFG.budget.map((b, i) => ({
+      label: b.label, amount: money(b.amount), flex: b.amount / budgetTotal, color: budgetColors[i]
+    }));
+
+    return {
+      ready: true, isCurator, isDry, modes, modeNote, nights, nn, formats, toggles, rail, story,
+      cn: { covers: money(c.covers), base: money(CFG.weeklyCostBase), total: money(c.nonLabour) },
+      goSection: this.goSection, jumpSheet: this.jumpSheet,
+      dockShow: this.state.wrapped ? 'block' : 'none',
+      dockLabel: isCurator ? 'to share' : 'up front',
+      dockNum: isCurator ? money(sc.profit) : money(dry.payable),
+      dockScenShow: isCurator ? 'flex' : 'none',
+      dockLine: n.short + ' · ' + E.EV_TYPES[s.ev.type].label + ' · ' + E.fmtT(t.open) + '–' + E.fmtT(t.end),
+      tb, lic, timeSummary: E.fmtT(t.open) + ' \u2013 ' + E.fmtT(t.end) + ' · ' + E.fmtDur(E.eventHours(s)),
+      alc: { label: t.alcohol ? 'Serving alcohol' : 'Alcohol-free event',
+        bg: t.alcohol ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent',
+        bc: t.alcohol ? accent : 'var(--color-divider)' },
+      tiers, mixSegs, avgTicket: money(c.avgTicket, 2), ab,
+      attSummary: d.att[0] + ' / ' + d.att[1] + ' / ' + d.att[2] + ' people',
+      barHead: money(d.barHead), costFields, nonLabour: money(c.nonLabour),
+      coversNote: 'This night carries ' + money(c.covers) + ' of the ' + money(CFG.weeklyCostBase) + '/week cost base. Gear and promotion come off the top too, before anyone is paid.',
+      crewNTxt: d.crewN + ' people', tokTxt: d.tok + ' drinks each', compsTxt: money(c.comps),
+      paRows, crewRows, scenBtns, scenLabel,
+      paSummary: money(sc.paPaid) + ' of ' + money(c.paHigh),
+      crewSummary: E.fmtDur(sc.crewHrs) + ' · ' + money(sc.crewPaid),
+      rateTxt: money(CFG.internalRate),
+      showCrew: this.state.showCrew,
+      crewToggleLabel: this.state.showCrew ? 'Hide the roster' : 'Show the ' + c.crewList.length + '-role roster',
+      sheetSub, heroLabel, heroNum, heroSub, heroColor, sheetRows, payBars, payNote, budget,
+      dry: {
+        hirePct: (dry.maxHire > 0 ? (1 - dry.hire / dry.maxHire) * 100 : 50).toFixed(1) + '%',
+        hire: money(dry.hire), bar: money(dry.barSpend), effective: money(dry.effective),
+        sumLine: money(dry.hire) + ' + 40% of ' + money(dry.barSpend) + ' (' + money(dry.barProfit) + ')',
+        targetLine: dry.surplus >= 0.5
+          ? money(dry.target) + ' needed, ' + money(dry.surplus) + ' over'
+          : money(dry.target) + ' needed'
+      },
+      status: this.state.status,
+      pickMode: this.pickMode, pickNight: this.pickNight, pickFormat: this.pickFormat,
+      toggleExtra: this.toggleExtra, toggleAlc: this.toggleAlc, toggleCrew: this.toggleCrew,
+      timeDown: this.timeDown, attDown: this.attDown, mixDown: this.mixDown, dryDown: this.dryDown,
+      dryPreset: this.dryPreset, onNum: this.onNum, onStep: this.onStep, onPa: this.onPa,
+      addPa: this.addPa, delPa: this.delPa, delCrew: this.delCrew, onDesc: this.onDesc,
+      onBook: this.onBook, pickScen: this.pickScen, copy: this.copy, download: this.download,
+      submit: this.submit
+    };
+  }
+}
+
+</script>
+</body>
+</html>

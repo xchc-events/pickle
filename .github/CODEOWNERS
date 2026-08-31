@@ -1,0 +1,5 @@
+# Sensitive surface area gets a named reviewer, not whoever is around.
+/prisma/                    @xchc-events
+/src/lib/finance.ts         @xchc-events
+/src/lib/finance.test.ts    @xchc-events
+/.github/workflows/         @xchc-events

@@ -1,0 +1,6 @@
+# Files that should follow you into every new git worktree.
+# gitignore syntax. Only files that match AND are gitignored get copied, so
+# nothing tracked is ever duplicated.
+.env
+.env.local
+.claude/settings.local.json

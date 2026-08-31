@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "allow": [
+      "Read",
+
+      "Bash(npm run lint)",
+      "Bash(npm run lint:fix)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run test)",
+      "Bash(npm run test:coverage)",
+      "Bash(npm run build)",
+      "Bash(npm run format)",
+      "Bash(npm run format:check)",
+      "Bash(npm run check)",
+      "Bash(npm run db:generate)",
+      "Bash(npm ci)",
+      "Bash(npm ls *)",
+      "Bash(npm view *)",
+
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(npx eslint *)",
+      "Bash(npx prettier *)",
+      "Bash(npx prisma validate)",
+      "Bash(npx prisma generate)",
+      "Bash(npx prisma format)",
+
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git add*)",
+      "Bash(git branch*)",
+      "Bash(git switch *)",
+      "Bash(git checkout *)",
+      "Bash(git stash*)",
+      "Bash(git worktree list*)",
+
+      "Bash(gh pr view*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr diff*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh run view*)",
+      "Bash(gh run list*)",
+      "Bash(gh issue view*)",
+      "Bash(gh issue list*)",
+
+      "Bash(docker compose ps*)",
+      "Bash(docker compose logs*)"
+    ],
+
+    "ask": [
+      "Bash(git push*)",
+      "Bash(gh pr create*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh release *)",
+      "Bash(npm run db:migrate*)",
+      "Bash(npm run db:deploy*)",
+      "Bash(npx prisma migrate *)",
+      "Bash(npx prisma db push*)",
+      "Bash(docker compose down*)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)"
+    ],
+
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./.claude/settings.local.json)",
+      "Bash(npm run db:reset*)",
+      "Bash(npx prisma migrate reset*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf *)"
+    ]
+  },
+
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "network": {
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "github.com",
+        "api.github.com",
+        "codeload.github.com",
+        "objects.githubusercontent.com",
+        "raw.githubusercontent.com",
+        "binaries.prisma.sh",
+        "fonts.googleapis.com",
+        "fonts.gstatic.com",
+        "localhost"
+      ]
+    },
+    "filesystem": {
+      "denyRead": [".env", ".env.local"]
+    }
+  }
+}
