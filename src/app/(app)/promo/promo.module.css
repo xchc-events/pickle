@@ -1,0 +1,388 @@
+/* Promotion. Densities are the prototype's own — nothing here is loosened. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.sync {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+/* --- tone --------------------------------------------------------------- */
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+.plain {
+  color: var(--color-neutral-600);
+}
+
+/* --- the event strip ---------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 158px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueDate,
+.queueNote {
+  font-size: 10.5px;
+}
+
+.queueDate {
+  color: var(--color-neutral-600);
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  gap: 22px;
+  align-items: start;
+  padding: 22px 28px 40px;
+}
+
+.empty {
+  padding: 40px 28px;
+  max-width: 560px;
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+}
+
+.main {
+  min-width: 0;
+}
+
+.channelHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+}
+
+.eventName {
+  font-size: 15px;
+  color: var(--color-neutral-100);
+}
+
+.eventMeta {
+  color: var(--color-neutral-600);
+}
+
+.blurb {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+  max-width: 78ch;
+  margin: 0 0 14px;
+}
+
+/* --- channel cards ------------------------------------------------------ */
+
+.channels {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(262px, 1fr));
+  gap: 10px;
+}
+
+.channel {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+}
+
+.channelStale {
+  border-color: var(--st-stop);
+}
+
+.channelOut {
+  border-color: var(--color-neutral-900);
+}
+
+.channelTop {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+
+.channelIcon {
+  font-size: 15px;
+  color: var(--color-neutral-400);
+}
+
+.channelName {
+  font-size: 12.5px;
+  color: var(--color-neutral-100);
+}
+
+.kind {
+  margin-left: auto;
+  font-size: 9.5px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  white-space: nowrap;
+}
+
+.kindApi {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-300);
+}
+
+.kindManual {
+  background: var(--st-warn-dim);
+  color: var(--st-warn);
+}
+
+.channelBlurb {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-neutral-600);
+  margin: 0 0 8px;
+}
+
+.state {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.stateNote {
+  color: var(--color-neutral-600);
+  min-width: 0;
+}
+
+.by {
+  font-size: 10.5px;
+  color: var(--color-neutral-500);
+  margin-bottom: 6px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.act {
+  font-size: 10.5px;
+  padding: 4px 10px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.undo {
+  cursor: pointer;
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-600);
+}
+
+.undo:hover:not(:disabled) {
+  border-color: var(--color-neutral-800);
+  color: var(--color-neutral-300);
+}
+
+.undo:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- aside -------------------------------------------------------------- */
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 11px 12px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.panelTitle {
+  font-size: 12px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.panelNote {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+.panelFoot {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--color-neutral-600);
+  margin: 9px 0 0;
+}
+
+/* --- beats -------------------------------------------------------------- */
+
+.beat {
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 9px;
+  margin-bottom: 5px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.beat:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.beat:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.beatDone {
+  border-color: var(--st-good);
+  background: var(--st-good-dim);
+}
+
+.beatTick {
+  font-size: 14px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.beatBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.beatTop {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.beatName {
+  font-size: 12px;
+  color: var(--color-neutral-100);
+}
+
+.beatWhen {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+.beatChannels {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--color-neutral-600);
+}
+
+/* --- lead and rules ----------------------------------------------------- */
+
+.lead {
+  font-size: 13px;
+  color: var(--color-neutral-200);
+  margin-top: 7px;
+}
+
+.rule {
+  margin-top: 9px;
+}
+
+.ruleTitle {
+  font-size: 11.5px;
+  color: var(--color-neutral-200);
+}
+
+.ruleBody {
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--color-neutral-600);
+}

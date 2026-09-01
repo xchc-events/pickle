@@ -1,0 +1,38 @@
+/* Bottom-centre, one at a time, gone at 3400ms. */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: 460px;
+  padding: 11px 15px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-neutral-100);
+}
+
+.icon {
+  font-size: 15px;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+.good .icon {
+  color: var(--st-good);
+}
+
+.warn .icon {
+  color: var(--st-warn);
+}
+
+.stop .icon {
+  color: var(--st-stop);
+}

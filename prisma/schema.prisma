@@ -4,9 +4,9 @@
 // person, one record of an hour. Every figure shown anywhere resolves back to
 // hours logged against events and prices set on the event record.
 //
-// This schema covers the spine (people, events, hours, money, audit). The
-// remaining modules — ticketing detail, assets, promo spread, tech presets —
-// hang off Event and are added as those modules are built.
+// This schema covers the spine (people, events, hours, money, audit) plus the
+// design and promotion modules. The remaining modules — ticketing detail, tech
+// presets — hang off Event and are added as those modules are built.
 
 generator client {
   provider = "prisma-client-js"
@@ -34,6 +34,8 @@ model Person {
   hourEntries  HourEntry[]
   availability Availability?
   activity     Activity[]
+  leads        EventLead[]
+  channelPosts ChannelPush[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -208,6 +210,11 @@ model Event {
   /// Share of surplus that goes to their people. 0–1.
   split     Float  @default(0)
 
+  /// The creative one-liner, written once by the coordinator. Design reads it
+  /// from here rather than from an email; null falls back to a line built out
+  /// of the event's own facts. See src/lib/design.ts.
+  brief     String?
+
   artists   EventArtist[]
   shifts    Shift[]
   tasks     Task[]
@@ -216,6 +223,10 @@ model Event {
   hours     HourEntry[]
   review    FinanceReview?
   actual    Actual?
+  leads     EventLead[]
+  assets    Asset[]
+  channels  ChannelPush[]
+  beats     Beat[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -315,6 +326,96 @@ model HourEntry {
 
   @@index([personId])
   @@index([eventId])
+}
+
+/// Which department a person owns on an event. Ticketing, design, promo and
+/// tech each get one lead; "unassigned" is the absence of a row, which is what
+/// the stage gates test for.
+enum LeadRole {
+  TICKETING
+  DESIGN
+  PROMO
+  TECH
+}
+
+/// One record of a person, here too: a lead is a Person, not a typed-in name,
+/// so renaming them in Admin renames them on every brief and every chase.
+model EventLead {
+  eventId  String
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  role     LeadRole
+  personId String
+  person   Person   @relation(fields: [personId], references: [id])
+
+  @@id([eventId, role])
+}
+
+// ---------------------------------------------------------------- design ---
+
+enum AssetState {
+  DRAFT
+  REVIEW
+  APPROVED
+}
+
+/// One piece of artwork on an event's set.
+///
+/// The name, format spec, tier and rationale are house standard and live in
+/// `ASSET_SET` in src/lib/design.ts — only `key` is stored here, so revising
+/// what the house asks for revises it on every event at once rather than on
+/// the events created after the change.
+model Asset {
+  id      String     @id @default(cuid())
+  eventId String
+  event   Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Key into ASSET_SET. Order and tier come from there.
+  key     String
+  state   AssetState @default(DRAFT)
+  /// Hero and lead pieces also need the promoter's sign-off, given in their
+  /// portal. Never set by the venue.
+  promoterSigned Boolean @default(false)
+
+  @@unique([eventId, key])
+}
+
+// ------------------------------------------------------------- promotion ---
+
+/// Where an event has been listed, and by whom.
+///
+/// Name, icon, integration mode and blurb are house standard — `PLATFORMS` in
+/// src/lib/promo.ts. What is stored here is only what happened to this event
+/// on that channel.
+model ChannelPush {
+  id      String  @id @default(cuid())
+  eventId String
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Key into PLATFORMS.
+  channel String
+  live    Boolean @default(false)
+  /// The record changed after this went out, so the listing now disagrees
+  /// with it. Only channels that mirror the record can go stale.
+  stale   Boolean @default(false)
+  note    String?
+  /// Who ticked off a manual post. Auto-sync channels have nobody — the
+  /// point of the distinction is that somebody is answerable for the others.
+  byId    String?
+  by      Person?   @relation(fields: [byId], references: [id])
+  at      DateTime?
+
+  @@unique([eventId, channel])
+}
+
+/// A beat in the promo plan. Name, timing and channel list are house standard
+/// — `BEATS` in src/lib/promo.ts.
+model Beat {
+  id      String  @id @default(cuid())
+  eventId String
+  event   Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Key into BEATS.
+  key     String
+  done    Boolean @default(false)
+
+  @@unique([eventId, key])
 }
 
 // ----------------------------------------------------------------- money ---

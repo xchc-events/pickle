@@ -1,0 +1,19 @@
+.select {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+}
+
+.select:hover:not(:disabled) {
+  border-color: var(--color-accent-600);
+}
+
+.select:disabled {
+  opacity: 0.45;
+}

@@ -1,0 +1,516 @@
+/* Design & comms. Densities are the prototype's own — this is deliberately a
+   dense tool, so nothing here is loosened for breathing room. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+/* --- tone --------------------------------------------------------------- */
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+.plain {
+  color: var(--color-neutral-600);
+}
+
+/* --- the event strip ---------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 168px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueNote {
+  font-size: 10.5px;
+}
+
+.queueLead {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--color-neutral-500);
+}
+
+.queueLead i {
+  font-size: 11px;
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  padding: 22px 28px 40px;
+}
+
+.empty {
+  padding: 40px 28px;
+  max-width: 560px;
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+}
+
+.briefRow {
+  display: grid;
+  grid-template-columns: 1fr 244px;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 26px;
+}
+
+.briefMain {
+  min-width: 0;
+}
+
+/* --- design lead -------------------------------------------------------- */
+
+.leadCard {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+  margin-bottom: 18px;
+}
+
+.leadLabel {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 9px;
+}
+
+.leadRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+}
+
+.leadNote {
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+  margin: 8px 0 0;
+}
+
+/* --- the brief ---------------------------------------------------------- */
+
+.brief {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.briefHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+}
+
+.live {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-accent-200);
+}
+
+.briefHint {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.briefBody {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 13px;
+}
+
+.fieldLabel {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  margin-bottom: 3px;
+}
+
+.oneLiner {
+  font-size: 13px;
+  color: var(--color-neutral-100);
+  max-width: 62ch;
+}
+
+.fieldValue {
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+}
+
+.tones {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  max-width: 260px;
+  gap: 12px;
+}
+
+.must {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 16px;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+}
+
+.must span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.must i {
+  font-size: 11px;
+  color: var(--st-good);
+}
+
+/* --- hours -------------------------------------------------------------- */
+
+.hoursCard {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 11px 13px;
+}
+
+.hoursFigure {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  color: var(--color-neutral-100);
+  margin-bottom: 7px;
+}
+
+.track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-neutral-900);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.fillWarn {
+  background: var(--st-warn);
+}
+
+.hoursNote {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  margin: 9px 0 0;
+}
+
+/* --- the set ------------------------------------------------------------ */
+
+.tier {
+  margin-bottom: 18px;
+}
+
+.step {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 14px 0 8px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.stepLabel {
+  color: var(--color-accent-300);
+}
+
+.stepNote {
+  color: var(--color-neutral-600);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+  gap: 10px;
+}
+
+.oneUp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  max-width: 640px;
+}
+
+.card {
+  display: flex;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.cardReview {
+  border-color: var(--st-warn);
+}
+
+.thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 96px;
+  padding: 12px 8px;
+  text-align: center;
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+  color: var(--color-neutral-700);
+}
+
+.thumbReview {
+  background: color-mix(in srgb, var(--st-warn) 7%, transparent);
+  color: var(--st-warn);
+}
+
+.thumbIcon {
+  font-size: 21px;
+}
+
+.spec {
+  font-size: 9.5px;
+  line-height: 1.3;
+  color: var(--color-neutral-600);
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.assetName {
+  font-size: 12.5px;
+  color: var(--color-neutral-100);
+}
+
+.chip {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.chip_good {
+  background: var(--st-good-dim);
+  color: var(--st-good);
+}
+
+.chip_warn {
+  background: var(--st-warn-dim);
+  color: var(--st-warn);
+}
+
+.chip_plain {
+  background: transparent;
+  color: var(--color-neutral-500);
+}
+
+.why {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-neutral-500);
+  margin: 0 0 8px;
+}
+
+.signOff {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  margin-bottom: 8px;
+}
+
+.done {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.act {
+  font-size: 10.5px;
+  padding: 5px 10px;
+}
+
+.actWide {
+  flex: 1;
+}
+
+/* --- content rules ------------------------------------------------------ */
+
+.rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 1px;
+  background: var(--color-divider);
+  margin: 10px 0 26px;
+}
+
+.rule {
+  background: var(--color-bg);
+  padding: 11px 13px;
+}
+
+.ruleHead {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.ruleNum {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  color: var(--color-accent);
+}
+
+.ruleTitle {
+  font-size: 12px;
+  color: var(--color-neutral-100);
+}
+
+.ruleBody {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+/* --- listing copy ------------------------------------------------------- */
+
+.copy {
+  margin-top: 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 13px;
+}
+
+.caption {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-200);
+  max-width: 68ch;
+  margin: 0 0 12px;
+}
+
+.copyRows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: 1px;
+  background: var(--color-divider);
+}
+
+.copyRow {
+  background: var(--color-bg);
+  padding: 8px 11px;
+}
+
+.copyLabel {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  margin-bottom: 2px;
+}
+
+.copyValue {
+  font-size: 12px;
+}
+
+.copyNote {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  margin: 12px 0 0;
+}

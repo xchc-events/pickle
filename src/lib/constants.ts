@@ -81,7 +81,7 @@ export const MODULES: readonly ModuleDef[] = [
 ]
 
 /** Which modules are actually built. The rest are in the nav but inert. */
-export const BUILT_MODULES: readonly ModuleKey[] = ['pipeline']
+export const BUILT_MODULES: readonly ModuleKey[] = ['pipeline', 'design', 'promo']
 
 export type RoleKey = 'coordinator' | 'design' | 'tech' | 'bar' | 'admin' | 'promoter'
 

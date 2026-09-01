@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { db } from './db'
 import type { ModuleKey } from './constants'
 import { currentUser, type SessionUser } from './session'
+import { eventScope } from './scope'
 
 /**
  * Server-side access control.
@@ -43,6 +44,23 @@ export async function requireModule(
   if (!modules.includes(moduleKey)) notFound()
 
   return { user, modules }
+}
+
+/**
+ * Resolve an event the user is allowed to touch, or 404.
+ *
+ * The scope clause goes into the query rather than into a check after it, so
+ * an event outside a user's reach never leaves the database. Denial is a 404
+ * for the same reason as `requireModule`: whether the row exists is itself
+ * something an external promoter has no business learning.
+ */
+export async function requireEvent(user: SessionUser, eventId: string): Promise<string> {
+  const row = await db.event.findFirst({
+    where: { AND: [{ id: eventId }, eventScope(user)] },
+    select: { id: true },
+  })
+  if (!row) notFound()
+  return row.id
 }
 
 export { eventScope, type ScopedUser } from './scope'
