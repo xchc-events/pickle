@@ -18,6 +18,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, type Role, type ArtistStatus } from '../src/generated/prisma/client'
 import { DEFAULT_PERMS, type RoleKey } from '../src/lib/constants'
 import { ASSET_SET } from '../src/lib/design'
+import { shiftPlan, type RosterEvent } from '../src/lib/roster'
 import { BEATS, PLATFORMS } from '../src/lib/promo'
 
 const connectionString = process.env.DATABASE_URL
@@ -74,28 +75,9 @@ const USERS: {
 // Role windows live here rather than in src/lib until the Roster module is
 // ported — the seed is their only consumer today. [start offset, hours].
 
-const ROLE_WIN: Record<string, [number, number]> = {
-  'Duty manager': [3, 6],
-  'Bar staff': [3.5, 5],
-  'Sound — Lead': [0, 8],
-  'Sound — 2IC': [2, 5],
-  'Lighting — Lead': [2, 3],
-  Door: [3.75, 3.5],
-  'Care team': [5, 2.5],
-  'Set-up crew': [0, 0.75],
-  'Clean-up crew': [9, 0.75],
-}
-const ROLE_WIN_EARLY: Record<string, [number, number]> = {
-  'Duty manager': [2, 5.5],
-  'Bar staff': [2.5, 4.5],
-  'Sound — Lead': [0, 6.5],
-  'Sound — 2IC': [1.5, 4],
-  'Lighting — Lead': [1.5, 2.5],
-  Door: [2.75, 3],
-  'Care team': [3.5, 2],
-  'Set-up crew': [0, 0.75],
-  'Clean-up crew': [7.5, 0.75],
-}
+// The role windows and the role list live in src/lib/roster.ts — they are
+// house standard, like ASSET_SET above, and a second copy here would mean the
+// seed and the product could disagree about what a shift is.
 
 // ----------------------------------------------------------------- events ---
 
@@ -444,32 +426,15 @@ function seedDate(today: Date, daysOut: number, dow: string): Date {
 
 // ----------------------------------------------------------------- shifts ---
 
-function rolesFor(e: SeedEvent, spaceName: string): string[] {
-  const apt = spaceName === 'Apartment U1'
-  const workshop = e.kind === 'workshop'
-  if (apt) {
-    return [
-      'Duty manager',
-      'Bar staff',
-      'Sound — Lead',
-      'Door',
-      'Care team',
-      'Set-up crew',
-      'Clean-up crew',
-    ]
+/** The seed's event shape, as the roster library wants it. */
+function rosterEventFor(e: SeedEvent, spaceName: string, lateBar: boolean): RosterEvent {
+  return {
+    spaceName,
+    format: e.format,
+    kind: e.kind,
+    att: e.att ?? [0, 0, 0],
+    lateBar,
   }
-  const cap = e.format === 'Cabaret' ? 150 : 220
-  const likely = e.att ? e.att[1] : Math.round(cap * 0.62)
-  const roles = ['Duty manager', 'Bar staff']
-  if (likely > 140) roles.push('Bar staff')
-  roles.push('Sound — Lead')
-  if (e.kind === 'live' || e.kind === 'live-djs') roles.push('Sound — 2IC')
-  roles.push('Lighting — Lead', 'Door')
-  if (!workshop) roles.push('Door')
-  roles.push('Care team')
-  if (!workshop) roles.push('Care team')
-  roles.push('Set-up crew', 'Set-up crew', 'Clean-up crew', 'Clean-up crew')
-  return roles
 }
 
 /**
@@ -670,25 +635,19 @@ async function main() {
       })),
     })
 
-    const win = lateBar ? ROLE_WIN : ROLE_WIN_EARLY
-    const roles = rolesFor(e, spaceName)
-    const filled = e.filled ?? roles.length
+    const plan = shiftPlan(rosterEventFor(e, spaceName, lateBar))
+    const filled = e.filled ?? plan.length
     const assigned: { role: string; person: string }[] = []
-    for (const [i, role] of roles.entries()) {
-      const w = win[role] ?? [3, 4]
-      let hours = w[1]
-      if (e.kind === 'workshop' && role === 'Sound — Lead') {
-        hours = spaceName === 'Apartment U1' ? 3 : 4
-      }
+    for (const [i, s] of plan.entries()) {
       const isFilled = i < filled
-      const who = isFilled ? pickFor(role, assigned) : null
-      if (who) assigned.push({ role, person: who })
+      const who = isFilled ? pickFor(s.role, assigned) : null
+      if (who) assigned.push({ role: s.role, person: who })
       await db.shift.create({
         data: {
           eventId: created.id,
-          role,
-          hours,
-          start: w[0],
+          role: s.role,
+          hours: s.hours,
+          start: s.start,
           personId: who ? (personByInitials.get(who) ?? null) : null,
           state: isFilled ? 'ASSIGNED' : 'OPEN',
           asked: 4,

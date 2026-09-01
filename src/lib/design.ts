@@ -129,12 +129,29 @@ export interface EventAsset {
 
 export type Tone = 'good' | 'warn' | 'stop' | 'plain'
 
+/** The artwork itself, once somebody has uploaded it. */
+export interface ArtworkFile {
+  id: string
+  name: string
+  size: number
+  version: number
+}
+
 export interface AssetCard extends AssetSpec {
   state: AssetState
   /** What the chip says: "approved" / "needs sign-off" / "in progress". */
   label: string
   tone: Tone
   promoterSigned: boolean
+  /**
+   * The file attached to this piece, if there is one.
+   *
+   * Left off by `assetCards`, which is pure and knows nothing about storage,
+   * and attached in design-data.ts. A piece can be approved without a file
+   * here — the sign-off is a decision about work, and the work sometimes
+   * lives somewhere else for good reasons.
+   */
+  file?: ArtworkFile | null
   /**
    * Whether to show the promoter sign-off line at all.
    *

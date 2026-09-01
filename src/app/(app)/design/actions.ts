@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { ASSET_SET, allApproved, assetSpec, type EventAsset } from '@/lib/design'
+import * as files from '@/lib/files-data'
 import { PLATFORMS } from '@/lib/promo'
 import { said, type Said } from '@/lib/toast'
 
@@ -156,4 +157,86 @@ export async function setDesignLead(eventId: string, personId: string): Promise<
 
   refresh()
   return said(`${person.name} leads design on this event — every chase in that stage goes to them.`)
+}
+
+// ------------------------------------------------------------- artwork ---
+
+/**
+ * The artwork itself.
+ *
+ * A piece of the set is a decision — approved, or sent back — and the file is
+ * the thing the decision is about. Keeping them separate means a piece can be
+ * signed off from a proof shown in the room, which is how the venue actually
+ * works, while still having somewhere for the finished file to live.
+ *
+ * Uploading creates the Asset row if it does not exist yet: until now a row
+ * only appeared when somebody approved or rejected a piece, and a file is
+ * just as good a reason for the piece to exist.
+ */
+export async function beginArtworkUpload(
+  eventId: string,
+  key: string,
+  name: string,
+  mime: string,
+  size: number,
+): Promise<{ ok: boolean; fileId?: string; url?: string; why?: string }> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+  if (!assetSpec(key)) return { ok: false, why: 'That is not a piece of the set.' }
+
+  const asset = await db.asset.upsert({
+    where: { eventId_key: { eventId: id, key } },
+    create: { eventId: id, key },
+    update: {},
+    select: { id: true },
+  })
+
+  const started = await files.begin({
+    kind: 'ARTWORK',
+    name,
+    mime,
+    size,
+    eventId: id,
+    assetId: asset.id,
+    uploadedById: user.personId,
+  })
+
+  return started.ok
+    ? { ok: true, fileId: started.fileId, url: started.url }
+    : { ok: false, why: started.why }
+}
+
+export async function finishArtworkUpload(eventId: string, fileId: string): Promise<Said> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+
+  const row = await db.storedFile.findUnique({
+    where: { id: fileId },
+    select: { eventId: true, name: true, version: true },
+  })
+  if (!row || row.eventId !== id) return said('That upload is not on this event.', 'stop')
+
+  const done = await files.finish(fileId, user)
+  if (!done.ok) return said(done.why, 'stop')
+
+  refresh()
+  return said(
+    row.version > 1
+      ? `${row.name} replaces the previous version. The old one is kept — anyone who printed it can still find it.`
+      : `${row.name} is on the piece. Sign-off is still a separate decision.`,
+  )
+}
+
+/** A short-lived link to the artwork. Fifteen minutes, always a download. */
+export async function linkToArtwork(eventId: string, fileId: string): Promise<string | null> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+
+  const row = await db.storedFile.findUnique({
+    where: { id: fileId },
+    select: { eventId: true },
+  })
+  if (!row || row.eventId !== id) return null
+
+  return files.linkTo(fileId)
 }

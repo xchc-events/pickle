@@ -6,7 +6,16 @@ import { SectionHeading } from '@/components/SectionHeading'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
-import { approveAsset, requestChange, setDesignLead } from './actions'
+import { FileUpload } from '@/components/FileUpload'
+import { OpenArtwork } from './OpenArtwork'
+import {
+  approveAsset,
+  beginArtworkUpload,
+  finishArtworkUpload,
+  linkToArtwork,
+  requestChange,
+  setDesignLead,
+} from './actions'
 import styles from './design.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -250,6 +259,31 @@ function AssetTile({ eventId, asset }: { eventId: string; asset: AssetCard }) {
           </span>
         </div>
         <p className={styles.why}>{asset.why}</p>
+
+        {/* The file and the sign-off are separate on purpose: a piece is often
+            approved off a proof in the room, and the finished artwork lands
+            afterwards. Neither waits on the other. */}
+        <div className={styles.artwork}>
+          {asset.file ? (
+            <div className={styles.artworkRow}>
+              <OpenArtwork eventId={eventId} fileId={asset.file.id} link={linkToArtwork}>
+                {asset.file.name}
+              </OpenArtwork>
+              {asset.file.version > 1 ? (
+                <span className={styles.artworkVersion}>v{asset.file.version}</span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <FileUpload
+            label={asset.file ? 'Replace the file' : 'Add the file'}
+            // Bound rather than wrapped in an arrow: a closure made in a
+            // server component cannot cross into a client one, and only a
+            // server action (or a bind of one) can be passed across.
+            begin={beginArtworkUpload.bind(null, eventId, asset.key)}
+            finish={finishArtworkUpload.bind(null, eventId)}
+          />
+        </div>
 
         {asset.needsPromoterSignOff ? (
           <div className={`${styles.signOff} ${asset.promoterSigned ? styles.good : ''}`}>
