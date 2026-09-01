@@ -17,6 +17,8 @@ import 'dotenv/config'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, type Role, type ArtistStatus } from '../src/generated/prisma/client'
 import { DEFAULT_PERMS, type RoleKey } from '../src/lib/constants'
+import { ASSET_SET } from '../src/lib/design'
+import { BEATS, PLATFORMS } from '../src/lib/promo'
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) throw new Error('DATABASE_URL is not set')
@@ -120,6 +122,11 @@ type SeedEvent = {
   lateBar?: boolean
   sold?: number
   filled?: number
+  /// How many pieces of the design set are signed off. The next one along is
+  /// the one up for sign-off; everything after it is still a draft.
+  approved?: number
+  /// The creative one-liner, where the coordinator has written one.
+  brief?: string
   att?: [number, number, number]
   concluded?: boolean
   risk?: string
@@ -153,6 +160,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'ssr',
     name: 'Sunday Slow Roast',
+    approved: 6,
     internal: true,
     promoter: 'internal · Ana Kelliher',
     owner: 'AK',
@@ -174,6 +182,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'bs4',
     name: 'Basement Sessions vol. 4',
+    approved: 6,
     internal: true,
     promoter: 'internal · Mere Tapu',
     owner: 'MT',
@@ -192,6 +201,9 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'sf',
     name: 'Slow Fold — album release',
+    approved: 5,
+    brief:
+      'Slow Fold play the whole record front to back, with Harbour Static opening. Last Ōtautahi show before they tour.',
     promoter: 'Kōura Records',
     dow: 'Sat',
     days: 16,
@@ -225,6 +237,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'sb',
     name: 'Static Bloom',
+    approved: 2,
     promoter: 'Hex Collective',
     dow: 'Sat',
     days: 23,
@@ -242,6 +255,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'obc',
     name: 'Ōtautahi Bass Co-op',
+    approved: 2,
     promoter: 'Puha Sound',
     dow: 'Fri',
     days: 29,
@@ -256,6 +270,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'dtm',
     name: 'Dust to Mountains',
+    approved: 0,
     internal: true,
     promoter: 'internal · Jonty Rewi',
     owner: 'JR',
@@ -272,6 +287,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'wl',
     name: 'Wax Lyrical #12',
+    approved: 0,
     promoter: 'Puha Sound',
     dow: 'Sat',
     days: 37,
@@ -284,6 +300,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'kr',
     name: 'Kōwhai Rooms residency',
+    approved: 0,
     internal: true,
     promoter: 'internal · Ana Kelliher',
     owner: 'AK',
@@ -302,6 +319,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'chr',
     name: 'Care & Harm Reduction hui',
+    approved: 0,
     internal: true,
     promoter: 'internal · unassigned',
     owner: null,
@@ -320,6 +338,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'ns',
     name: 'Nightshade (Halloween)',
+    approved: 0,
     promoter: 'Hex Collective',
     dow: 'Fri',
     days: 71,
@@ -332,6 +351,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'apt',
     name: 'Kiwa Trio — listening room',
+    approved: 6,
     promoter: 'Kōura Records',
     dow: 'Fri',
     days: 8,
@@ -354,6 +374,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'lps',
     name: 'Long Player Sundays #9',
+    approved: 6,
     internal: true,
     promoter: 'internal · Ana Kelliher',
     owner: 'AK',
@@ -377,6 +398,7 @@ const EVENTS: SeedEvent[] = [
   {
     id: 'vs7',
     name: 'Vault Sessions #7',
+    approved: 6,
     promoter: 'Puha Sound',
     dow: 'Sat',
     days: -8,
@@ -468,6 +490,29 @@ function pickFor(role: string, assigned: { role: string; person: string }[]): st
   return p ? p.i : null
 }
 
+/**
+ * What a listing says about itself. Only Slow Fold carries notes in the
+ * prototype — it is the event the demo walks through, so it is the one with a
+ * history behind each channel.
+ */
+function channelNote(e: SeedEvent, channel: string, cap: number): string | null {
+  if (e.id !== 'sf') return null
+  switch (channel) {
+    case 'facebook-event':
+      return 'Start time says 8:30pm · support act missing'
+    case 'eventfinda':
+      return `Capacity still 180, now ${cap}`
+    case 'gather':
+      return `4 tiers live · ${e.sold ?? 0} sold · cap ${cap}`
+    case 'instagram':
+      return 'Grid post 24 Aug · 2 stories queued'
+    case 'mailchimp':
+      return '“What’s on in September” · 2,140 subscribers'
+    default:
+      return null
+  }
+}
+
 // ------------------------------------------------------------------- main ---
 
 async function main() {
@@ -480,6 +525,10 @@ async function main() {
   await db.task.deleteMany()
   await db.addon.deleteMany()
   await db.eventArtist.deleteMany()
+  await db.asset.deleteMany()
+  await db.channelPush.deleteMany()
+  await db.beat.deleteMany()
+  await db.eventLead.deleteMany()
   await db.financeReview.deleteMany()
   await db.actual.deleteMany()
   await db.event.deleteMany()
@@ -588,6 +637,7 @@ async function main() {
         crew: 6,
         tok: 2,
         split: 0.62,
+        brief: e.brief ?? null,
       },
     })
 
@@ -646,6 +696,81 @@ async function main() {
       })
     }
 
+    // Department leads. The prototype hands them out by stage: ticketing at
+    // confirmation, design and tech when the creative starts, promo when it
+    // goes on sale. Anything earlier than its stage has nobody, which is what
+    // the gates test for.
+    const leads: [string, string, number][] = [
+      ['TICKETING', 'MT', 2],
+      ['DESIGN', 'TW', 3],
+      ['PROMO', 'TW', 4],
+      ['TECH', 'JR', 3],
+    ]
+    for (const [role, who, from] of leads) {
+      if (e.stage < from) continue
+      const personId = personByInitials.get(who)
+      if (!personId) continue
+      await db.eventLead.create({
+        data: { eventId: created.id, role: role as never, personId },
+      })
+    }
+
+    // The design set. `approved` pieces are signed off and the next one along
+    // is the one up for sign-off — but only once the event has reached Design.
+    // An event sitting at Confirmed has nothing in front of anyone yet, which
+    // is what "no creative brief yet" on the pipeline is describing.
+    const signedOff = e.approved ?? 0
+    const briefed = e.stage >= 3
+    await db.asset.createMany({
+      data: ASSET_SET.map((a, i) => ({
+        eventId: created.id,
+        key: a.key,
+        state: (i < signedOff
+          ? 'APPROVED'
+          : i === signedOff && briefed
+            ? 'REVIEW'
+            : 'DRAFT') as never,
+      })),
+    })
+
+    // Channel spread. Everything that syncs itself goes out at confirmation;
+    // the two that need a human are only ticked off once the event is on sale.
+    const twId = personByInitials.get('TW') ?? null
+    await db.channelPush.createMany({
+      data: PLATFORMS.map((pl) => {
+        const auto = pl.kind === 'api'
+        const live = e.stage >= 2 && (auto || e.stage >= 4)
+        const byHand = live && !auto
+        return {
+          eventId: created.id,
+          channel: pl.key,
+          live,
+          stale: false,
+          note: channelNote(e, pl.key, cap),
+          byId: byHand ? twId : null,
+          at: live ? addDays(today, -e.stageDays) : null,
+        }
+      }),
+    })
+
+    // Slow Fold is the worked example: two listings drifted after the room was
+    // upsized and the start time moved, and nobody has re-pushed them.
+    if (e.id === 'sf') {
+      await db.channelPush.updateMany({
+        where: { eventId: created.id, channel: { in: ['facebook-event', 'eventfinda'] } },
+        data: { stale: true },
+      })
+    }
+
+    await db.beat.createMany({
+      data: BEATS.map((b, i) => ({
+        eventId: created.id,
+        key: b.key,
+        // Announce and on sale are worked by the time tickets are live.
+        done: e.stage >= 4 && i < 2,
+      })),
+    })
+
     if (e.actual) {
       await db.actual.create({ data: { eventId: created.id, ...e.actual } })
     }
@@ -695,6 +820,10 @@ async function main() {
     shifts: await db.shift.count(),
     tasks: await db.task.count(),
     artists: await db.eventArtist.count(),
+    assets: await db.asset.count(),
+    channels: await db.channelPush.count(),
+    beats: await db.beat.count(),
+    leads: await db.eventLead.count(),
   }
   console.log('seeded', counts)
 }
