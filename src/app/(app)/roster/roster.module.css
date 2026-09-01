@@ -1,0 +1,258 @@
+/* Roster. A dense list read while filling gaps — the open shifts have to be
+   findable at a glance, so they carry the only left edge on the page. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+/* --- the event strip ---------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 168px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueDate,
+.queueNote {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.queueDate {
+  color: var(--color-neutral-600);
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  padding: 18px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty {
+  margin: 0;
+  padding: 22px 28px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+  max-width: 60ch;
+}
+
+.eventHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eventName {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+.eventMeta {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+}
+
+.call {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.callLabel {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-neutral-600);
+}
+
+.callFigure {
+  font-size: 19px;
+  font-family: var(--font-heading);
+  color: var(--color-neutral-100);
+}
+
+.callCost {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.footnote {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}
+
+/* --- shifts ------------------------------------------------------------- */
+
+.shifts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.shift {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(200px, 1.2fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid transparent;
+}
+
+/* The only left edge on the page. An unfilled shift is the thing somebody
+   opened this module to find. */
+.shiftOpen {
+  border-left-color: var(--st-warn);
+}
+
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.roleName {
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+}
+
+.roleCall {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  font-variant-numeric: tabular-nums;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.picker {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+}
+
+.picker:hover:not(:disabled) {
+  border-color: var(--color-accent-600);
+}
+
+.picker:disabled {
+  opacity: 0.45;
+}
+
+.state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.asked {
+  color: var(--color-neutral-600);
+  font-size: 10.5px;
+}
+
+.askButton {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.askButton:hover:not(:disabled) {
+  color: var(--color-neutral-200);
+  border-color: var(--color-neutral-700);
+}
+
+.askButton:disabled {
+  opacity: 0.5;
+}

@@ -1,0 +1,429 @@
+/* Finance — the paying-people half. Denser than the promoter portal and
+   calmer than the pipeline: this is read carefully, once per settlement. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+/* --- the seal ----------------------------------------------------------- */
+
+.sealedBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 11px 28px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--st-warn);
+  background: var(--st-warn-dim);
+}
+
+.sealed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+}
+
+/* --- the event strip ---------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 168px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueDate,
+.queueNote {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.queueDate {
+  color: var(--color-neutral-600);
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  padding: 18px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty,
+.none {
+  margin: 0;
+  padding: 22px 28px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+  max-width: 60ch;
+}
+
+.none {
+  padding: 0;
+}
+
+.eventHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.eventName {
+  margin: 0;
+  font-size: 17px;
+}
+
+.eventMeta {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+}
+
+.footnote {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}
+
+/* --- the payable rows --------------------------------------------------- */
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) minmax(150px, 1.2fr) auto auto auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.whoName {
+  font-size: 13px;
+  color: var(--color-neutral-100);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.whoKind {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-neutral-600);
+}
+
+.account {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.mono {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-300);
+}
+
+.accountNote {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+.fee {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+  white-space: nowrap;
+}
+
+.withheld {
+  font-size: 10.5px;
+  color: var(--st-warn);
+}
+
+.noReveal {
+  font-size: 11px;
+  color: var(--color-neutral-700);
+  white-space: nowrap;
+}
+
+/* --- reveal ------------------------------------------------------------- */
+
+.revealButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--color-accent-200);
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.revealButton:hover:not(:disabled) {
+  background: var(--color-accent-800);
+}
+
+.revealButton:disabled {
+  opacity: 0.5;
+}
+
+.revealed {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.plain,
+.plainIrd {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--st-good);
+  background: var(--st-good-dim);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  user-select: all;
+}
+
+.plainIrd {
+  color: var(--color-neutral-300);
+  background: var(--color-neutral-900);
+}
+
+.hide {
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--color-neutral-500);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.hide:hover {
+  color: var(--color-neutral-300);
+}
+
+/* --- payee actions ------------------------------------------------------ */
+
+.payeeActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ghost:hover:not(:disabled) {
+  color: var(--color-neutral-200);
+  border-color: var(--color-neutral-700);
+}
+
+.ghost:disabled {
+  opacity: 0.5;
+}
+
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.confirmText {
+  font-size: 11px;
+  color: var(--st-stop);
+}
+
+.confirmYes {
+  font: inherit;
+  font-size: 11px;
+  color: var(--st-stop);
+  background: var(--st-stop-dim);
+  border: 1px solid var(--st-stop);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.confirmNo {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+/* --- paid --------------------------------------------------------------- */
+
+.paid {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-500);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.paid:hover:not(:disabled) {
+  border-color: var(--color-neutral-700);
+}
+
+.paidOn {
+  color: var(--st-good);
+  border-color: color-mix(in srgb, var(--st-good) 45%, transparent);
+  background: var(--st-good-dim);
+}
+
+/* --- the one-time link -------------------------------------------------- */
+
+.linkBox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  grid-column: span 2;
+}
+
+.linkUrl {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--color-neutral-300);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-accent-200);
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  cursor: pointer;
+}

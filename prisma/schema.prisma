@@ -36,6 +36,8 @@ model Person {
   activity     Activity[]
   leads        EventLead[]
   channelPosts ChannelPush[]
+  uploads      StoredFile[]
+  grantsIssued AccessGrant[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -168,7 +170,15 @@ model Event {
   ownerId   String?
   owner     Person? @relation("EventOwner", fields: [ownerId], references: [id])
   /// Set when an outside promoter brings the show. Scopes portal access.
+  ///
+  /// Still the free-text name `eventScope()` matches on. `promoterId` below
+  /// is the record it should resolve to; the two live side by side until the
+  /// scope rule is migrated onto the relation, which is a permissions change
+  /// and gets its own tests rather than riding along with this one.
   promoter  String?
+  /// The promoter as a record — who is paid, and where their details live.
+  promoterId String?
+  promoterPayee Payee? @relation("EventPromoter", fields: [promoterId], references: [id])
   internal  Boolean  @default(false)
 
   /// 0 enquiry … 7 settled. Transitions are gated — see src/lib/gates.ts.
@@ -227,6 +237,8 @@ model Event {
   assets    Asset[]
   channels  ChannelPush[]
   beats     Beat[]
+  files     StoredFile[]
+  grants    AccessGrant[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -234,6 +246,7 @@ model Event {
   @@index([stage])
   @@index([date])
   @@index([promoter])
+  @@index([promoterId])
 }
 
 enum ArtistStatus {
@@ -252,10 +265,15 @@ model EventArtist {
   /// Fee floor and ceiling, agreed before the event can advance.
   low     Float        @default(0)
   high    Float        @default(0)
-  /// promo pics, bio, EPK, hospitality rider, tech rider.
-  files   Json         @default("{}")
+  /// The act as a record, carrying their payment details across every event
+  /// they play. Null until somebody links them — `name` above is still what
+  /// the pipeline shows, so an unlinked act is not a broken one.
+  payeeId String?
+  payee   Payee?       @relation(fields: [payeeId], references: [id])
   paid    Boolean      @default(false)
   order   Int          @default(0)
+
+  @@index([payeeId])
 }
 
 enum ShiftState {
@@ -375,6 +393,10 @@ model Asset {
   /// portal. Never set by the venue.
   promoterSigned Boolean @default(false)
 
+  /// The artwork itself. A piece can carry more than one file — a print PDF
+  /// and the flattened preview beside it — and keeps superseded versions.
+  files StoredFile[]
+
   @@unique([eventId, key])
 }
 
@@ -447,6 +469,189 @@ model Actual {
   ticketRev  Float  @default(0)
   barTake    Float  @default(0)
   barProfit  Float  @default(0)
+}
+
+// ---------------------------------------------------------------- payees ---
+
+enum PayeeKind {
+  /// An act. Linked from EventArtist, once per act rather than once per show.
+  ARTIST
+  /// An outside promoter's organisation.
+  PROMOTER
+}
+
+/// Somebody XCHC pays.
+///
+/// One record of a person, applied to the people who are not staff: an act
+/// that plays four times enters their account number once, and correcting it
+/// corrects it on every settlement that has not yet gone out.
+///
+/// `bankEnc` and `irdEnc` are the only encrypted columns in this schema —
+/// AES-256-GCM, sealed and opened in src/lib/secrets.ts, keyed from
+/// PAYMENT_KEY which appears nowhere in this repository. The matching `*Tail`
+/// columns hold the last three digits in the clear so Finance can tell two
+/// accounts apart on screen without either one being decrypted.
+model Payee {
+  id      String    @id @default(cuid())
+  kind    PayeeKind
+  name    String
+  email   String?
+  phone   String?
+  /// ISO country of tax residence. Anything other than NZ withholds — see
+  /// `withholdingRate` in src/lib/bank.ts.
+  country String    @default("NZ")
+
+  /// Sealed NZ bank account, 16 digits normalised. Null until they fill it in.
+  bankEnc     Bytes?
+  /// Last three digits of the account body. Never enough to reconstruct it.
+  bankTail    String?
+  /// Account holder name as it appears at the bank. Not secret, and needed
+  /// to spot the mismatch that makes a payment bounce.
+  bankName    String?
+  /// Sealed IRD number, nine digits normalised.
+  irdEnc      Bytes?
+  irdTail     String?
+  gstReg      Boolean   @default(false)
+  gstNumber   String?
+  /// Agreed non-resident contractor rate, 0–1. Null falls back to the
+  /// standard rate for a non-NZ payee, which is the safe direction.
+  nrctRate    Float?
+  /// Whether a current certificate of exemption has been sighted.
+  nrctExempt  Boolean   @default(false)
+  /// When the payee last confirmed these details are current. Null means
+  /// never — the details came from somewhere other than the payee.
+  detailsAt   DateTime?
+
+  artists EventArtist[]
+  events  Event[]       @relation("EventPromoter")
+  files   StoredFile[]
+  grants  AccessGrant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind, name])
+}
+
+// ----------------------------------------------------------------- files ---
+
+enum FileKind {
+  RIDER_HOSPITALITY
+  RIDER_TECH
+  STAGE_PLOT
+  TECH_SPEC
+  PRESS_SHOT
+  BIO
+  EPK
+  /// A finished piece of the house asset set. Links to an Asset row.
+  ARTWORK
+  /// Brand marks and templates that belong to the venue, not to one event.
+  BRAND
+  OTHER
+}
+
+enum ScanState {
+  PENDING
+  CLEAN
+  BLOCKED
+}
+
+/// One uploaded file, stored in R2 and described here.
+///
+/// The bytes never pass through the application: the browser PUTs them
+/// straight to a presigned URL and reads them back from a presigned GET, so
+/// a 100MB video cut is not a 100MB request against the Next server.
+///
+/// `key` is opaque and randomly generated — never derived from the uploader's
+/// filename, which is theirs to choose and would otherwise let them write
+/// across another event's prefix.
+model StoredFile {
+  id     String    @id @default(cuid())
+  /// Object key in the bucket. Unique, unguessable, never reused.
+  key    String    @unique
+  /// The filename the uploader gave it. Display only; never a path.
+  name   String
+  mime   String
+  size   Int
+  /// Content hash, so the same rider uploaded twice is recognisable as one
+  /// file rather than two.
+  sha256 String
+  kind   FileKind
+  /// Files arriving from outside the venue are not served until they have
+  /// been through a scan. See src/lib/files.ts.
+  scan   ScanState @default(PENDING)
+
+  eventId String?
+  event   Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  payeeId String?
+  payee   Payee?  @relation(fields: [payeeId], references: [id], onDelete: Cascade)
+  /// Set when this file is a piece of the house asset set.
+  assetId String?
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  /// Who put it there. Null when it came in through a grant, in which case
+  /// `grantId` names the link it arrived on.
+  uploadedById String?
+  uploadedBy   Person?      @relation(fields: [uploadedById], references: [id])
+  grantId      String?
+  grant        AccessGrant? @relation(fields: [grantId], references: [id])
+
+  /// Replacing a rider supersedes the old one rather than overwriting it —
+  /// the tech who printed last week's copy needs to know it changed.
+  version   Int     @default(1)
+  current   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@index([eventId, kind])
+  @@index([payeeId, kind])
+  @@index([assetId])
+}
+
+// ---------------------------------------------------------------- access ---
+
+enum GrantScope {
+  /// Bank and tax details only.
+  PAYMENT_DETAILS
+  /// Riders, stage plots, press shots.
+  RIDER
+  BOTH
+}
+
+/// A link that lets somebody outside the venue put their own details in.
+///
+/// Touring acts are not staff and will not have accounts. They get a signed,
+/// single-use link that reaches exactly one payee's form and nothing else.
+///
+/// Only the SHA-256 of the token is stored. The token itself is shown once,
+/// at the moment it is created, and cannot be recovered afterwards — a
+/// database read therefore does not hand over working links.
+model AccessGrant {
+  id        String     @id @default(cuid())
+  tokenHash String     @unique
+  scope     GrantScope
+  payeeId   String
+  payee     Payee      @relation(fields: [payeeId], references: [id], onDelete: Cascade)
+  /// The event the link was sent about. Scopes what the form shows; the
+  /// payment details themselves belong to the payee, not to the event.
+  eventId   String?
+  event     Event?     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  expires   DateTime
+  /// Set the first time the link is used. A grant is not spent on use — the
+  /// artist may come back to correct a typo — but a first use that the
+  /// artist did not make is the signal that the link went astray.
+  usedAt    DateTime?
+  revokedAt DateTime?
+
+  createdById String?
+  createdBy   Person?  @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  files StoredFile[]
+
+  @@index([payeeId])
+  @@index([expires])
 }
 
 // ----------------------------------------------------------------- audit ---

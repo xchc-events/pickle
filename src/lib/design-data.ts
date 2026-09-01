@@ -130,6 +130,22 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
 
   const assets = flatten(row.assets)
   const portal = hasPortal(row.promoter)
+
+  // The artwork attached to each piece. Keyed by asset key rather than by
+  // asset id so a piece with no Asset row yet still lines up.
+  const artwork = new Map(
+    (
+      await db.storedFile.findMany({
+        where: { eventId: row.id, kind: 'ARTWORK', current: true, scan: 'CLEAN' },
+        include: { asset: { select: { key: true } } },
+      })
+    )
+      .filter((f) => f.asset)
+      .map((f) => [f.asset!.key, { id: f.id, name: f.name, size: f.size, version: f.version }]),
+  )
+
+  const withArtwork = (cards: AssetCard[]): AssetCard[] =>
+    cards.map((c) => ({ ...c, file: artwork.get(c.key) ?? null }))
   const facts = {
     brief: row.brief,
     name: row.name,
@@ -156,9 +172,9 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
       leadInitials: lead?.person.initials ?? null,
       leadPersonId: lead?.personId ?? null,
       approved: approvedLine(assets),
-      hero: assetCards(assets, 'hero', { hasPortal: portal }),
-      lead: assetCards(assets, 'lead', { hasPortal: portal }),
-      support: assetCards(assets, 'support', { hasPortal: portal }),
+      hero: withArtwork(assetCards(assets, 'hero', { hasPortal: portal })),
+      lead: withArtwork(assetCards(assets, 'lead', { hasPortal: portal })),
+      support: withArtwork(assetCards(assets, 'support', { hasPortal: portal })),
       verticals: verticalCuts(assets),
       brief: {
         line: briefLine(facts),

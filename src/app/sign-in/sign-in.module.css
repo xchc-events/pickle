@@ -74,3 +74,140 @@
   color: var(--color-neutral-600);
   text-wrap: pretty;
 }
+
+/* --- real sign-in ------------------------------------------------------- */
+
+.providers {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 340px;
+  margin-bottom: 28px;
+}
+
+.provider {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  font-family: var(--font-heading);
+  color: var(--color-accent-100);
+  background: var(--color-accent-700);
+  border: 1px solid var(--color-accent-600);
+  border-radius: var(--radius-sm);
+  padding: 11px 16px;
+  cursor: pointer;
+}
+
+.provider:hover {
+  background: var(--color-accent-600);
+}
+
+.providerNote {
+  margin: 5px 0 0;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  text-align: center;
+}
+
+.emailForm {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.emailLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-neutral-600);
+}
+
+.emailRow {
+  display: flex;
+  gap: 6px;
+}
+
+.emailRow .provider {
+  width: auto;
+  flex: none;
+  font-size: 12.5px;
+  padding: 9px 13px;
+}
+
+.emailInput {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+}
+
+.emailInput:focus {
+  outline: none;
+  border-color: var(--color-accent-500);
+}
+
+.error,
+.sent {
+  max-width: 420px;
+  margin: 0 0 20px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+}
+
+.error {
+  color: var(--st-stop);
+  background: var(--st-stop-dim);
+}
+
+.sent {
+  color: var(--st-good);
+  background: var(--st-good-dim);
+}
+
+/* --- the development role picker ---------------------------------------- */
+
+.dev {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--color-neutral-800);
+}
+
+.devHead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.devTag {
+  font-family: var(--font-heading);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--st-warn);
+  background: var(--st-warn-dim);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+}
+
+.devNote {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}

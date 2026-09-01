@@ -514,3 +514,56 @@
   color: var(--color-neutral-600);
   margin: 12px 0 0;
 }
+
+/* --- the artwork on a piece --------------------------------------------- */
+
+.artwork {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 60%, transparent);
+}
+
+.artworkRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.artworkOpen {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-accent-200);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.artworkOpen:hover:not(:disabled) {
+  color: var(--color-accent-100);
+  text-decoration: underline;
+}
+
+.artworkOpen:disabled {
+  opacity: 0.5;
+}
+
+.artworkName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artworkVersion {
+  flex: none;
+  font-size: 10px;
+  color: var(--color-neutral-600);
+}
