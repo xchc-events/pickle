@@ -17,10 +17,10 @@ import { CFG, tiers } from './finance'
  * The order the four proportions are stored in on `Event.mix`.
  *
  * **Subsidised first, supporter third.** Worth stating plainly because the
- * handoff README's prose says the opposite ("supporter/standard/subsidised"),
- * and the schema comment copied that prose. The code is authoritative: the
- * prototype's own `TIER_KEYS` is [sub, std, sup, door], and `avgTicket` in
- * finance.ts pairs `mix[0]` with `tiers().sub`.
+ * handoff README's prose had it the other way round until it was corrected,
+ * and our schema comment had copied the error. The code was always right:
+ * the prototype's own `TIER_KEYS` is [sub, std, sup, door], and `avgTicket`
+ * in finance.ts pairs `mix[0]` with `tiers().sub`.
  *
  * Getting it backwards is not a cosmetic slip. A supporter pays *more* than
  * standard and a subsidised ticket costs *less*, so inverting the labels tells

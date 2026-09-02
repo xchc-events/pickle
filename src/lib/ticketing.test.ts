@@ -66,10 +66,11 @@ describe('the tier table', () => {
   })
 
   /**
-   * The handoff README's prose says "supporter/standard/subsidised" and is
+   * The handoff README's prose said "supporter/standard/subsidised" and was
    * wrong; the prototype's `TIER_KEYS` and `avgTicket` both say subsidised
    * first. A supporter pays more than standard, so a table that labels the
-   * cheap tier "Supporter" is telling the coordinator something false.
+   * cheap tier "Supporter" is telling the coordinator something false. This
+   * test is what stops it inverting again.
    */
   it('labels the cheap tier subsidised and the dear one supporter', () => {
     const rows = tierTable(30, 40, [0.15, 0.5, 0.2, 0.15])
