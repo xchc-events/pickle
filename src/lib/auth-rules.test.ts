@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { mayAdmit, mayChangeRole, mayDeactivate, normaliseEmail, userProblems } from './auth-rules'
+import {
+  LINK_COOLDOWN_SECONDS,
+  mayAdmit,
+  mayChangeRole,
+  mayDeactivate,
+  mayRequestLink,
+  normaliseEmail,
+  userProblems,
+} from './auth-rules'
 
 /**
  * Who gets in, and who is allowed to change that.
@@ -160,5 +168,53 @@ describe('userProblems', () => {
     expect(
       userProblems({ role: 'TECH', promoter: 'Kōura Records', personId: 'p1' }),
     ).toContainEqual(expect.stringMatching(/staff|internal|organisation/i))
+  })
+})
+
+describe('mayRequestLink', () => {
+  const now = new Date('2026-09-02T12:00:00Z')
+  const ago = (seconds: number) => new Date(now.getTime() - seconds * 1000)
+
+  /**
+   * Sign-in links cost real emails. Resend's free tier is a hundred a day,
+   * so an unthrottled form lets anybody type a colleague's address on repeat
+   * and exhaust the venue's quota — which locks out the people who actually
+   * need to sign in. The throttle is about availability, not about secrecy.
+   */
+  it('lets a first request through', () => {
+    expect(mayRequestLink(null, now).ok).toBe(true)
+  })
+
+  it('lets a request through once the cooldown has passed', () => {
+    expect(mayRequestLink(ago(LINK_COOLDOWN_SECONDS + 1), now).ok).toBe(true)
+  })
+
+  it('refuses a second request inside the cooldown', () => {
+    const v = mayRequestLink(ago(5), now)
+    expect(v.ok).toBe(false)
+    expect(v.ok === false && v.why).toMatch(/already|moment|wait|sent/i)
+  })
+
+  it('says how long is left, so the wait is not a mystery', () => {
+    const v = mayRequestLink(ago(10), now)
+    expect(v.ok === false && v.why).toMatch(new RegExp(String(LINK_COOLDOWN_SECONDS - 10)))
+  })
+
+  it('treats the boundary as through rather than blocked', () => {
+    expect(mayRequestLink(ago(LINK_COOLDOWN_SECONDS), now).ok).toBe(true)
+  })
+
+  /**
+   * A clock that has gone backwards, or a row written by a machine whose
+   * time is off. Refusing forever would be the wrong failure — somebody
+   * would be locked out with no way to explain it — so a future timestamp
+   * is treated as no timestamp.
+   */
+  it('does not lock somebody out over a timestamp in the future', () => {
+    expect(mayRequestLink(new Date(now.getTime() + 60_000), now).ok).toBe(true)
+  })
+
+  it('is short enough not to annoy a real person', () => {
+    expect(LINK_COOLDOWN_SECONDS).toBeLessThanOrEqual(120)
   })
 })

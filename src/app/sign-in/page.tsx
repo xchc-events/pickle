@@ -5,7 +5,7 @@ import { initialsOf } from '@/lib/format'
 import { Brand } from '@/components/Brand'
 import { Avatar } from '@/components/Avatar'
 import { signInAs } from '../actions'
-import { SignInWithGoogle, SignInByEmail } from './Providers'
+import { SignInByEmail } from './Providers'
 import styles from './sign-in.module.css'
 
 // Reads the user table on every request: a signed-in list baked at build time
@@ -15,18 +15,16 @@ export const dynamic = 'force-dynamic'
 const REASON: Record<string, string> = {
   AccessDenied:
     'That address has no account here, or its account has been switched off. Accounts are made by an administrator at the venue — there is no sign-up.',
-  Verification: 'That link has been used already, or it expired. Ask for a new one.',
+  Verification:
+    'That link has been used already, or it expired, or one was sent to that address a moment ago. Check the inbox, then ask for a new one.',
   Configuration:
-    'Sign-in is not configured on this install. An administrator needs to set the provider keys.',
+    'Sign-in is not configured on this install. An administrator needs to set the Resend keys — see the README.',
 }
 
 export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
   const sp = await searchParams
   const error = typeof sp.error === 'string' ? sp.error : null
   const sent = sp.sent === '1'
-
-  const google = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET)
-  const email = Boolean(process.env.AUTH_RESEND_KEY && process.env.EMAIL_FROM)
 
   return (
     <main className={styles.wrap}>
@@ -41,24 +39,23 @@ export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
 
       {sent ? (
         <p className={styles.sent} role="status">
-          Check your email — the link signs you in and works once.
+          Check your email — the link signs you in, works once, and expires in an hour.
         </p>
       ) : null}
 
       {authConfigured ? (
         <>
           <p className={styles.blurb}>
-            Use the account the venue added for you. There is no sign-up here.
+            Use the address the venue added for you. There is no sign-up here and no password to
+            remember.
           </p>
           <div className={styles.providers}>
-            {google ? <SignInWithGoogle /> : null}
-            {email ? <SignInByEmail /> : null}
+            <SignInByEmail />
           </div>
         </>
       ) : (
         <p className={styles.blurb}>
-          Real sign-in is not configured on this install yet — see the README for the Google and
-          Resend keys.
+          Real sign-in is not configured on this install yet — see the README for the Resend keys.
         </p>
       )}
 

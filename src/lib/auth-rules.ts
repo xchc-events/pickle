@@ -161,3 +161,41 @@ export function userProblems(u: UserShape): string[] {
 
   return problems
 }
+
+// ----------------------------------------------------------- sign-in links ---
+
+/**
+ * How long an address must wait between sign-in links.
+ *
+ * Short enough that a real person who mistyped their address and tried again
+ * barely notices, long enough that the form is not a way to send somebody a
+ * hundred emails.
+ */
+export const LINK_COOLDOWN_SECONDS = 60
+
+/**
+ * Whether to send another sign-in link to this address.
+ *
+ * This is an availability guard rather than a secrecy one. Every link is a
+ * real email against a finite quota, and a form that will send unlimited ones
+ * lets anybody exhaust the venue's allowance and lock out the people who need
+ * to get in.
+ *
+ * A timestamp in the future is treated as no timestamp. A clock that has gone
+ * backwards should not lock somebody out permanently with no way to explain
+ * why — failing open on a nonsense value is the right direction here, because
+ * the worst case is one extra email.
+ */
+export function mayRequestLink(lastSentAt: Date | null, now: Date): Verdict {
+  if (!lastSentAt) return { ok: true }
+
+  const elapsed = (now.getTime() - lastSentAt.getTime()) / 1000
+  if (elapsed < 0) return { ok: true }
+  if (elapsed >= LINK_COOLDOWN_SECONDS) return { ok: true }
+
+  const left = Math.ceil(LINK_COOLDOWN_SECONDS - elapsed)
+  return {
+    ok: false,
+    why: `A link was already sent to that address. Check the inbox, or try again in ${left} seconds.`,
+  }
+}
