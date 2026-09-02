@@ -642,17 +642,39 @@ async function main() {
       const isFilled = i < filled
       const who = isFilled ? pickFor(s.role, assigned) : null
       if (who) assigned.push({ role: s.role, person: who })
-      await db.shift.create({
+      const personId = who ? (personByInitials.get(who) ?? null) : null
+
+      const shift = await db.shift.create({
         data: {
           eventId: created.id,
           role: s.role,
           hours: s.hours,
           start: s.start,
-          personId: who ? (personByInitials.get(who) ?? null) : null,
+          personId,
           state: isFilled ? 'ASSIGNED' : 'OPEN',
           asked: 4,
         },
       })
+
+      // An assigned shift carries its hours. The product enforces this —
+      // assigning writes the entry, unassigning removes it, in one
+      // transaction (src/app/(app)/roster/actions.ts) — so seed data that
+      // skipped it would be data the product could never have produced, and
+      // every on-site figure would read zero.
+      if (personId) {
+        await db.hourEntry.create({
+          data: {
+            personId,
+            eventId: created.id,
+            shiftId: shift.id,
+            hours: s.hours,
+            // The shift's own role, not a team: "Sound — Lead" is what the
+            // person actually did, and it is what their timesheet should say.
+            role: s.role,
+            workedOn: date,
+          },
+        })
+      }
     }
 
     // Department leads. The prototype hands them out by stage: ticketing at
@@ -764,11 +786,23 @@ async function main() {
     ['AK', 'Maintenance & working bees — cellar shelving and lines clean', 5, 1],
     ['SL', 'Governance & meetings — board meeting and minutes', 3, 1],
   ]
-  for (const [who, note, hours, monthOffset] of orgHours) {
+  for (const [who, line, hours, monthOffset] of orgHours) {
     const at = new Date(today)
     at.setMonth(at.getMonth() + monthOffset)
+
+    // The role is its own column rather than a prefix on the note: the
+    // monthly pool groups by it, and reading wages out of free text is the
+    // kind of thing that breaks quietly. See src/lib/hours.ts.
+    const [role, ...rest] = line.split(' — ')
     await db.hourEntry.create({
-      data: { personId: personByInitials.get(who)!, hours, note, createdAt: at },
+      data: {
+        personId: personByInitials.get(who)!,
+        hours,
+        role,
+        note: rest.join(' — ') || null,
+        workedOn: at,
+        createdAt: at,
+      },
     })
   }
 
