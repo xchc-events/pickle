@@ -109,7 +109,9 @@ The hub. Back link, title, badges (stage, space, booking model), and tabbed/stac
 **Stage gates** are the load-bearing interaction: each stage transition lists named conditions with a pass/fail state, a reason, and a deep link to the screen that fixes it. An event cannot advance while a gate fails. Gate sets are defined per transition in `gates(e)` — reproduce the full list from the prototype; examples: *An owner is named*, *Date is locked*, *At least one act confirmed*, *Fee floor and ceiling agreed*, *Terms agreed with the promoter*, *Bar close decided*, *Artist bios and pics in*, *Licence filed if it is needed*.
 
 ### Ticketing
-Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup = round(std × 1.2)`, plus a `door` price. A four-way `mix` (supporter/standard/subsidised/door proportions) produces the average ticket price. Shows allocation, sold count, sales curve, and door list. Source of truth is **Gather.rsvp**.
+Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup = round(std × 1.2)`, plus a `door` price. A four-way `mix` (subsidised/standard/supporter/door proportions) produces the average ticket price. Shows allocation, sold count, sales curve, and door list. Source of truth is **Gather.rsvp**.
+
+> **Corrected 2 Sep 2026.** This line previously read "supporter/standard/subsidised", which contradicts the prototype it describes: `TIER_KEYS` is `[sub, std, sup, door]` and `avgTicket` pairs `mix[0]` with `tiers().sub`. Read the wrong way round it prices a supporter at 80% of standard rather than 120%, and the mix feeds the average ticket price straight into the P&L. The prototype code is authoritative and is unchanged; only this sentence was wrong.
 
 ### Design
 Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each with format spec and a rationale line. Hero = two vertical video cuts (9:16); lead = the 1920×1005 event cover; support = story, A2 poster, listing copy. `CONTENT_RULES` render as a short doctrine panel: vertical video first (twice), video beats a still, almost no words on an image, real over polished, one idea per asset.
