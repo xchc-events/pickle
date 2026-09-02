@@ -328,6 +328,15 @@ model Addon {
 }
 
 /// One record of an hour. Every wage figure resolves back to these.
+///
+/// Three kinds of row, told apart by what they hang off rather than by a
+/// type column:
+///
+///  - `shiftId` set — an on-site hour, written by the roster when a shift was
+///    assigned. Never typed by a person; see src/app/(app)/roster/actions.ts.
+///  - `eventId` set, no shift — off-site work on a named event.
+///  - neither set — org-wide work, pooled by month and apportioned across the
+///    events in that month. This is what feeds `orgShareHours` in finance.ts.
 model HourEntry {
   id       String  @id @default(cuid())
   personId String
@@ -337,13 +346,24 @@ model HourEntry {
   shiftId  String? @unique
   shift    Shift?  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
   hours    Float
+  /// Which team or org-wide role the hour belongs to. Kept as its own column
+  /// rather than read out of `note`: the apportionment groups by it, and
+  /// parsing a free-text note to work out where wages land is the kind of
+  /// thing that breaks quietly.
+  role     String?
   note     String?
   paid     Boolean @default(false)
+
+  /// The day the work happened, which is not the day it was typed in. People
+  /// log a fortnight late, and an October hour logged in November is October's
+  /// — the monthly org-wide pool would otherwise land on the wrong events.
+  workedOn DateTime @default(now())
 
   createdAt DateTime @default(now())
 
   @@index([personId])
   @@index([eventId])
+  @@index([workedOn])
 }
 
 /// Which department a person owns on an event. Ticketing, design, promo and
