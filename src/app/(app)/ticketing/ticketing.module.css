@@ -1,0 +1,449 @@
+/* Ticketing. The room diagram is the screen — everything else supports the
+   question it answers, which is whether the show is going to be alright. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+.plain {
+  color: var(--color-neutral-500);
+}
+
+/* --- the event strip ---------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 168px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueDate,
+.queueNote {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.queueDate {
+  color: var(--color-neutral-600);
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  padding: 18px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty {
+  margin: 0;
+  padding: 22px 28px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+  max-width: 62ch;
+}
+
+.eventHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.eventName {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+.eventMeta {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+}
+
+.live,
+.notLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.live {
+  color: var(--st-good);
+}
+
+.notLive {
+  color: var(--st-warn);
+}
+
+.footnote {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}
+
+/* --- the room ----------------------------------------------------------- */
+
+.room {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.roomTrack {
+  position: relative;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-900);
+  overflow: hidden;
+}
+
+.roomSold {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--color-accent-500);
+}
+
+/* What is projected on top of what has actually gone. Hatched rather than
+   solid, because it has not happened. */
+.roomProjected {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-accent) 35%, transparent) 0 5px,
+    transparent 5px 10px
+  );
+}
+
+.marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--st-warn);
+}
+
+.markerFull {
+  background: var(--st-good);
+}
+
+.roomLegend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+}
+
+.roomLegend b {
+  font-weight: 500;
+  color: var(--color-neutral-100);
+}
+
+.sold {
+  color: var(--color-accent-200) !important;
+}
+
+.pace {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.paceToday {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-neutral-400);
+}
+
+.paceCaveat {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}
+
+/* --- tiers -------------------------------------------------------------- */
+
+.mixWarn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--st-stop);
+  background: var(--st-stop-dim);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+}
+
+.tiers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tier {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto minmax(90px, 1fr) auto;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.tierLabel {
+  color: var(--color-neutral-200);
+}
+
+.tierPrice {
+  font-size: 14px;
+  color: var(--color-neutral-100);
+}
+
+.tierShare,
+.tierContributes {
+  color: var(--color-neutral-600);
+  font-size: 11.5px;
+}
+
+.tierContributes {
+  text-align: right;
+}
+
+/* --- the forms ---------------------------------------------------------- */
+
+.forms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.formTitle {
+  font-family: var(--font-heading);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--color-neutral-400);
+}
+
+.input {
+  width: 84px;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent-500);
+}
+
+.submit {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-accent-100);
+  background: var(--color-accent-700);
+  border: 1px solid var(--color-accent-600);
+  border-radius: var(--radius-sm);
+  padding: 5px 13px;
+  cursor: pointer;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--color-accent-600);
+}
+
+.submit:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.formNote {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+}
+
+/* --- scenarios ---------------------------------------------------------- */
+
+.scenarios {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.scenario {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid transparent;
+}
+
+.scenarioOn {
+  border-left-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+}
+
+.scenarioMain {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+
+.scenarioLabel {
+  font-size: 13px;
+  color: var(--color-neutral-100);
+}
+
+.scenarioAtt {
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+}
+
+.scenarioRevenue {
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+  white-space: nowrap;
+}
+
+.scenarioOnTag {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent-300);
+  white-space: nowrap;
+}
+
+.scenarioPick {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scenarioPick:hover:not(:disabled) {
+  color: var(--color-neutral-200);
+  border-color: var(--color-neutral-700);
+}
+
+.scenarioPick:disabled {
+  opacity: 0.5;
+}

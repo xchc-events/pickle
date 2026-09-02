@@ -7,10 +7,28 @@ import { signOut } from './actions'
 import styles from './landing.module.css'
 
 /**
- * Where a signed-in user lands. Pipeline is the only module built so far, and
- * not every role can see it — Bar & duty manager cannot — so this decides
- * rather than sending everyone to a 404.
+ * Where a signed-in user lands.
+ *
+ * Not every role can see Pipeline — Bar & duty manager cannot — so this picks
+ * the first module their role actually reaches rather than sending everybody
+ * to one URL and 404ing half of them. Sign-in redirects here for that reason;
+ * see `SignInByEmail` in src/app/sign-in/Providers.tsx.
  */
+/**
+ * Never prerendered.
+ *
+ * This page reads the session and routes each person to a module their role
+ * actually reaches, so it is per-user by definition. Next infers dynamism
+ * from the APIs a page touches, and that inference is thinner than it looks:
+ * with no provider configured at build time, `currentUser()` returns null
+ * before it ever reads a cookie, and the page prerenders to a redirect to
+ * /sign-in. That redirect would then be served to everybody — including
+ * people who had just signed in, since sign-in lands here — which is a loop
+ * back to the sign-in page. Stating it is cheaper than depending on the
+ * build environment matching the runtime one.
+ */
+export const dynamic = 'force-dynamic'
+
 export default async function Index() {
   const user = await currentUser()
   if (!user) redirect('/sign-in')
@@ -31,8 +49,7 @@ export default async function Index() {
       <h1 className={styles.title}>Nothing you can see is built yet</h1>
       <p className={styles.body}>
         You are signed in as {user.name} — {ROLE_LABEL[user.roleKey]}. That role can see{' '}
-        {labels || 'no modules'}, and of those, none have been built. Pipeline is the module that
-        exists today.
+        {labels || 'no modules'}, and of those, none have been built yet.
       </p>
       <form action={signOut}>
         <button type="submit" className={styles.link}>

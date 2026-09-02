@@ -2,30 +2,17 @@ import { signIn } from '@/lib/auth'
 import styles from './sign-in.module.css'
 
 /**
- * The real ways in.
+ * The way in.
  *
- * Server components wrapping a server action apiece, so there is no client
+ * A server component wrapping a server action, so there is no client
  * JavaScript here at all — a sign-in page that cannot fail to hydrate is one
  * fewer way to be locked out of your own venue on a Friday night.
+ *
+ * Where the link lands afterwards is deliberately not decided here. Sending
+ * everybody to `/pipeline` would 404 the promoters, who do not have it, so
+ * the redirect goes to `/` and the app's own layout puts each person where
+ * their permissions actually reach.
  */
-
-export function SignInWithGoogle() {
-  return (
-    <form
-      action={async () => {
-        'use server'
-        await signIn('google', { redirectTo: '/pipeline' })
-      }}
-    >
-      <button type="submit" className={styles.provider}>
-        <i className="ph ph-google-logo" aria-hidden="true" />
-        Continue with Google
-      </button>
-      <p className={styles.providerNote}>For anyone with an XCHC account.</p>
-    </form>
-  )
-}
-
 export function SignInByEmail() {
   return (
     <form
@@ -33,13 +20,13 @@ export function SignInByEmail() {
         'use server'
         await signIn('resend', {
           email: String(formData.get('email') ?? ''),
-          redirectTo: '/portal',
+          redirectTo: '/',
         })
       }}
       className={styles.emailForm}
     >
       <label className={styles.emailLabel} htmlFor="signin-email">
-        Or have a link emailed to you
+        Your email address
       </label>
       <div className={styles.emailRow}>
         <input
@@ -48,15 +35,17 @@ export function SignInByEmail() {
           type="email"
           required
           autoComplete="email"
-          placeholder="you@example.com"
+          autoFocus
+          placeholder="you@xchc.co.nz"
           className={styles.emailInput}
         />
         <button type="submit" className={styles.provider}>
-          Send link
+          Email me a link
         </button>
       </div>
       <p className={styles.providerNote}>
-        For promoters working with the venue from outside. The link works once.
+        It has to be the address the venue has on file for you. The link works once and stops
+        working in an hour.
       </p>
     </form>
   )

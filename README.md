@@ -81,27 +81,36 @@ say so rather than failing.
 ## Signing in
 
 There is **no sign-up**. `createUser` in `src/lib/auth.ts` throws, so somebody
-arriving with a perfectly good Google account gets nothing until an
-administrator has added their address in **Admin**. That is deliberate: this is
-one venue's internal tool, and a provider vouching for an email is not the same
-as XCHC having decided somebody works here.
+arriving with a perfectly good email address gets nothing until an administrator
+has added it in **Admin**. That is deliberate: this is one venue's internal
+tool, and being able to receive mail is not the same as XCHC having decided
+somebody works here.
 
-Two ways in, each switched on by whether it is configured:
+One way in — **a link emailed to the address on the account**, via
+`AUTH_RESEND_KEY` and `EMAIL_FROM`. No passwords and no OAuth, which was a
+decision rather than a default:
 
-| Who                | Provider     | Keys                                   |
-| ------------------ | ------------ | -------------------------------------- |
-| Venue staff        | Google       | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
-| External promoters | Emailed link | `AUTH_RESEND_KEY`, `EMAIL_FROM`        |
+- **Google** would serve only the half of our users inside the venue. An
+  external promoter signing off a poster is not in XCHC's Workspace.
+- **Passwords** look simpler than they are. Reset needs email anyway, so the
+  dependency does not go away — it just arrives after hashing, reset tokens,
+  strength rules and lockout have been built. Auth.js also refuses database
+  sessions for a credentials-only setup, which would cost us the property
+  below.
 
 Sessions are stored in the database rather than in a JWT, so switching somebody
 off in Admin ends the session they already have open. A token cannot be taken
 back; a row can.
 
-**Google setup:** console.cloud.google.com → APIs & Services → Credentials →
-OAuth client ID → Web application. Authorised redirect URI is
-`<your-url>/api/auth/callback/google`.
+**Resend setup:** resend.com → add and verify the sending domain → API keys.
+`EMAIL_FROM` must be on that verified domain, e.g. `XCHC <no-reply@xchc.co.nz>`.
 
-Until either provider is configured, the development role picker on `/sign-in`
+Links live one hour, and an address can only be sent one a minute
+(`LINK_COOLDOWN_SECONDS` in `auth-rules.ts`) — every link is a real email
+against a finite quota, and an unthrottled form is how somebody exhausts the
+venue's allowance and locks out the people who need to get in.
+
+Until the provider is configured, the development role picker on `/sign-in`
 stands in. It is unavailable in production (`stubAllowed` in `session.ts`) and
 the sessions it grants are marked `authenticated: false`, so it can drive every
 module but can never open a payment detail — see `canReveal` in `payments.ts`.

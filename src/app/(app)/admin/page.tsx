@@ -12,7 +12,7 @@ import styles from './admin.module.css'
  *
  * This is where accounts come from. There is no sign-up anywhere in this
  * product: the adapter in auth.ts refuses to create a user, so somebody
- * reaching the sign-in page with a perfectly good Google account still gets
+ * reaching the sign-in page with a perfectly good email address still gets
  * nothing until they appear on this page.
  */
 export default async function AdminPage() {
@@ -36,8 +36,8 @@ export default async function AdminPage() {
           <i className="ph ph-warning" aria-hidden="true" />
           Real sign-in is not configured, so nobody here can actually sign in yet.
           {stubAllowed
-            ? ' The development role picker is standing in. Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see the README.'
-            : ' Set AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see the README.'}
+            ? ' The development role picker is standing in. Set AUTH_RESEND_KEY and EMAIL_FROM — see the README.'
+            : ' Set AUTH_RESEND_KEY and EMAIL_FROM — see the README.'}
         </p>
       ) : null}
 
@@ -75,9 +75,9 @@ export default async function AdminPage() {
         <AddUser roles={roles} people={people} promoters={promoters} add={addUser} />
 
         <p className={styles.footnote}>
-          Adding an account sends nothing. Give them the address of this site — staff sign in with
-          their XCHC Google account, and an external coordinator asks for a link by email. Either
-          way the address has to match the one above exactly.
+          Adding an account sends nothing. Give them the address of this site and they ask for a
+          sign-in link by email — staff and outside coordinators alike. The address they type has to
+          match the one above exactly, or they get nothing and no explanation of why.
         </p>
       </div>
     </div>
