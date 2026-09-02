@@ -199,7 +199,11 @@ model Event {
   /// Standard price. sub = round(std * 0.8), sup = round(std * 1.2).
   std       Float @default(0)
   door      Float @default(0)
-  /// [supporter, standard, subsidised, door] proportions. Must sum to 1.
+  /// [subsidised, standard, supporter, door] proportions. Must sum to 1.
+  ///
+  /// This order matches `avgTicket` in src/lib/finance.ts and the prototype's
+  /// own TIER_KEYS. The handoff README's prose has it the other way round and
+  /// is wrong — a supporter pays more than standard, not less.
   mix       Float[] @default([0.15, 0.5, 0.2, 0.15])
   /// Attendance by scenario: [quiet, likely, great].
   att       Int[]   @default([0, 0, 0])

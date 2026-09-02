@@ -1,4 +1,4 @@
-import { CFG } from './finance'
+import { capacityOf } from './ticketing'
 
 /**
  * Rostering.
@@ -73,7 +73,10 @@ const isApt = (e: RosterEvent) => e.spaceName === 'Apartment U1'
  * own figure and roughly what the venue actually does.
  */
 function likelyCrowd(e: RosterEvent): number {
-  const cap = isApt(e) ? CFG.capApt : e.format === 'Cabaret' ? CFG.capSeated : CFG.capMusic
+  // One capacity rule, shared with Ticketing. Two copies would drift the
+  // first time the venue changes a layout, and this one decides whether a
+  // second bar staff is paid for.
+  const cap = capacityOf(e.spaceName, e.format)
   const likely = e.att[1] ?? 0
   return likely > 0 ? likely : Math.round(cap * 0.62)
 }
