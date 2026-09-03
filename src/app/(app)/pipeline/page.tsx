@@ -128,7 +128,9 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                   data-testid="pipeline-row"
                 >
                   <span className={styles.name}>
-                    <span className={styles.eventName}>{e.name}</span>
+                    <Link href={`/events/${e.id}`} className={styles.eventName}>
+                      {e.name}
+                    </Link>
                     <span className={`${styles.meta} ${atRisk ? styles.metaRisk : ''}`}>
                       {atRisk ? (
                         <i

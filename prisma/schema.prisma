@@ -148,6 +148,19 @@ enum RiskKind {
   STOP
 }
 
+/// Where the terms with an outside promoter stand. SENT is the resting state
+/// — the venue has put a deal to them and nobody has said anything back.
+enum DealState {
+  SENT
+  AGREED
+  QUERIED
+}
+
+enum TechStatus {
+  DRAFT
+  CONFIRMED
+}
+
 enum Licence {
   NOT_REQUIRED
   REQUIRED
@@ -161,6 +174,14 @@ model Event {
   id        String   @id @default(cuid())
   name      String
   date      DateTime
+  /// The date is still a best guess. `date` is always set so the event sorts
+  /// into the calendar and the pipeline can count days to door, but the stage
+  /// gate out of Enquiry treats it as unlocked until this clears.
+  ///
+  /// A nullable `date` would have been the other way to say this, and it was
+  /// not taken: every read of the date would then need a null branch, to
+  /// express something only the first stage cares about.
+  dateTbc   Boolean  @default(false)
   spaceId   String
   space     Space    @relation(fields: [spaceId], references: [id])
   kind      String
@@ -181,7 +202,8 @@ model Event {
   promoterPayee Payee? @relation("EventPromoter", fields: [promoterId], references: [id])
   internal  Boolean  @default(false)
 
-  /// 0 enquiry … 7 settled. Transitions are gated — see src/lib/gates.ts.
+  /// 0 enquiry … 7 settled. Transitions are gated — see `gatesFor` in
+  /// src/lib/event-record.ts.
   stage     Int          @default(0)
   /// When the event entered its current stage. Days-in-stage derives from
   /// this — it is never stored, so it cannot go stale.
@@ -189,6 +211,15 @@ model Event {
   concluded Boolean      @default(false)
   model     BookingModel @default(CURATOR)
   licence   Licence      @default(NOT_REQUIRED)
+
+  /// Where the terms with the promoter stand. The gate out of Negotiating
+  /// requires AGREED, and QUERIED carries their words in `dealNote` so the
+  /// coordinator reads the objection rather than a status.
+  deal      DealState    @default(SENT)
+  dealNote  String?
+
+  /// Whether the tech lead has signed the plan off. Gates Rostering.
+  techStatus TechStatus  @default(DRAFT)
 
   /// Why this event is flagged, in the coordinator's own words. Null means
   /// not at risk. The wording is shown verbatim on the pipeline row.
@@ -211,9 +242,21 @@ model Event {
   scen      Int     @default(1)
   sold      Int     @default(0)
 
+  // --- run times ---
+  /// Doors, bar close and everyone-out, as the venue says them: "8:00pm",
+  /// "1:00am". Strings rather than DateTimes because these are a time of
+  /// night, not an instant — an event moved to another week keeps its doors
+  /// time, and nothing here should survive a timezone conversion.
+  ///
+  /// The ordering that matters is "is this after midnight", which
+  /// `timeMinutes` in src/lib/event-record.ts answers by carrying the small
+  /// hours past 1440. The licence gate hangs off it.
+  doors     String?
+  barClose  String?
+  allOut    String?
+
   // --- cost inputs ---
   barHead   Float  @default(0)
-  barClose  String?
   gear      Float  @default(0)
   adv       Float  @default(0)
   /// "wheke" triggers the Wheke Sound sliding-scale fee.

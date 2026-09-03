@@ -1,0 +1,655 @@
+/* The event record. Densities are the prototype's own — this is deliberately
+   a dense tool, so nothing here is loosened for breathing room. Every value
+   comes from src/styles/tokens.css. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.headMain {
+  min-width: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+  text-decoration: none;
+  margin-bottom: 7px;
+}
+
+.back:hover {
+  color: var(--color-accent);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.nick {
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+  font-style: italic;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  font-size: 12px;
+}
+
+.body {
+  padding: var(--body-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* --- tone --------------------------------------------------------------- */
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+.plain {
+  color: var(--color-neutral-600);
+}
+
+.loss {
+  color: var(--st-stop);
+}
+
+.thin {
+  color: var(--st-warn);
+}
+
+.healthy {
+  color: var(--st-good);
+}
+
+.note {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  margin: 0 0 var(--space-3);
+  max-width: 72ch;
+}
+
+.none {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+/* --- leads -------------------------------------------------------------- */
+
+.leads {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.lead {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+}
+
+.leadLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+  margin-bottom: 6px;
+}
+
+/* --- facts -------------------------------------------------------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.fact {
+  border-left: 2px solid var(--color-divider);
+  padding-left: 10px;
+}
+
+.factKey {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+  margin-bottom: 3px;
+}
+
+.factValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: var(--color-neutral-100);
+}
+
+.factNote {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  margin-top: 2px;
+}
+
+/* --- run times ---------------------------------------------------------- */
+
+.times {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.timeField {
+  display: block;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+}
+
+.select {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+}
+
+.textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  resize: vertical;
+}
+
+/* --- gates -------------------------------------------------------------- */
+
+.gates {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: 13px 15px;
+  margin-bottom: var(--space-4);
+}
+
+.gatesHead {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 9px;
+}
+
+.gatesTitle {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  flex: none;
+}
+
+.gate {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-top: 1px solid var(--color-divider);
+  font-size: 12.5px;
+  color: var(--st-warn);
+}
+
+.gateOk {
+  color: var(--st-good);
+}
+
+.gateLabel {
+  flex: none;
+  color: var(--color-neutral-100);
+}
+
+.gateWhy {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+  min-width: 0;
+}
+
+.gateGap {
+  flex: 1;
+}
+
+.gatesMsg {
+  font-size: 11.5px;
+  color: var(--st-warn);
+  margin: 9px 0 0;
+}
+
+.gatesMsgGood {
+  font-size: 11.5px;
+  color: var(--st-good);
+  margin: 9px 0 0;
+}
+
+/* --- tiers -------------------------------------------------------------- */
+
+.tiers {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.tiersLabel {
+  color: var(--color-neutral-600);
+  font-size: 11.5px;
+}
+
+.tier {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.tierName {
+  color: var(--color-neutral-500);
+  font-size: 11px;
+}
+
+.tierPrice {
+  color: var(--color-neutral-100);
+}
+
+.tierShare {
+  color: var(--color-neutral-600);
+  font-size: 11px;
+}
+
+.tierLink {
+  font-size: 11.5px;
+  color: var(--color-accent);
+}
+
+/* --- chips -------------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+}
+
+.chip {
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 4px 11px;
+}
+
+.chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+.chipOn {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.chipStop {
+  color: var(--st-stop);
+  border-color: var(--st-stop);
+  background: color-mix(in srgb, var(--st-stop) 12%, transparent);
+}
+
+/* --- artists ------------------------------------------------------------ */
+
+.artists {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.artist {
+  border-top: 1px solid var(--color-divider);
+  padding: 9px 0;
+}
+
+.artistMain {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+
+.artistName {
+  font-size: 13.5px;
+  color: var(--color-neutral-100);
+}
+
+.status {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+
+.st_confirmed {
+  color: var(--st-good);
+}
+
+.st_pencilled {
+  color: var(--st-warn);
+}
+
+.st_declined {
+  color: var(--color-neutral-700);
+  text-decoration: line-through;
+}
+
+.fee {
+  font-size: 12px;
+  color: var(--color-neutral-400);
+}
+
+.unlinked {
+  font-size: 11px;
+  color: var(--st-warn);
+}
+
+.artistFiles {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 2px 7px;
+}
+
+.fileHave {
+  color: var(--st-good);
+  border-color: color-mix(in srgb, var(--st-good) 40%, transparent);
+}
+
+/* --- terms & split ------------------------------------------------------ */
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: var(--space-3);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: 13px 15px;
+  margin-bottom: var(--space-3);
+}
+
+.splitCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.splitLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+
+.splitBig {
+  font-family: var(--font-heading);
+  font-size: 23px;
+  line-height: 1.1;
+  color: var(--color-neutral-100);
+}
+
+.splitNote {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.splitBars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(252px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.barHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 9px;
+  font-size: 12px;
+  color: var(--color-neutral-300);
+}
+
+/* --- deal --------------------------------------------------------------- */
+
+.deal {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dealHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+
+.dealNote {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--color-neutral-300);
+  border-left: 2px solid var(--st-warn);
+  padding-left: 10px;
+  margin: 0;
+}
+
+.dealActions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+/* --- tables ------------------------------------------------------------- */
+
+.table {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  overflow-x: auto;
+}
+
+.tableHead,
+.tableRow {
+  display: grid;
+  grid-template-columns: 1.4fr 2fr 0.6fr 0.7fr 0.7fr;
+  gap: 11px;
+  align-items: center;
+  padding: 7px 13px;
+  font-size: 12px;
+  min-width: 620px;
+}
+
+.tableHead {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.tableRow {
+  border-top: 1px solid var(--color-divider);
+  color: var(--color-neutral-200);
+}
+
+.tableRow:first-of-type {
+  border-top: 0;
+}
+
+.right {
+  text-align: right;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.person {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--color-neutral-300);
+}
+
+.orgLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  margin: 0 0 4px;
+  max-width: 78ch;
+}
+
+/* --- distribution ------------------------------------------------------- */
+
+.channels {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+}
+
+.channel {
+  display: grid;
+  grid-template-columns: 16px 1.1fr 2fr 0.7fr;
+  gap: 11px;
+  align-items: center;
+  border-top: 1px solid var(--color-divider);
+  padding: 7px 0;
+  font-size: 12px;
+}
+
+.channelName {
+  color: var(--color-neutral-100);
+}
+
+.channelNote {
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+}
+
+/* --- activity ----------------------------------------------------------- */
+
+.activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.beat {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  border-top: 1px solid var(--color-divider);
+  padding: 7px 0;
+  font-size: 12px;
+}
+
+.beatText {
+  flex: 1;
+  color: var(--color-neutral-200);
+  min-width: 0;
+}
+
+.beatWhen {
+  flex: none;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}

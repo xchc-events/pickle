@@ -3,6 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, money } from './format'
 import { financeVals, type Scenario } from './finance'
+import { financeInputFor, orgShareFor, scenarioOf } from './finance-input'
 import { capacityOf, mixProblem, normaliseMix, paceOf, sellThrough, tierTable } from './ticketing'
 import { STAGES } from './constants'
 import type { SessionUser } from './session'
@@ -84,60 +85,6 @@ export interface TicketingLoad {
 
 const SCENARIO_LABELS = ['Quiet', 'Likely', 'Great'] as const
 
-/** The shape `financeVals` wants, assembled from a loaded event row. */
-function financeInputFor(
-  row: {
-    date: Date
-    std: number
-    door: number
-    mix: number[]
-    att: number[]
-    scen: number
-    barHead: number
-    gear: number
-    adv: number
-    sound: string | null
-    crew: number
-    tok: number
-    split: number
-    artists: { low: number; high: number; status: string }[]
-    shifts: { hours: number; personId: string | null }[]
-    tasks: { est: number; actual: number | null }[]
-    addons: { kind: string; cost: number | null; hours: number | null }[]
-  },
-  scen: Scenario,
-  orgShareHours: number,
-) {
-  return {
-    dow: row.date.getDay(),
-    std: row.std,
-    door: row.door,
-    mix: normaliseMix(row.mix),
-    att: [row.att[0] ?? 0, row.att[1] ?? 0, row.att[2] ?? 0] as [number, number, number],
-    scen,
-    barHead: row.barHead,
-    gear: row.gear,
-    adv: row.adv,
-    sound: row.sound,
-    crew: row.crew,
-    tok: row.tok,
-    split: row.split,
-    artists: row.artists.map((a) => ({
-      low: a.low,
-      high: a.high,
-      status: a.status.toLowerCase() as 'enquired' | 'pencilled' | 'confirmed' | 'declined',
-    })),
-    shifts: row.shifts.map((s) => ({ hours: s.hours, assigned: s.personId !== null })),
-    tasks: row.tasks.map((t) => ({ est: t.est, actual: t.actual })),
-    addons: row.addons.map((a) => ({
-      kind: a.kind.toLowerCase() as 'gear' | 'labour',
-      cost: a.cost ?? undefined,
-      hours: a.hours ?? undefined,
-    })),
-    orgShareHours,
-  }
-}
-
 const EVENT_INCLUDE = {
   space: { select: { name: true } },
   artists: { select: { low: true, high: true, status: true } },
@@ -184,21 +131,11 @@ export async function loadTicketing(
 
   const row = rows.find((e) => e.id === chosen)!
 
-  // Org-wide labour apportioned to this event's month, the same input the
-  // Finance module uses. Kept simple here: the count of org hours that month
-  // over the events in it.
-  const monthStart = new Date(row.date.getFullYear(), row.date.getMonth(), 1)
-  const monthEnd = new Date(row.date.getFullYear(), row.date.getMonth() + 1, 1)
-  const [orgHours, eventsThatMonth] = await Promise.all([
-    db.hourEntry.aggregate({
-      where: { eventId: null, workedOn: { gte: monthStart, lt: monthEnd } },
-      _sum: { hours: true },
-    }),
-    db.event.count({ where: { date: { gte: monthStart, lt: monthEnd } } }),
-  ])
-  const orgShareHours = eventsThatMonth > 0 ? (orgHours._sum.hours ?? 0) / eventsThatMonth : 0
+  // Org-wide labour apportioned to this event's month, the same input every
+  // other projection uses. See src/lib/finance-input.ts.
+  const orgShareHours = await orgShareFor(row.date)
 
-  const scen = Math.min(2, Math.max(0, row.scen)) as Scenario
+  const scen = scenarioOf(row.scen)
   const vals = financeVals(financeInputFor(row, scen, orgShareHours))
   const capacity = capacityOf(row.space.name, row.format)
 
