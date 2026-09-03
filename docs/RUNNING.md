@@ -15,13 +15,13 @@ file is canonical** — if the two disagree, this one wins.
 The app and the database do not live in the same place. They talk over
 `localhost:5432`, and that is the only connection between them.
 
-|           | The app                               | The database                                                                     |
-| --------- | ------------------------------------- | -------------------------------------------------------------------------------- |
-| **Where** | your Mac, as a `node` process         | Docker, container `pickleevents_devcontainer-db-1`                               |
-| **What**  | `next dev` on port 3000               | `postgres:17-alpine` on port 5432                                                |
-| **Start** | `npm run dev`                         | Docker Desktop, or `docker compose -f .devcontainer/docker-compose.yml up -d db` |
-| **Stop**  | Ctrl+C                                | almost never — leave it running                                                  |
-| **Holds** | your code, and a cached Prisma client | every event, person and hour you have seeded                                     |
+|           | The app                               | The database                                                     |
+| --------- | ------------------------------------- | ---------------------------------------------------------------- |
+| **Where** | your Mac, as a `node` process         | Docker, container `pickleevents_devcontainer-db-1`               |
+| **What**  | `next dev` on port 3000               | `postgres:17-alpine` on port 5432                                |
+| **Start** | `npm run dev`                         | Docker Desktop, or `docker start pickleevents_devcontainer-db-1` |
+| **Stop**  | Ctrl+C                                | almost never — leave it running                                  |
+| **Holds** | your code, and a cached Prisma client | every event, person and hour you have seeded                     |
 
 **So: use the Mac terminal — or the VS Code terminal, which is the same thing.**
 VS Code's built-in terminal is a Mac shell in a panel; use it if you like,
@@ -48,14 +48,21 @@ has been stopped for a day. Everything here assumes you stay out of it.
    `pickleevents_devcontainer-db-1` running. Or:
 
    ```bash
-   docker ps --filter name=db --format "{{.Names}}  {{.Status}}"
+   docker ps --filter name=db --format "{{.Names}}  {{.Status}}  {{.Ports}}"
    ```
 
-   If nothing comes back, start it — this does not require the devcontainer:
+   The one you want says `0.0.0.0:5432->5432/tcp` in the ports column. **A
+   container without that is not the one the app talks to** — see the trap
+   below.
+
+   If it is stopped, start it by name. This is the safest form, because it can
+   only ever start the container that already exists:
 
    ```bash
-   docker compose -f .devcontainer/docker-compose.yml up -d db
+   docker start pickleevents_devcontainer-db-1
    ```
+
+   Clicking ▶ next to it in Docker Desktop does exactly the same thing.
 
 2. **Start the app**, in a terminal you can leave open:
 
@@ -72,6 +79,47 @@ has been stopped for a day. Everything here assumes you stay out of it.
 
 4. **Stop it with Ctrl+C** when you're done. The database keeps running, which
    is what you want.
+
+---
+
+## The `docker compose` trap
+
+**Do not start the database with a bare `docker compose … up -d db`.** It looks
+right and does the wrong thing.
+
+Compose takes its _project name_ from the directory the compose file sits in.
+Our file is at `.devcontainer/docker-compose.yml`, so a bare invocation runs
+under the project `devcontainer` — and names its container `devcontainer-db-1`,
+with its own separate `devcontainer_postgres` volume.
+
+But the real stack was created by VS Code's devcontainer tooling, which prefixes
+the project with the workspace folder: `pickleevents_devcontainer`. That is the
+container publishing port 5432, and the volume holding your data.
+
+So the bare command silently builds a **second, empty database** beside the real
+one, and leaves the app pointing at a port nothing is listening on —
+`ECONNREFUSED`.
+
+If you ever do need compose, name the project explicitly:
+
+```bash
+docker compose -p pickleevents_devcontainer -f .devcontainer/docker-compose.yml up -d db
+```
+
+### Recovering a deleted database container
+
+If `pickleevents_devcontainer-db-1` is gone entirely, the data is almost
+certainly still fine — the container and its volume are separate things, and
+deleting the container leaves `pickleevents_devcontainer_postgres` untouched.
+The command above recreates the container on the existing volume:
+
+```bash
+docker volume ls | grep pickleevents      # confirm the volume is still there
+docker compose -p pickleevents_devcontainer -f .devcontainer/docker-compose.yml up -d db
+```
+
+Nothing is re-seeded and nothing is lost. Only removing the _volume_ destroys
+data.
 
 ---
 
@@ -134,13 +182,13 @@ the same as the page rendering.
 
 ## When something looks broken
 
-| What you see                                    | What it is                                   | Fix                                     | Where  |
-| ----------------------------------------------- | -------------------------------------------- | --------------------------------------- | ------ |
-| Every page 500s after new work                  | Server holding a pre-migration Prisma client | Ctrl+C, `npm run dev`                   | Mac    |
-| `Another next dev server is already running`    | An old server still holds port 3000          | `lsof -ti:3000 \| xargs kill`           | Mac    |
-| `Can't reach database server at localhost:5432` | Postgres container is stopped                | Start it in Docker Desktop              | Docker |
-| `Unknown field … for select statement`          | Same cached-client problem                   | `npm run db:generate`, restart          | Mac    |
-| `.env.example: Operation not permitted`         | Claude's sandbox refusing to read env files  | Ignore — never happens in your terminal | Mac    |
+| What you see                                                     | What it is                                                                  | Fix                                                                        | Where  |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ |
+| Every page 500s after new work                                   | Server holding a pre-migration Prisma client                                | Ctrl+C, `npm run dev`                                                      | Mac    |
+| `Another next dev server is already running`                     | An old server still holds port 3000                                         | `lsof -ti:3000 \| xargs kill`                                              | Mac    |
+| `ECONNREFUSED` / `Can't reach database server at localhost:5432` | The real container is stopped or was replaced by a bare `docker compose up` | `docker start pickleevents_devcontainer-db-1` — see the compose trap above | Docker |
+| `Unknown field … for select statement`                           | Same cached-client problem                                                  | `npm run db:generate`, restart                                             | Mac    |
+| `.env.example: Operation not permitted`                          | Claude's sandbox refusing to read env files                                 | Ignore — never happens in your terminal                                    | Mac    |
 
 ---
 
@@ -175,10 +223,14 @@ project name. It has its own volume, holds nothing needed, and cannot take port
 To remove it:
 
 ```bash
-docker rm devcontainer-db-1
+docker rm -f devcontainer-db-1
 docker volume rm devcontainer_postgres
 ```
 
 **Read the name before pressing enter.** Remove `devcontainer-db-1`; keep
-`pickleevents_devcontainer-db-1`. They differ by a prefix, and removing the
+`pickleevents_devcontainer-db-1`. They differ only by a prefix, and removing the
 wrong volume destroys the seeded data.
+
+Removing the stray container is safe at any time. Removing the _stray volume_ is
+also safe — it has never held anything — but it is the one irreversible command
+on this page, so check the name twice.
