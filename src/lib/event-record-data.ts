@@ -437,19 +437,9 @@ export async function loadEventRecord(
       { key: 'Kind of night', value: row.kind, note: 'drives the roster' },
       { key: 'Format', value: row.format, note: 'what the room is told it is' },
       { key: 'Space', value: row.space.name, note: `holds ${capacity}` },
-      { key: 'Doors', value: row.doors ?? 'not set', note: 'every shift offsets from here' },
-      {
-        key: 'Bar close',
-        value: row.barClose ?? 'not set',
-        note: isLate(row.barClose)
-          ? 'past midnight — needs a licence'
-          : 'within the standard licence',
-      },
-      {
-        key: 'Everyone out',
-        value: row.allOut ?? 'not set',
-        note: 'clean-up crew works back from it',
-      },
+      // Doors, bar close and everyone-out are not repeated here — they are
+      // editable a few lines below in RunTimes, and a read-only copy beside an
+      // editable one is two places showing the same field.
     ],
 
     gates,

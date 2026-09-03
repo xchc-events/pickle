@@ -116,10 +116,11 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                   <i className={`ph ${l.icon}`} aria-hidden="true" />
                   {l.label} lead
                 </span>
+                {/* Bound, not wrapped in an arrow: a closure created here is
+                    an ordinary function, and a Server Component may only hand
+                    a Client Component a server action itself. */}
                 <LeadPicker
-                  action={(personId) =>
-                    setLead(ev.id, l.role.toUpperCase() as LeadRole, personId || null)
-                  }
+                  action={setLead.bind(null, ev.id, l.role.toUpperCase() as LeadRole)}
                   value={l.personId ?? ''}
                   options={leadOptions}
                   label={`${l.label} lead`}
