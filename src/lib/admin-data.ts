@@ -21,7 +21,13 @@ export interface AdminUser {
   role: Role
   roleLabel: string
   modules: string
-  promoter: string | null
+  /** The organisation an external account acts for, and what scopes it. */
+  organisationId: string | null
+  organisationName: string | null
+  /** External people only. Staff are named through their Person record. */
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
   active: boolean
   personId: string | null
   personName: string | null
@@ -46,8 +52,8 @@ export interface AdminLoad {
   people: PersonOption[]
   roles: { value: Role; label: string }[]
   activeAdmins: number
-  /** Promoter organisations already in use, for the picker. */
-  promoters: string[]
+  /** Every promoter organisation, for the picker. */
+  organisations: { id: string; name: string }[]
 }
 
 export async function loadAdmin(): Promise<AdminLoad> {
@@ -55,6 +61,7 @@ export async function loadAdmin(): Promise<AdminLoad> {
     orderBy: [{ active: 'desc' }, { role: 'asc' }, { email: 'asc' }],
     include: {
       person: { select: { id: true, name: true, initials: true } },
+      organisation: { select: { id: true, name: true } },
       accounts: { select: { provider: true } },
       sessions: { where: { expires: { gt: new Date() } }, select: { sessionToken: true } },
     },
@@ -79,12 +86,20 @@ export async function loadAdmin(): Promise<AdminLoad> {
       modules: MODULES.filter((m) => mods.includes(m.key))
         .map((m) => m.label)
         .join(' · '),
-      promoter: u.promoter,
+      organisationId: u.organisationId,
+      organisationName: u.organisation?.name ?? null,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      phone: u.phone,
       active: u.active,
       personId: u.personId,
       personName: u.person?.name ?? null,
       initials: u.person?.initials ?? initialsOf(u.name ?? u.email),
-      problems: userProblems({ role: u.role, promoter: u.promoter, personId: u.personId }),
+      problems: userProblems({
+        role: u.role,
+        organisationId: u.organisationId,
+        personId: u.personId,
+      }),
       everSignedIn: u.accounts.length > 0 || u.emailVerified !== null,
       liveSessions: u.sessions.length,
     }
@@ -99,9 +114,14 @@ export async function loadAdmin(): Promise<AdminLoad> {
     })
   ).map((p) => ({ ...p, taken: claimed.has(p.id) }))
 
-  const promoters = [
-    ...new Set(rows.map((u) => u.promoter).filter((p): p is string => Boolean(p))),
-  ].sort()
+  // Every organisation on the books, not only those already carrying an
+  // account — a coordinator links a new promoter to an existing label, which
+  // means the label has to be offerable before anybody belongs to it.
+  const organisations = await db.payee.findMany({
+    where: { kind: 'PROMOTER' },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  })
 
   return {
     users,
@@ -111,6 +131,6 @@ export async function loadAdmin(): Promise<AdminLoad> {
       label: ROLE_LABEL[k],
     })),
     activeAdmins: rows.filter((u) => u.active && u.role === 'ADMIN').length,
-    promoters,
+    organisations,
   }
 }

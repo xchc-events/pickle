@@ -297,19 +297,33 @@ describe('pipelineSubline', () => {
 
 describe('eventScope', () => {
   it('does not narrow the query for venue staff', () => {
-    expect(eventScope({ external: false, promoter: null })).toEqual({})
+    expect(eventScope({ external: false, organisationId: null })).toEqual({})
   })
 
-  it('scopes an external promoter to their own org', () => {
-    expect(eventScope({ external: true, promoter: 'Kōura Records' })).toEqual({
-      promoter: { contains: 'Kōura Records' },
+  it('scopes an external promoter to their organisation by id', () => {
+    // An exact match on the relation, never a match on the free-text name.
+    expect(eventScope({ external: true, organisationId: 'org_koura' })).toEqual({
+      promoterId: 'org_koura',
     })
   })
 
   it('shows an external user with no org nothing at all', () => {
     // The dangerous failure is returning {} here, which would hand them the
     // whole building.
-    expect(eventScope({ external: true, promoter: null })).toEqual({ id: { in: [] } })
+    expect(eventScope({ external: true, organisationId: null })).toEqual({ id: { in: [] } })
+  })
+
+  it('never scopes on a substring of a name', () => {
+    // The bug this replaced: `{ promoter: { contains: 'Sound' } }` matched
+    // "Puha Sound" and "Wheke Sound" too, so an organisation whose name was a
+    // substring of another's read that other organisation's shows — their
+    // ticket figures, their terms, their settlements.
+    //
+    // Asserted structurally rather than by example, because the failure is
+    // that a *substring* operator is present at all.
+    const clause = eventScope({ external: true, organisationId: 'Sound' })
+    expect(JSON.stringify(clause)).not.toContain('contains')
+    expect(clause).not.toHaveProperty('promoter')
   })
 })
 

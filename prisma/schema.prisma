@@ -61,9 +61,32 @@ model User {
   name     String?
   image    String?
   role     Role    @default(COORDINATOR)
-  /// Set for PROMOTER users — scopes every query to this promoter's events.
-  promoter String?
   active   Boolean @default(true)
+
+  // --- external promoters and curators ---
+  //
+  // People outside the venue are Users, not Persons. A Person carries shifts,
+  // timesheets and availability; an outside coordinator has none of those, and
+  // giving them one would put them in the roster's people list.
+  /// Given and family name, kept apart because the venue writes to these
+  /// people by name and "Awhina" is not the half you greet someone with.
+  firstName String?
+  lastName  String?
+  phone     String?
+
+  /// The organisation, label, collective, agency or brand this person acts
+  /// for — and the whole of what they may see. `eventScope` matches
+  /// `Event.promoterId` against exactly this, so a wrong value here is a
+  /// disclosure rather than a display bug.
+  ///
+  /// Many users may share one organisation. That is the point: a label with
+  /// three promoters gets three accounts and one set of shows.
+  organisationId String?
+  organisation   Payee?  @relation("OrgMembers", fields: [organisationId], references: [id])
+
+  /// Superseded by `organisationId`. Kept for one release so the backfill can
+  /// be checked against it, then dropped.
+  promoter String?
 
   personId String? @unique
   person   Person? @relation(fields: [personId], references: [id])
@@ -148,6 +171,19 @@ enum RiskKind {
   STOP
 }
 
+/// Where the terms with an outside promoter stand. SENT is the resting state
+/// — the venue has put a deal to them and nobody has said anything back.
+enum DealState {
+  SENT
+  AGREED
+  QUERIED
+}
+
+enum TechStatus {
+  DRAFT
+  CONFIRMED
+}
+
 enum Licence {
   NOT_REQUIRED
   REQUIRED
@@ -161,6 +197,14 @@ model Event {
   id        String   @id @default(cuid())
   name      String
   date      DateTime
+  /// The date is still a best guess. `date` is always set so the event sorts
+  /// into the calendar and the pipeline can count days to door, but the stage
+  /// gate out of Enquiry treats it as unlocked until this clears.
+  ///
+  /// A nullable `date` would have been the other way to say this, and it was
+  /// not taken: every read of the date would then need a null branch, to
+  /// express something only the first stage cares about.
+  dateTbc   Boolean  @default(false)
   spaceId   String
   space     Space    @relation(fields: [spaceId], references: [id])
   kind      String
@@ -169,19 +213,21 @@ model Event {
   format    String  @default("DJs")
   ownerId   String?
   owner     Person? @relation("EventOwner", fields: [ownerId], references: [id])
-  /// Set when an outside promoter brings the show. Scopes portal access.
+  /// What the pipeline shows and what staff type — "Kōura Records",
+  /// "internal · Ana Kelliher". Display only.
   ///
-  /// Still the free-text name `eventScope()` matches on. `promoterId` below
-  /// is the record it should resolve to; the two live side by side until the
-  /// scope rule is migrated onto the relation, which is a permissions change
-  /// and gets its own tests rather than riding along with this one.
+  /// It decides nothing about access. `promoterId` below is what `eventScope`
+  /// matches on; this field was doing that job and let one organisation read
+  /// another's shows by substring. See src/lib/scope.ts.
   promoter  String?
-  /// The promoter as a record — who is paid, and where their details live.
+  /// The organisation that brought the show — who is paid, where their details
+  /// live, and the only thing that scopes an external user to this event.
   promoterId String?
   promoterPayee Payee? @relation("EventPromoter", fields: [promoterId], references: [id])
   internal  Boolean  @default(false)
 
-  /// 0 enquiry … 7 settled. Transitions are gated — see src/lib/gates.ts.
+  /// 0 enquiry … 7 settled. Transitions are gated — see `gatesFor` in
+  /// src/lib/event-record.ts.
   stage     Int          @default(0)
   /// When the event entered its current stage. Days-in-stage derives from
   /// this — it is never stored, so it cannot go stale.
@@ -189,6 +235,15 @@ model Event {
   concluded Boolean      @default(false)
   model     BookingModel @default(CURATOR)
   licence   Licence      @default(NOT_REQUIRED)
+
+  /// Where the terms with the promoter stand. The gate out of Negotiating
+  /// requires AGREED, and QUERIED carries their words in `dealNote` so the
+  /// coordinator reads the objection rather than a status.
+  deal      DealState    @default(SENT)
+  dealNote  String?
+
+  /// Whether the tech lead has signed the plan off. Gates Rostering.
+  techStatus TechStatus  @default(DRAFT)
 
   /// Why this event is flagged, in the coordinator's own words. Null means
   /// not at risk. The wording is shown verbatim on the pipeline row.
@@ -211,9 +266,21 @@ model Event {
   scen      Int     @default(1)
   sold      Int     @default(0)
 
+  // --- run times ---
+  /// Doors, bar close and everyone-out, as the venue says them: "8:00pm",
+  /// "1:00am". Strings rather than DateTimes because these are a time of
+  /// night, not an instant — an event moved to another week keeps its doors
+  /// time, and nothing here should survive a timezone conversion.
+  ///
+  /// The ordering that matters is "is this after midnight", which
+  /// `timeMinutes` in src/lib/event-record.ts answers by carrying the small
+  /// hours past 1440. The licence gate hangs off it.
+  doors     String?
+  barClose  String?
+  allOut    String?
+
   // --- cost inputs ---
   barHead   Float  @default(0)
-  barClose  String?
   gear      Float  @default(0)
   adv       Float  @default(0)
   /// "wheke" triggers the Wheke Sound sliding-scale fee.
@@ -548,6 +615,8 @@ model Payee {
 
   artists EventArtist[]
   events  Event[]       @relation("EventPromoter")
+  /// The people who act for this organisation. Empty for an artist payee.
+  members User[]        @relation("OrgMembers")
   files   StoredFile[]
   grants  AccessGrant[]
 

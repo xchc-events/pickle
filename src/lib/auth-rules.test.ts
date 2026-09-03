@@ -138,7 +138,7 @@ describe('mayChangeRole', () => {
 
 describe('userProblems', () => {
   it('is silent for a well-formed staff account', () => {
-    expect(userProblems({ role: 'TECH', promoter: null, personId: 'p1' })).toEqual([])
+    expect(userProblems({ role: 'TECH', organisationId: null, personId: 'p1' })).toEqual([])
   })
 
   /**
@@ -147,26 +147,26 @@ describe('userProblems', () => {
    * That is safe, and it is also useless, so it is worth saying out loud.
    */
   it('flags a promoter with no organisation — they would see nothing', () => {
-    expect(userProblems({ role: 'PROMOTER', promoter: null, personId: null })).toContainEqual(
+    expect(userProblems({ role: 'PROMOTER', organisationId: null, personId: null })).toContainEqual(
       expect.stringMatching(/organisation|promoter/i),
     )
   })
 
   it('flags an internal account with no person record', () => {
-    expect(userProblems({ role: 'TECH', promoter: null, personId: null })).toContainEqual(
+    expect(userProblems({ role: 'TECH', organisationId: null, personId: null })).toContainEqual(
       expect.stringMatching(/person|hours|roster/i),
     )
   })
 
   it('does not ask a promoter for a person record — they are not staff', () => {
-    expect(userProblems({ role: 'PROMOTER', promoter: 'Kōura Records', personId: null })).toEqual(
+    expect(userProblems({ role: 'PROMOTER', organisationId: 'org_koura', personId: null })).toEqual(
       [],
     )
   })
 
   it('flags a staff account that carries a promoter organisation', () => {
     expect(
-      userProblems({ role: 'TECH', promoter: 'Kōura Records', personId: 'p1' }),
+      userProblems({ role: 'TECH', organisationId: 'org_koura', personId: 'p1' }),
     ).toContainEqual(expect.stringMatching(/staff|internal|organisation/i))
   })
 })

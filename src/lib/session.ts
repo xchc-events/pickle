@@ -36,8 +36,13 @@ export type SessionUser = {
   name: string
   role: Role
   roleKey: RoleKey
-  /** Set for external promoters — scopes every event query to their org. */
-  promoter: string | null
+  /**
+   * The organisation an external promoter acts for. This — not the name
+   * beside it — is what `eventScope` narrows every event query by.
+   */
+  organisationId: string | null
+  /** The organisation's name, for display only. Never used to scope. */
+  organisationName: string | null
   external: boolean
   /** The person record behind the account, when there is one. */
   personId: string | null
@@ -54,10 +59,14 @@ export const stubAllowed = process.env.NODE_ENV !== 'production'
 /** Whether real sign-in is available on this install. */
 export { authConfigured }
 
-const USER_INCLUDE = { person: true } as const
+const USER_INCLUDE = {
+  person: true,
+  organisation: { select: { id: true, name: true } },
+} as const
 
 type Row = NonNullable<Awaited<ReturnType<typeof db.user.findFirst>>> & {
   person?: { name: string; initials: string } | null
+  organisation?: { id: string; name: string } | null
 }
 
 function shape(u: Row, authenticated: boolean): SessionUser {
@@ -66,7 +75,8 @@ function shape(u: Row, authenticated: boolean): SessionUser {
     name: u.name ?? u.person?.name ?? u.email,
     role: u.role,
     roleKey: roleKeyOf(u.role),
-    promoter: u.promoter,
+    organisationId: u.organisation?.id ?? null,
+    organisationName: u.organisation?.name ?? null,
     external: u.role === 'PROMOTER',
     personId: u.personId,
     initials: u.person?.initials ?? initialsOf(u.name ?? u.email),

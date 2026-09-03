@@ -64,8 +64,10 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
         <div>
           <h1 className={styles.title}>{user.external ? 'Your events' : 'Pipeline'}</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>{user.external ? user.promoter : 'the Crock'}</span> ·{' '}
-            {pipelineSubline(all, rows.length)}
+            <span className={styles.kicker}>
+              {user.external ? user.organisationName : 'the Crock'}
+            </span>{' '}
+            · {pipelineSubline(all, rows.length)}
           </p>
         </div>
         {/* An external promoter does not start enquiries from in here. */}
@@ -128,7 +130,9 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                   data-testid="pipeline-row"
                 >
                   <span className={styles.name}>
-                    <span className={styles.eventName}>{e.name}</span>
+                    <Link href={`/events/${e.id}`} className={styles.eventName}>
+                      {e.name}
+                    </Link>
                     <span className={`${styles.meta} ${atRisk ? styles.metaRisk : ''}`}>
                       {atRisk ? (
                         <i

@@ -17,23 +17,19 @@ import type { SessionUser } from './session'
  */
 
 /**
- * The Payee record for a promoter's organisation, created on first use.
+ * The organisation this user acts for.
  *
- * `User.promoter` is a name rather than a relation — see the note on
- * `Event.promoter` in the schema — so the name is the join key until that
- * migration happens.
+ * A plain read now, where it used to look a Payee up by name and create one if
+ * it was missing. Both of those were consequences of scoping on a name: the
+ * organisation is created by the migration or by a coordinator in Admin, and a
+ * user who is not linked to one sees nothing rather than silently minting an
+ * organisation for themselves.
  */
 export async function ownPayee(user: SessionUser): Promise<{ id: string; name: string } | null> {
-  if (!user.external || !user.promoter) return null
+  if (!user.external || !user.organisationId) return null
 
-  const existing = await db.payee.findFirst({
-    where: { kind: 'PROMOTER', name: user.promoter },
-    select: { id: true, name: true },
-  })
-  if (existing) return existing
-
-  return db.payee.create({
-    data: { kind: 'PROMOTER', name: user.promoter, country: 'NZ' },
+  return db.payee.findFirst({
+    where: { id: user.organisationId, kind: 'PROMOTER' },
     select: { id: true, name: true },
   })
 }
@@ -73,7 +69,7 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
 
   return {
     payee: own ? await maskedPayee(own.id) : null,
-    orgName: user.promoter,
+    orgName: user.organisationName,
     events: rows.map((e) => ({
       id: e.id,
       name: e.name,

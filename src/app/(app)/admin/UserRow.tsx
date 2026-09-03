@@ -19,14 +19,18 @@ export function UserRow({
   people,
   roles,
   isSelf,
+  organisations,
   setRole,
   setActive,
   linkPerson,
+  setOrganisation,
 }: {
   user: AdminUser
   people: PersonOption[]
   roles: { value: Role; label: string }[]
   isSelf: boolean
+  organisations: { id: string; name: string }[]
+  setOrganisation: (organisationId: string) => Promise<Said>
   setRole: (role: Role) => Promise<Said>
   setActive: (active: boolean) => Promise<Said>
   linkPerson: (personId: string) => Promise<Said>
@@ -59,9 +63,22 @@ export function UserRow({
       </select>
 
       {user.role === 'PROMOTER' ? (
-        <span className={styles.org}>
-          {user.promoter ?? <em className={styles.warn}>no org</em>}
-        </span>
+        /* Several accounts may point at one organisation — that is how a
+           label with three promoters is set up. Nothing stops two rows
+           choosing the same one. */
+        <select
+          className={styles.select}
+          value={user.organisationId ?? ''}
+          disabled={pending}
+          onChange={(e) => run(() => setOrganisation(e.target.value))}
+        >
+          <option value="">— no organisation —</option>
+          {organisations.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.name}
+            </option>
+          ))}
+        </select>
       ) : (
         <select
           className={styles.select}

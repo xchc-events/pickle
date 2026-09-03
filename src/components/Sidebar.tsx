@@ -61,7 +61,7 @@ export function Sidebar({ user, modules }: { user: SessionUser; modules: ModuleK
           <span className={styles.name}>{user.name}</span>
           <span className={styles.role}>
             {ROLE_LABEL[user.roleKey]}
-            {user.promoter ? ` · ${user.promoter}` : ''}
+            {user.organisationName ? ` · ${user.organisationName}` : ''}
           </span>
         </span>
         <form action={signOut}>

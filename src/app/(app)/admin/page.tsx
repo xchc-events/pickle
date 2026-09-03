@@ -4,7 +4,7 @@ import { authConfigured, stubAllowed } from '@/lib/session'
 import { SectionHeading } from '@/components/SectionHeading'
 import { UserRow } from './UserRow'
 import { AddUser } from './AddUser'
-import { addUser, linkPerson, setActive, setRole } from './actions'
+import { addUser, linkPerson, setActive, setOrganisation, setRole } from './actions'
 import styles from './admin.module.css'
 
 /**
@@ -17,7 +17,7 @@ import styles from './admin.module.css'
  */
 export default async function AdminPage() {
   const { user } = await requireModule('admin')
-  const { users, people, roles, activeAdmins, promoters } = await loadAdmin()
+  const { users, people, roles, activeAdmins, organisations } = await loadAdmin()
 
   return (
     <div>
@@ -56,9 +56,11 @@ export default async function AdminPage() {
               people={people}
               roles={roles}
               isSelf={u.id === user.id}
+              organisations={organisations}
               setRole={setRole.bind(null, u.id)}
               setActive={setActive.bind(null, u.id)}
               linkPerson={linkPerson.bind(null, u.id)}
+              setOrganisation={setOrganisation.bind(null, u.id)}
             />
           ))}
         </ul>
@@ -72,7 +74,7 @@ export default async function AdminPage() {
 
         <SectionHeading note="they cannot add themselves">Add somebody</SectionHeading>
 
-        <AddUser roles={roles} people={people} promoters={promoters} add={addUser} />
+        <AddUser roles={roles} people={people} organisations={organisations} add={addUser} />
 
         <p className={styles.footnote}>
           Adding an account sends nothing. Give them the address of this site and they ask for a
