@@ -37,7 +37,12 @@ export async function addUser(form: FormData): Promise<Said> {
   const name = String(form.get('name') ?? '').trim()
   const role = String(form.get('role') ?? 'COORDINATOR') as Role
   const personId = String(form.get('personId') ?? '') || null
-  const promoter = String(form.get('promoter') ?? '').trim() || null
+  // For an external account this is an organisation *id* from the picker, not
+  // a typed name — see `setOrganisation` below for why.
+  const organisationId = String(form.get('organisationId') ?? '').trim() || null
+  const firstName = String(form.get('firstName') ?? '').trim() || null
+  const lastName = String(form.get('lastName') ?? '').trim() || null
+  const phone = String(form.get('phone') ?? '').trim() || null
 
   if (!email.includes('@')) return said('That is not an email address.', 'stop')
 
@@ -64,10 +69,12 @@ export async function addUser(form: FormData): Promise<Said> {
   await db.user.create({
     data: {
       email,
-      name: name || null,
+      name: name || [firstName, lastName].filter(Boolean).join(' ') || null,
       role,
       personId,
-      promoter: role === 'PROMOTER' ? promoter : null,
+      ...(role === 'PROMOTER'
+        ? { organisationId, firstName, lastName, phone }
+        : { organisationId: null }),
       active: true,
     },
   })
@@ -94,7 +101,7 @@ export async function setRole(userId: string, role: Role): Promise<Said> {
     where: { id: userId },
     // Only a promoter carries an organisation. Moving somebody inside the
     // venue clears it rather than leaving a stale scope on the account.
-    data: { role, ...(role === 'PROMOTER' ? {} : { promoter: null }) },
+    data: { role, ...(role === 'PROMOTER' ? {} : { organisationId: null }) },
   })
 
   refresh()
@@ -172,9 +179,29 @@ export async function linkPerson(userId: string, personId: string): Promise<Said
   )
 }
 
-export async function setPromoter(userId: string, promoter: string): Promise<Said> {
+/**
+ * Put an external account into an organisation.
+ *
+ * Takes an organisation *id*, never a typed name. That is the whole point of
+ * this change: the organisation is a record, several people can share it, and
+ * what a promoter may read is decided by matching that id against
+ * `Event.promoterId` rather than by matching text against text.
+ *
+ * Linking more than one promoter to one label is exactly this action, run
+ * twice. It is deliberately manual — the venue does it rarely, and a
+ * heuristic that guessed which label somebody belonged to would be a
+ * heuristic deciding who reads whose settlements.
+ */
+export async function setOrganisation(userId: string, organisationId: string): Promise<Said> {
   const { user } = await requireModule('admin')
-  if (user.role !== 'ADMIN') return said('Only an administrator can do that.', 'stop')
+
+  // Coordinators as well as admins, per the venue's own ask. Still not the
+  // promoters themselves: an external user moving their own account into
+  // another organisation would be choosing what they can read.
+  if (user.role !== 'ADMIN' && user.role !== 'COORDINATOR') {
+    return said('Only a coordinator or an administrator can do that.', 'stop')
+  }
+  if (user.external) return said('Not something an external account can do.', 'stop')
 
   const target = await db.user.findUnique({
     where: { id: userId },
@@ -185,14 +212,65 @@ export async function setPromoter(userId: string, promoter: string): Promise<Sai
     return said('Only an external coordinator carries an organisation.', 'stop')
   }
 
-  const org = promoter.trim() || null
-  await db.user.update({ where: { id: userId }, data: { promoter: org } })
+  const id = organisationId.trim() || null
+
+  // The id has to name a real promoter organisation. Without this the account
+  // would be scoped to something that matches no event, which looks identical
+  // to a permissions bug from the outside.
+  let name: string | null = null
+  if (id) {
+    const org = await db.payee.findFirst({
+      where: { id, kind: 'PROMOTER' },
+      select: { name: true },
+    })
+    if (!org) return said('That is not an organisation on the books.', 'stop')
+    name = org.name
+  }
+
+  await db.user.update({ where: { id: userId }, data: { organisationId: id } })
 
   refresh()
   return said(
-    org
-      ? `${target.email} now sees ${org}'s events, and nothing else.`
+    name
+      ? `${target.email} now sees ${name}'s events, and nothing else.`
       : 'Organisation cleared — they will see no events at all until one is set.',
-    org ? 'good' : 'warn',
+    name ? 'good' : 'warn',
   )
+}
+
+/** Name and phone for somebody outside the venue. */
+export async function setExternalDetails(
+  userId: string,
+  form: { firstName: string; lastName: string; phone: string },
+): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email: true },
+  })
+  if (!target) return said('No such account.', 'stop')
+  if (target.role !== 'PROMOTER') {
+    return said('Staff are named through their person record, not here.', 'stop')
+  }
+
+  const firstName = form.firstName.trim() || null
+  const lastName = form.lastName.trim() || null
+  const phone = form.phone.trim() || null
+
+  await db.user.update({
+    where: { id: userId },
+    data: {
+      firstName,
+      lastName,
+      phone,
+      // `name` stays the one line the rest of the product shows, so it is kept
+      // in step rather than becoming a third spelling of the same person.
+      name: [firstName, lastName].filter(Boolean).join(' ') || target.email,
+    },
+  })
+
+  refresh()
+  return said('Saved. This is the name and number the venue contacts them on.')
 }

@@ -18,12 +18,12 @@ import styles from './admin.module.css'
 export function AddUser({
   roles,
   people,
-  promoters,
+  organisations,
   add,
 }: {
   roles: { value: Role; label: string }[]
   people: PersonOption[]
-  promoters: string[]
+  organisations: { id: string; name: string }[]
   add: (form: FormData) => Promise<Said>
 }) {
   const say = useToast()
@@ -83,20 +83,33 @@ export function AddUser({
       </label>
 
       {external ? (
-        <label className={styles.field}>
-          <span className={styles.label}>Organisation</span>
-          <input
-            name="promoter"
-            list="promoter-orgs"
-            className={styles.input}
-            placeholder="Kōura Records"
-          />
-          <datalist id="promoter-orgs">
-            {promoters.map((p) => (
-              <option key={p} value={p} />
-            ))}
-          </datalist>
-        </label>
+        <>
+          <label className={styles.field}>
+            <span className={styles.label}>Organisation</span>
+            {/* Chosen from the organisations on the books, not typed. A typo
+                used to mean an account scoped to a name no event carried. */}
+            <select name="organisationId" className={styles.select} defaultValue="">
+              <option value="">— no organisation —</option>
+              {organisations.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>First name</span>
+            <input name="firstName" className={styles.input} placeholder="Awhina" />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Last name</span>
+            <input name="lastName" className={styles.input} placeholder="Reid" />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Phone</span>
+            <input name="phone" className={styles.input} placeholder="021 555 0134" />
+          </label>
+        </>
       ) : (
         <label className={styles.field}>
           <span className={styles.label}>Person</span>

@@ -122,7 +122,8 @@ export function mayChangeRole(
 
 export interface UserShape {
   role: Role
-  promoter: string | null
+  /** The organisation an external account is scoped to. A `Payee` id. */
+  organisationId: string | null
   personId: string | null
 }
 
@@ -137,7 +138,7 @@ export function userProblems(u: UserShape): string[] {
   const problems: string[] = []
 
   if (u.role === 'PROMOTER') {
-    if (!u.promoter) {
+    if (!u.organisationId) {
       problems.push(
         'No promoter organisation, so this account matches no events at all and the portal will be empty.',
       )
@@ -147,7 +148,7 @@ export function userProblems(u: UserShape): string[] {
     return problems
   }
 
-  if (u.promoter) {
+  if (u.organisationId) {
     problems.push(
       'A staff account carrying a promoter organisation. The organisation is ignored for internal roles — clear it to avoid confusion.',
     )

@@ -61,9 +61,32 @@ model User {
   name     String?
   image    String?
   role     Role    @default(COORDINATOR)
-  /// Set for PROMOTER users — scopes every query to this promoter's events.
-  promoter String?
   active   Boolean @default(true)
+
+  // --- external promoters and curators ---
+  //
+  // People outside the venue are Users, not Persons. A Person carries shifts,
+  // timesheets and availability; an outside coordinator has none of those, and
+  // giving them one would put them in the roster's people list.
+  /// Given and family name, kept apart because the venue writes to these
+  /// people by name and "Awhina" is not the half you greet someone with.
+  firstName String?
+  lastName  String?
+  phone     String?
+
+  /// The organisation, label, collective, agency or brand this person acts
+  /// for — and the whole of what they may see. `eventScope` matches
+  /// `Event.promoterId` against exactly this, so a wrong value here is a
+  /// disclosure rather than a display bug.
+  ///
+  /// Many users may share one organisation. That is the point: a label with
+  /// three promoters gets three accounts and one set of shows.
+  organisationId String?
+  organisation   Payee?  @relation("OrgMembers", fields: [organisationId], references: [id])
+
+  /// Superseded by `organisationId`. Kept for one release so the backfill can
+  /// be checked against it, then dropped.
+  promoter String?
 
   personId String? @unique
   person   Person? @relation(fields: [personId], references: [id])
@@ -190,14 +213,15 @@ model Event {
   format    String  @default("DJs")
   ownerId   String?
   owner     Person? @relation("EventOwner", fields: [ownerId], references: [id])
-  /// Set when an outside promoter brings the show. Scopes portal access.
+  /// What the pipeline shows and what staff type — "Kōura Records",
+  /// "internal · Ana Kelliher". Display only.
   ///
-  /// Still the free-text name `eventScope()` matches on. `promoterId` below
-  /// is the record it should resolve to; the two live side by side until the
-  /// scope rule is migrated onto the relation, which is a permissions change
-  /// and gets its own tests rather than riding along with this one.
+  /// It decides nothing about access. `promoterId` below is what `eventScope`
+  /// matches on; this field was doing that job and let one organisation read
+  /// another's shows by substring. See src/lib/scope.ts.
   promoter  String?
-  /// The promoter as a record — who is paid, and where their details live.
+  /// The organisation that brought the show — who is paid, where their details
+  /// live, and the only thing that scopes an external user to this event.
   promoterId String?
   promoterPayee Payee? @relation("EventPromoter", fields: [promoterId], references: [id])
   internal  Boolean  @default(false)
@@ -591,6 +615,8 @@ model Payee {
 
   artists EventArtist[]
   events  Event[]       @relation("EventPromoter")
+  /// The people who act for this organisation. Empty for an artist payee.
+  members User[]        @relation("OrgMembers")
   files   StoredFile[]
   grants  AccessGrant[]
 
