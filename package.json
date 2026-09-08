@@ -21,7 +21,8 @@
     "db:reset": "prisma migrate reset",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test",
     "postinstall": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "r2:smoke": "tsx --conditions=react-server scripts/r2-smoke.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",

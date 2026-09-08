@@ -63,6 +63,32 @@ function noSignUpAdapter(): Adapter {
  */
 const LINK_TTL_SECONDS = 60 * 60
 
+/**
+ * When a sign-in link last went out to this address, or null if none has.
+ *
+ * Derived from the token's expiry rather than stored: Auth.js does not record
+ * an issued-at, and expiry minus the link's life is the same number.
+ *
+ * `excludeToken` exists because the two callers see a different world. The
+ * sign-in action asks *before* Auth.js has written anything, so every token it
+ * finds is a previous one. `sendVerificationRequest` asks *after* — Auth.js
+ * has already written the new token by then — so it has to discount the token
+ * it is being asked to send, or every request would look like a repeat of
+ * itself.
+ */
+export async function lastLinkSentAt(
+  identifier: string,
+  excludeToken?: string,
+): Promise<Date | null> {
+  const previous = await db.verificationToken.findFirst({
+    where: { identifier, ...(excludeToken ? { token: { not: excludeToken } } : {}) },
+    orderBy: { expires: 'desc' },
+    select: { expires: true },
+  })
+
+  return previous ? new Date(previous.expires.getTime() - LINK_TTL_SECONDS * 1000) : null
+}
+
 const APP_NAME = 'PicklePicklePickle'
 const VENUE = 'XCHC · Ōtautahi Christchurch'
 
@@ -114,20 +140,20 @@ if (process.env.AUTH_RESEND_KEY && process.env.EMAIL_FROM) {
        * getting in themselves.
        */
       async sendVerificationRequest({ identifier, provider, url, token }) {
-        const previous = await db.verificationToken.findFirst({
-          where: { identifier, token: { not: token } },
-          orderBy: { expires: 'desc' },
-          select: { expires: true },
-        })
-
-        const lastSentAt = previous
-          ? new Date(previous.expires.getTime() - LINK_TTL_SECONDS * 1000)
-          : null
-
-        const verdict = mayRequestLink(lastSentAt, new Date())
+        const verdict = mayRequestLink(await lastLinkSentAt(identifier, token), new Date())
         if (!verdict.ok) {
-          // Auth.js turns a throw here into its Verification error, which the
-          // sign-in page explains. Nothing is sent and nothing is charged.
+          // The last line of defence rather than the one a person meets. The
+          // sign-in action checks the same rule first and can say how many
+          // seconds are left; this one guards the /api/auth route, which
+          // anybody can post to directly.
+          //
+          // Throwing here does NOT produce a tidy error page: `signIn()`
+          // rethrows an AuthError out of a server action rather than
+          // redirecting to `pages.error`, which is exactly how this reached
+          // the browser as "an unexpected response was received from the
+          // server". See src/app/sign-in/actions.ts, which catches it.
+          //
+          // Nothing is sent and nothing is charged.
           throw new Error(verdict.why)
         }
 
