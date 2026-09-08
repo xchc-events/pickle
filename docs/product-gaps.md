@@ -77,10 +77,17 @@ These are not gaps against the market. They are things that are broken now.
 **This is the highest-priority item in this document.** The stage 6 → 7 gate
 (`Show week` → `Payout`) requires `hasActual`, which reads
 `db.actual.count(...)` at
-[event-record-data.ts:366](../src/lib/event-record-data.ts:366). Nothing in the
-codebase ever creates an `Actual` row — there is no `actual.create`,
-`actual.upsert` or `actual.update` anywhere in `src/`. The gate is therefore
-unreachable by construction, and every event ever run will pile up at stage 6.
+[event-record-data.ts:366](../src/lib/event-record-data.ts:366). No application
+code path creates an `Actual` row — there is no `actual.create`,
+`actual.upsert` or `actual.update` anywhere in `src/`.
+
+**Corrected 9 September 2026.** `prisma/seed.ts` _does_ write `Actual` rows, for
+two concluded events. So the two seeded demo nights can pass this gate, and an
+earlier draft of this document overstated the fault by saying nothing anywhere
+creates one. The consequence for real work is unchanged: an event created and
+run through the product can never acquire actuals, so it can never pass the gate
+and will pile up at stage 6 forever. This is the same failure PR #7 found in the
+roster — the seed producing data the product itself cannot produce.
 
 The gate also deep-links to `'bar'`
 ([event-record.ts:388](../src/lib/event-record.ts:388)) — a module that is not
@@ -111,8 +118,10 @@ P&L needs — `income`, `base`, `wheke`, `comps`, `ourPeople`, `orgCost`,
 specified screen" and gives the eleven lines verbatim. **None of it is rendered
 anywhere.** `/finance` is 185 lines and shows payee bank accounts only.
 
-`marginHealth()` is likewise implemented, exported, tested — and called by
-nothing.
+**Corrected 9 September 2026.** An earlier draft said `marginHealth()` was
+called by nothing. It is: `event-record-data.ts:371` computes it and the event
+record renders it as the margin indicator. What is missing is the _finance
+review panel_ the handoff specifies around it (PG-3), not the function.
 
 **Acceptance criteria**
 

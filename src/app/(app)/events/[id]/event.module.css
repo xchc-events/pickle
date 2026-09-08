@@ -653,3 +653,77 @@
   font-size: 11px;
   color: var(--color-neutral-600);
 }
+
+/* ------------------------------------------------------------ actuals --- */
+/* Reconciling the night. Four numbers, each labelled with its GST terms,
+   because getting those wrong moves the settlement silently. */
+
+.actuals {
+  margin: 0 0 30px;
+}
+
+.actualGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.actualField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.actualInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+}
+
+.actualInputWrap:focus-within {
+  border-color: var(--color-accent-700);
+}
+
+.actualPrefix {
+  color: var(--color-neutral-500);
+}
+
+.actualInput {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: var(--color-neutral-100);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 9px 0;
+}
+
+.actualInput:focus {
+  outline: none;
+}
+
+.actualNote {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.actualSave {
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent-200);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.actualSave:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

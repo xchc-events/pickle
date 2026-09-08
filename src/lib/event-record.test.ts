@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BUILT_MODULES, STAGES } from './constants'
 import {
   advanceLabel,
   canAdvance,
@@ -409,5 +410,26 @@ describe('the gate summary', () => {
     expect(advanceLabel(0)).toBe('Move to Negotiating')
     expect(advanceLabel(6)).toBe('Move to Payout')
     expect(advanceLabel(7)).toBe('Complete')
+  })
+})
+
+/**
+ * A gate's whole value is that it tells you where to go and fix the thing. A
+ * gate pointing at a module nobody can open still reads as an actionable step,
+ * so this walks every stage rather than trusting the one that was wrong.
+ *
+ * "Actuals in" pointed at `bar`, which is not in BUILT_MODULES — and since
+ * nothing could write an `Actual` row either, the last gate in the product was
+ * unreachable and its only affordance was a dead link.
+ */
+describe('gate deep links', () => {
+  it('every gate points at the event record or a module that is built', () => {
+    const targets = new Set<string>()
+    for (let stage = 0; stage < STAGES.length; stage++) {
+      for (const g of gatesFor(ev({ stage }))) targets.add(g.screen)
+    }
+
+    const allowed = new Set<string>(['event', ...BUILT_MODULES])
+    expect([...targets].filter((t) => !allowed.has(t))).toEqual([])
   })
 })
