@@ -296,6 +296,15 @@ model Event {
   /// of the event's own facts. See src/lib/design.ts.
   brief     String?
 
+  /// When each money milestone was raised, or null while it has not been.
+  ///
+  /// A timestamp rather than a boolean so "reverse" is a real event with a
+  /// before and an after, and so the activity feed and the row agree about
+  /// when the invoice went out. Which two milestones these are depends on the
+  /// booking model — see `milestonesFor` in src/lib/finance-review.ts.
+  depositRaisedAt DateTime?
+  invoiceRaisedAt DateTime?
+
   artists   EventArtist[]
   shifts    Shift[]
   tasks     Task[]

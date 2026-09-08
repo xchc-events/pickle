@@ -494,3 +494,216 @@
   color: var(--color-neutral-500);
   font-size: 12px;
 }
+
+/* ------------------------------------------------- finance review --- */
+/* Sits above the settlement. The border and tint carry the state, so the
+   panel reads as pending or flagged before any of it is read. */
+
+.review {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 18px 20px;
+  margin: 0 0 26px;
+}
+
+.rev_pending {
+  border-color: var(--st-warn);
+  background: color-mix(in srgb, var(--st-warn) 6%, transparent);
+}
+
+.rev_flagged {
+  border-color: var(--st-stop);
+  background: color-mix(in srgb, var(--st-stop) 6%, transparent);
+}
+
+.revHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.revChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  text-transform: capitalize;
+  background: color-mix(in srgb, var(--color-neutral-100) 10%, transparent);
+  color: var(--color-neutral-200);
+}
+
+.rev_pending .revChip {
+  background: color-mix(in srgb, var(--st-warn) 14%, transparent);
+  color: var(--st-warn);
+}
+
+.rev_flagged .revChip {
+  background: color-mix(in srgb, var(--st-stop) 14%, transparent);
+  color: var(--st-stop);
+}
+
+.rev_approved .revChip {
+  background: color-mix(in srgb, var(--st-good) 14%, transparent);
+  color: var(--st-good);
+}
+
+.revMilestone {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.revRisk {
+  margin: 0 0 10px;
+}
+
+.risk_loss {
+  color: var(--st-stop);
+}
+
+.risk_thin {
+  color: var(--st-warn);
+}
+
+.risk_healthy {
+  color: var(--st-good);
+}
+
+.revBlurb {
+  margin: 0 0 12px;
+  color: var(--color-neutral-400);
+  max-width: 66ch;
+}
+
+.revBy {
+  margin: 0 0 6px;
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.revNote {
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 2px solid var(--st-stop);
+  color: var(--color-neutral-200);
+}
+
+.revActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.revInput {
+  background: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-100);
+  font: inherit;
+  padding: 9px 11px;
+  resize: vertical;
+}
+
+.revInput:focus {
+  outline: none;
+  border-color: var(--color-accent-700);
+}
+
+.revButtons {
+  display: flex;
+  gap: 10px;
+}
+
+.revOk,
+.revFlag {
+  border-radius: var(--radius-sm);
+  padding: 8px 15px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.revOk {
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent-200);
+}
+
+.revFlag {
+  background: transparent;
+  border: 1px solid var(--st-stop);
+  color: var(--st-stop);
+}
+
+.revOk:disabled,
+.revFlag:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ----------------------------------------------------- milestones --- */
+
+.steps {
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.stepDone {
+  border-color: var(--st-good);
+  background: color-mix(in srgb, var(--st-good) 7%, transparent);
+}
+
+.stepIcon {
+  color: var(--color-neutral-500);
+  font-size: 18px;
+}
+
+.stepDone .stepIcon {
+  color: var(--st-good);
+}
+
+.stepBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stepLabel {
+  color: var(--color-neutral-200);
+}
+
+.stepNote {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.stepBtn {
+  background: transparent;
+  border: 1px solid var(--color-neutral-700);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-200);
+  font: inherit;
+  padding: 6px 13px;
+  cursor: pointer;
+}
+
+.stepBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

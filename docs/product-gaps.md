@@ -139,8 +139,17 @@ review panel_ the handoff specifies around it (PG-3), not the function.
 > As an admin, I want to red-flag an event whose numbers do not work, so that
 > the deposit invoice does not go out while it is losing money.
 
-`FinanceReview` is in the schema with `state`, `note`, `by`, `when`. It is read
-and written by nothing outside the generated Prisma client. The dry-hire and
+`FinanceReview` is in the schema with `state`, `note`, `by`, `when`.
+
+**Corrected 9 September 2026.** An earlier draft said it was read and written by
+nothing outside the generated Prisma client. `prisma/seed.ts` writes one for
+every event — APPROVED at `stage >= 4` or concluded, PENDING otherwise, exactly
+as the handoff describes. The accurate claim is narrower: nothing _reads_ them
+and no _application_ code writes them, so the rows exist and govern nothing.
+This is the third such overstatement found by building against the code rather
+than reading it; the other two are noted under PG-1 and PG-2.
+
+The dry-hire and
 curator milestone ladders, the state machine
 (`pending → approved | flagged`, `flagged → approved`), the projected-margin
 indicator and the "red-flagging requires a reason" rule are all specified in the

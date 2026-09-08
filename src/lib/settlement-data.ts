@@ -3,6 +3,16 @@ import { db } from './db'
 import { CFG, financeVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './finance-input'
 import { settlementLines, type SettlementLine } from './settlement'
+import {
+  approveLabel,
+  milestonesFor,
+  reviewBlurb,
+  reviewMilestone,
+  type BookingModelKey,
+  type Milestone,
+  type ReviewState,
+} from './finance-review'
+import { marginHealth, type MarginHealth } from './finance'
 import { COV, COV_FALLBACK } from './finance'
 
 /**
@@ -24,8 +34,29 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const monthLabel = (d: Date): string =>
   d.toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })
 
+export interface ReviewPanel {
+  state: ReviewState
+  /** The flag reason, shown only while flagged. */
+  note: string | null
+  by: string | null
+  when: Date | null
+  /** Where the review sits on this path. */
+  milestone: string
+  blurb: string
+  /** 'Approve it' / 'Clear the flag and approve'. */
+  okLabel: string
+  health: MarginHealth
+  /** Retained over income, 0–1. */
+  margin: number
+  income: number
+  retained: number
+}
+
 export interface Settlement {
   lines: SettlementLine[]
+  model: BookingModelKey
+  review: ReviewPanel
+  milestones: Milestone[]
   /** True once an Actual row exists — the sheet is counted, not projected. */
   reconciled: boolean
   /** Who reconciled it and when, for the attribution line. */
@@ -38,7 +69,16 @@ export interface Settlement {
 export async function settlementFor(eventId: string): Promise<Settlement | null> {
   const row = await db.event.findUnique({
     where: { id: eventId },
-    select: { ...FINANCE_SELECT, id: true, actual: true },
+    select: {
+      ...FINANCE_SELECT,
+      id: true,
+      actual: true,
+      stage: true,
+      model: true,
+      depositRaisedAt: true,
+      invoiceRaisedAt: true,
+      review: true,
+    },
   })
   if (!row) return null
 
@@ -91,8 +131,36 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
     grossBar: reconciled ? actual.barTake : counted.att * row.barHead,
   })
 
+  const model: BookingModelKey = row.model === 'DRY' ? 'dry' : 'curator'
+  const state = (row.review?.state ?? 'PENDING').toLowerCase() as ReviewState
+
+  // The indicator reads off the *projection*, not the counted night, even once
+  // actuals are in: the review is a decision taken before the money moves, and
+  // re-scoring it against what happened would rewrite why it was made.
+  const health = marginHealth(vals)
+
   return {
     lines,
+    model,
+    review: {
+      state,
+      note: row.review?.note ?? null,
+      by: row.review?.by ?? null,
+      when: row.review?.when ?? null,
+      milestone: reviewMilestone(model),
+      blurb: reviewBlurb(model),
+      okLabel: approveLabel(state),
+      health: health.health,
+      margin: health.margin,
+      income: vals.income,
+      retained: vals.ours,
+    },
+    milestones: milestonesFor(model, {
+      stage: row.stage,
+      depositRaised: row.depositRaisedAt !== null,
+      invoiceRaised: row.invoiceRaisedAt !== null,
+      review: state,
+    }),
     reconciled,
     reconciledBy: actual?.reconciledBy ?? null,
     reconciledAt: actual?.reconciledAt ?? null,
