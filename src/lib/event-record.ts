@@ -216,7 +216,7 @@ export function gatesFor(e: GateEvent): Gate[] {
     [
       g('An owner is named', e.hasOwner, 'Set Owner on the event record', 'event'),
       g('Date is locked', !e.dateTbc, 'The enquiry still says date TBC', 'event'),
-      g('Space chosen', e.hasSpace, 'Pick Main, the Apartment, or both', 'event'),
+      g('Space chosen', e.hasSpace, 'Pick the room this is booked into', 'event'),
       g('Kind of night set', !!e.kind, 'Live, DJs, or workshop — it drives the roster', 'tech'),
     ],
     // 1 Negotiating → Confirmed

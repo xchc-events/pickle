@@ -15,7 +15,6 @@ import { hrs, money, days as dayLabel } from './format'
 import { CFG } from './finance'
 
 export type RiskKind = 'warn' | 'stop'
-export type SpaceFilter = 'all' | 'main' | 'apt'
 export type StatusFilter = 'all' | 'mine' | 'risk' | 'soon' | 'done'
 export type SortKey = 'door' | 'stuck'
 
@@ -132,7 +131,6 @@ export function metaLine(e: PipelineEvent): string {
 
 export interface RowFilters {
   status: StatusFilter
-  space: SpaceFilter
   sort: SortKey
   /** Initials of the signed-in person, for the "Mine" filter. */
   meInitials: string | null
@@ -142,8 +140,12 @@ export interface RowFilters {
  * Filter and sort, reproducing the prototype's order of operations exactly.
  *
  * Note the quirk, kept deliberately: "Concluded" replaces the row set outright
- * and so ignores the space chips, where every other status filter composes
- * with them.
+ * rather than narrowing it, where every other status filter composes.
+ *
+ * The space chips are gone with the second room. They filtered on the room's
+ * name, and with one bookable space every chip returned the same set — inert
+ * controls that look like they do something. They come back when a second
+ * room does, filtering on `spaceId` rather than on a name.
  */
 export function pipelineRows(all: PipelineEvent[], f: RowFilters): PipelineEvent[] {
   const live = all.filter((e) => !e.concluded)
@@ -152,8 +154,6 @@ export function pipelineRows(all: PipelineEvent[], f: RowFilters): PipelineEvent
   if (f.status === 'mine') rows = rows.filter((e) => e.ownerInitials === f.meInitials)
   if (f.status === 'risk') rows = rows.filter(isAtRisk)
   if (f.status === 'soon') rows = rows.filter((e) => e.daysToDoor <= 30)
-  if (f.space === 'main') rows = rows.filter((e) => e.spaceName.includes('Main'))
-  if (f.space === 'apt') rows = rows.filter((e) => e.spaceName.includes('Apartment U1'))
   if (f.status === 'done') rows = all.filter((e) => e.concluded)
 
   rows.sort((x, y) =>

@@ -1,4 +1,4 @@
-import { CFG, tiers } from './finance'
+import { tiers } from './finance'
 
 /**
  * Ticketing.
@@ -39,9 +39,15 @@ export type MixKey = 'sub' | 'std' | 'sup' | 'door'
  * places — the alternative is two copies that drift the first time the venue
  * changes a layout.
  */
-export function capacityOf(spaceName: string, format: string): number {
-  if (spaceName === 'Apartment U1') return CFG.capApt
-  return format === 'Cabaret' ? CFG.capSeated : CFG.capMusic
+export interface SpaceCapacity {
+  /** Standing capacity — the room as it is used most nights. */
+  capacity: number
+  /** Seated capacity, used when the room is laid out cabaret. */
+  seatedCapacity: number
+}
+
+export function capacityOf(space: SpaceCapacity, format: string): number {
+  return format === 'Cabaret' ? space.seatedCapacity : space.capacity
 }
 
 export interface TierRow {

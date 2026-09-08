@@ -24,8 +24,10 @@ import {
  * and hours are wages: a role added by accident is money the event loses.
  */
 
+const MAIN = { capacity: 220, seatedCapacity: 150 }
+
 const music = {
-  spaceName: 'Main',
+  space: MAIN,
   format: 'DJs',
   kind: 'djs',
   att: [80, 120, 180] as [number, number, number],
@@ -77,21 +79,6 @@ describe('the role list', () => {
     expect(roles.filter((r) => r === 'Door')).toHaveLength(1)
     expect(roles.filter((r) => r === 'Care team')).toHaveLength(1)
   })
-
-  /**
-   * The upstairs room seats forty and runs early. One of each — doubling up
-   * in a room that size costs wages and gets in the way.
-   */
-  it('staffs the apartment with one of each and no doubling up', () => {
-    const roles = rolesFor({ ...music, spaceName: 'Apartment U1' })
-    expect(roles).toHaveLength(7)
-    expect(new Set(roles).size).toBe(7)
-    expect(roles).not.toContain('Sound — 2IC')
-  })
-
-  it('ignores the crowd size in the apartment — the room is the limit', () => {
-    expect(rolesFor({ ...music, spaceName: 'Apartment U1', att: [0, 300, 0] })).toHaveLength(7)
-  })
 })
 
 describe('shift windows', () => {
@@ -127,11 +114,6 @@ describe('the plan', () => {
     expect(
       shiftPlan({ ...music, kind: 'workshop' }).find((s) => s.role === 'Sound — Lead')!.hours,
     ).toBe(4)
-    expect(
-      shiftPlan({ ...music, kind: 'workshop', spaceName: 'Apartment U1' }).find(
-        (s) => s.role === 'Sound — Lead',
-      )!.hours,
-    ).toBe(3)
   })
 
   it('does not shorten the sound call on a normal show', () => {

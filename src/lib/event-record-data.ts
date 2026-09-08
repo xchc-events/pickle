@@ -231,7 +231,7 @@ export async function loadEventRecord(
       promoter: true,
       internal: true,
       sold: true,
-      space: { select: { name: true } },
+      space: { select: { name: true, capacity: true, seatedCapacity: true } },
       owner: { select: { name: true, initials: true } },
       leads: { select: { role: true, personId: true, person: { select: { name: true } } } },
       assets: { select: { key: true, state: true, promoterSigned: true } },
@@ -374,7 +374,7 @@ export async function loadEventRecord(
   gateInput.hasActual = actuals !== null
 
   const gates = gatesFor(gateInput)
-  const capacity = capacityOf(row.space.name, row.format)
+  const capacity = capacityOf(row.space, row.format)
   const pace = paceOf({ sold: row.sold, breakeven: vals.breakeven })
   const health = marginHealth(vals)
 

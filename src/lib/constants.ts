@@ -141,10 +141,3 @@ export const DEFAULT_PERMS: Record<RoleKey, ModuleKey[]> = {
   ],
   promoter: ['pipeline', 'portal'],
 }
-
-/** Capacity by room. Cabaret seating drops the main room to capSeated. */
-export const SPACES = {
-  MAIN: 'Main',
-  APT: 'Apartment U1',
-  BOTH: 'Main + Apartment U1',
-} as const
