@@ -8,6 +8,7 @@ import { loadEventRecord } from '@/lib/event-record-data'
 import { canAdvance, LICENCE_WORD, type LicenceState } from '@/lib/event-record'
 import { STAGES } from '@/lib/constants'
 import { said, type Said } from '@/lib/toast'
+import { money } from '@/lib/format'
 import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
 
 /**
@@ -218,4 +219,65 @@ export async function setDateTbc(eventId: string, tbc: boolean): Promise<Said> {
     tbc ? 'Back to TBC — this cannot leave Enquiry until a date is held.' : 'Date locked.',
     tbc ? 'warn' : 'good',
   )
+}
+
+/**
+ * Reconcile the night: what the door and the till actually took.
+ *
+ * This is the write the product was missing. `hasActual` gates the last
+ * transition — Show week → Payout — and nothing outside `prisma/seed.ts` could
+ * create the row it counts, so an event created in the product could never
+ * settle. The gate was unreachable rather than merely unmet.
+ *
+ * Figures arrive as the venue states them: ticket and bar takings GST
+ * **inclusive**, because that is what the door and the till report, and bar
+ * profit GST **exclusive**, because it is already a margin. `settlement.ts`
+ * divides the first two by CFG.gst exactly as the projection does, so a
+ * counted night and a projected one stay comparable. Getting these terms
+ * wrong is silent, so they are stated on the form as well as here.
+ *
+ * `source` is stored from the start. A till integration will write POS rows
+ * beside these hand-entered ones, and a settlement that cannot say which is
+ * which cannot be audited.
+ */
+export async function reconcileActuals(
+  eventId: string,
+  figures: { tickets: number; ticketRev: number; barTake: number; barProfit: number },
+): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  // Negative takings are a typo, not a night. Refused rather than stored,
+  // because every one of these reaches the settlement and then a person.
+  const clean = {
+    tickets: Math.max(0, Math.trunc(figures.tickets)),
+    ticketRev: Math.max(0, figures.ticketRev),
+    barTake: Math.max(0, figures.barTake),
+    barProfit: Math.max(0, figures.barProfit),
+  }
+
+  if (!Number.isFinite(clean.ticketRev) || !Number.isFinite(clean.barProfit)) {
+    return said('Those figures do not read as numbers — nothing was saved.', 'warn')
+  }
+
+  await db.actual.upsert({
+    where: { eventId: id },
+    create: {
+      eventId: id,
+      ...clean,
+      source: 'MANUAL',
+      reconciledBy: user.initials,
+      reconciledAt: new Date(),
+    },
+    update: { ...clean, source: 'MANUAL', reconciledBy: user.initials, reconciledAt: new Date() },
+  })
+
+  await record(
+    id,
+    user,
+    `reconciled the night — ${clean.tickets} in, ${money(clean.ticketRev)} on the door, ${money(clean.barTake)} over the bar`,
+  )
+
+  refresh()
+  return said('Reconciled. The settlement now reads off counted figures, not the model.')
 }

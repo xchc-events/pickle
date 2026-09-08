@@ -159,6 +159,8 @@ export interface EventRecord {
   orgCost: string
   margin: string
   marginHealth: 'loss' | 'thin' | 'healthy'
+  /** What the night actually took, once somebody has reconciled it. */
+  actuals: { tickets: number; ticketRev: number; barTake: number; barProfit: number } | null
 
   sold: number
   capacity: number
@@ -361,9 +363,15 @@ export async function loadEventRecord(
     ceil: vals.ceil,
   }
 
-  // `hasActual` needs its own read — Actual is a one-to-one that the finance
-  // select does not carry.
-  gateInput.hasActual = (await db.actual.count({ where: { eventId: row.id } })) > 0
+  // Actual is a one-to-one the finance select does not carry, so it needs its
+  // own read. The figures come back with it rather than just the count: the
+  // reconcile form on this page edits them, and a form that could only create
+  // would make a typo permanent.
+  const actuals = await db.actual.findUnique({
+    where: { eventId: row.id },
+    select: { tickets: true, ticketRev: true, barTake: true, barProfit: true },
+  })
+  gateInput.hasActual = actuals !== null
 
   const gates = gatesFor(gateInput)
   const capacity = capacityOf(row.space.name, row.format)
@@ -484,6 +492,7 @@ export async function loadEventRecord(
     orgCost: money(vals.orgCost),
     margin: `${Math.round(health.margin * 100)}%`,
     marginHealth: health.health,
+    actuals,
 
     sold: row.sold,
     capacity,

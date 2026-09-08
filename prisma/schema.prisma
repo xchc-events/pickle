@@ -552,14 +552,36 @@ model FinanceReview {
 }
 
 /// Once an event concludes, actuals replace projections.
+/// Where a reconciled figure came from.
+///
+/// Hand-entered today, a till system later. The distinction is stored from the
+/// start rather than bolted on when the integration lands: a POS-read figure
+/// and a typed one carry different authority, and a settlement that cannot
+/// tell them apart cannot be audited.
+enum ActualSource {
+  MANUAL
+  POS
+}
+
 model Actual {
   id         String @id @default(cuid())
   eventId    String @unique
   event      Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Final count and gross takings, GST **inclusive** — what the door and the
+  /// till actually took. `settlement.ts` divides by CFG.gst exactly as the
+  /// projection does, so a settled night and a projected one are comparable.
   tickets    Int    @default(0)
   ticketRev  Float  @default(0)
   barTake    Float  @default(0)
+  /// Bar profit after stock cost, GST **exclusive** — this goes onto the bar
+  /// margin line untouched, so it must arrive in the same terms as `barMarg`.
   barProfit  Float  @default(0)
+
+  source       ActualSource @default(MANUAL)
+  /// Who reconciled it. Denormalised like `Activity.who`, so it keeps reading
+  /// correctly for somebody who has since left.
+  reconciledBy String?
+  reconciledAt DateTime     @default(now())
 }
 
 // ---------------------------------------------------------------- payees ---

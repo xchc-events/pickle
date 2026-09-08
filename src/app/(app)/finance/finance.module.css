@@ -427,3 +427,70 @@
   padding: 4px 8px;
   cursor: pointer;
 }
+
+/* --------------------------------------------------------- settlement --- */
+/* The eleven lines. Read once, carefully, and often in front of the person
+   being paid — so it is a table of figures, not a dashboard. */
+
+.settle {
+  margin: 0 0 30px;
+  display: flex;
+  flex-direction: column;
+}
+
+.settleRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 18px;
+  padding: 9px 0;
+}
+
+/* Income and Retained are the two the handoff rules off. */
+.settleRuled {
+  border-top: 1px solid var(--color-neutral-700);
+  margin-top: 4px;
+  padding-top: 13px;
+}
+
+.settleLabel {
+  color: var(--color-neutral-200);
+}
+
+.settleTotal .settleLabel {
+  color: var(--color-neutral-100);
+  font-weight: 500;
+}
+
+.settleNote {
+  grid-column: 1 / -1;
+  color: var(--color-neutral-500);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.settleValue {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-100);
+}
+
+.settleTotal .settleValue {
+  font-weight: 600;
+}
+
+/* Retained: accent when the night paid for itself, stop when it did not. */
+.settleKept .settleLabel,
+.settleKept .settleValue {
+  color: var(--color-accent-200);
+}
+
+.settleLoss .settleLabel,
+.settleLoss .settleValue {
+  color: var(--st-stop);
+}
+
+.settleStamp {
+  margin: 0 0 22px;
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}

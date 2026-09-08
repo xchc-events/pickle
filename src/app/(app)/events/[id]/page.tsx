@@ -9,6 +9,7 @@ import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
 import { advanceStage, setLead } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
+import { Actuals } from './Actuals'
 import styles from './event.module.css'
 import type { LeadRole } from '@/generated/prisma/client'
 
@@ -346,6 +347,25 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
 
           <DealPanel eventId={ev.id} state={ev.deal} note={ev.dealNote} />
         </section>
+
+        {/* ----------------------------------------------------- actuals --- */}
+        {/* Only from show week. Before the night there is nothing to count,
+            and a form offering to reconcile an event that has not happened
+            invites somebody to model it twice. */}
+        {(ev.stage >= 6 || ev.concluded) && (
+          <section id="actuals">
+            <SectionHeading
+              note={
+                ev.actuals
+                  ? 'the settlement reads off these, not the model'
+                  : 'until these are in, the event cannot reach Payout'
+              }
+            >
+              What the night took
+            </SectionHeading>
+            <Actuals eventId={ev.id} initial={ev.actuals} />
+          </section>
+        )}
 
         {/* ------------------------------------------------------ labour --- */}
         <section id="labour">

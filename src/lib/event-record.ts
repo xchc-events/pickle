@@ -375,7 +375,9 @@ export function gatesFor(e: GateEvent): Gate[] {
         'Doors and everyone-out drive every shift',
         'event',
       ),
-      g('Bar session set', !!e.barClose, 'The bar breakdown needs a service window', 'bar'),
+      // Also the event record: bar close is a run time, set here. Same reason
+      // as 'Actuals in' below — Bar is not built, so linking there is a dead end.
+      g('Bar session set', !!e.barClose, 'The bar breakdown needs a service window', 'event'),
     ],
     // 7 Payout
     [
@@ -385,7 +387,10 @@ export function gatesFor(e: GateEvent): Gate[] {
         'Nobody has logged their time',
         'hours',
       ),
-      g('Actuals in', e.hasActual, 'Bar take and final ticket count not reconciled', 'bar'),
+      // Points at the event record, not the Bar module: reconciling happens
+      // here, and Bar is not built. A gate that deep-links to a screen nobody
+      // can open is worse than no link — it reads as a fixable step and is not.
+      g('Actuals in', e.hasActual, 'Bar take and final ticket count not reconciled', 'event'),
     ],
   ]
 

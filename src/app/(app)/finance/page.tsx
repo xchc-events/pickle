@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { requireModule, modulesFor } from '@/lib/permissions'
 import { loadFinance } from '@/lib/finance-data'
+import { settlementFor } from '@/lib/settlement-data'
 import { canReveal } from '@/lib/payments'
 import { STAGES } from '@/lib/constants'
 import { money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ActionButton } from '@/components/ActionButton'
+import { SettlementSheet } from './SettlementSheet'
 import { Reveal } from './Reveal'
 import { PayeeActions } from './PayeeActions'
 import { chaseDetails, forget, markPaid, reveal, revokeAllLinks } from './actions'
@@ -44,6 +46,10 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
     allowed: verdict.ok,
     why: verdict.ok ? null : verdict.why,
   })
+
+  // The sheet is the reason the payables list exists, so it is loaded with it
+  // rather than behind a tab. Null only when no event is selected.
+  const settlement = event ? await settlementFor(event.id) : null
 
   return (
     <div>
@@ -91,6 +97,29 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
               {event.date} · {STAGES[event.stage] ?? '—'}
             </span>
           </div>
+
+          {settlement && (
+            <>
+              <SectionHeading
+                note={
+                  settlement.reconciled
+                    ? 'counted from the door and the till, not modelled'
+                    : 'projected — the figures move until the actuals are in'
+                }
+              >
+                Settlement
+              </SectionHeading>
+
+              <SettlementSheet lines={settlement.lines} />
+
+              {settlement.reconciled && settlement.reconciledBy && (
+                <p className={styles.settleStamp}>
+                  Reconciled by {settlement.reconciledBy}
+                  {settlement.source === 'MANUAL' ? ', entered by hand' : ', read from the till'}
+                </p>
+              )}
+            </>
+          )}
 
           <SectionHeading note="details are entered by the act, never re-typed here">
             Who gets paid
