@@ -8,6 +8,8 @@ import { money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ActionButton } from '@/components/ActionButton'
 import { SettlementSheet } from './SettlementSheet'
+import { Review } from './Review'
+import { Milestones } from './Milestones'
 import { Reveal } from './Reveal'
 import { PayeeActions } from './PayeeActions'
 import { chaseDetails, forget, markPaid, reveal, revokeAllLinks } from './actions'
@@ -100,6 +102,16 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
 
           {settlement && (
             <>
+              {/* The review sits above the settlement on both paths: it is the
+                  decision taken about these figures, so it is read first. */}
+              <SectionHeading note={settlement.review.milestone}>Finance review</SectionHeading>
+              <Review eventId={event.id} review={settlement.review} />
+
+              <SectionHeading note={settlement.model === 'dry' ? 'Dry hire' : 'Curator model'}>
+                Milestones
+              </SectionHeading>
+              <Milestones eventId={event.id} steps={settlement.milestones} />
+
               <SectionHeading
                 note={
                   settlement.reconciled

@@ -7,6 +7,8 @@ import { forgetDetails, revealFor, type RevealedDetails } from '@/lib/payments-d
 import { issueGrant, revokeGrant } from '@/lib/grants-data'
 import { grantStatus } from '@/lib/grants'
 import { said, type Said } from '@/lib/toast'
+import { record } from '@/lib/activity'
+import { flagRefusal } from '@/lib/finance-review'
 
 /**
  * Finance's mutations.
@@ -167,5 +169,104 @@ export async function forget(eventId: string, payeeId: string): Promise<Said> {
   return said(
     'Erased. If they play again they will be asked afresh — which is the point, not a gap.',
     'warn',
+  )
+}
+
+/**
+ * The finance review: sign a booking off, or hold it.
+ *
+ * Approving and flagging are the same shape and are deliberately not one
+ * function with a boolean. A flag has a precondition — it must say why — and
+ * folding the two together would put that check behind an argument nobody
+ * reading the call site can see.
+ *
+ * External promoters never reach either: `requireModule('finance')` is the
+ * control, and Finance is not in their module set. The prototype also hides
+ * the buttons; hiding is the courtesy, this is the refusal.
+ */
+export async function approveReview(eventId: string): Promise<Said> {
+  const { user } = await requireModule('finance')
+  const id = await requireEvent(user, eventId)
+
+  const before = await db.financeReview.findUnique({ where: { eventId: id } })
+
+  await db.financeReview.upsert({
+    where: { eventId: id },
+    create: { eventId: id, state: 'APPROVED', note: null, by: user.initials, when: new Date() },
+    // Approving clears the reason. A cleared flag that kept its words would
+    // leave the coordinator reading an objection that no longer stands.
+    update: { state: 'APPROVED', note: null, by: user.initials, when: new Date() },
+  })
+
+  await record(
+    id,
+    user,
+    before?.state === 'FLAGGED'
+      ? 'cleared the red flag and approved this event'
+      : 'approved this event',
+  )
+
+  refresh()
+  return said('Approved — the milestone can go ahead.')
+}
+
+export async function flagReview(eventId: string, note: string): Promise<Said> {
+  const { user } = await requireModule('finance')
+  const id = await requireEvent(user, eventId)
+
+  // Checked here, not only in the form. An empty flag is refused rather than
+  // stored, because a flag without a reason tells the coordinator that
+  // somebody is unhappy and nothing about what would move it.
+  const refusal = flagRefusal(note)
+  if (refusal) return said(refusal, 'warn')
+
+  const reason = note.trim()
+
+  await db.financeReview.upsert({
+    where: { eventId: id },
+    create: { eventId: id, state: 'FLAGGED', note: reason, by: user.initials, when: new Date() },
+    update: { state: 'FLAGGED', note: reason, by: user.initials, when: new Date() },
+  })
+
+  await record(id, user, `red-flagged this event: ${reason}`)
+
+  refresh()
+  return said('Red-flagged — it sits with the coordinator until the numbers move.')
+}
+
+/**
+ * Raise or reverse a money milestone.
+ *
+ * A flagged event cannot raise. That refusal is the entire purpose of the
+ * review: the deposit is held until the numbers move. Reversing is always
+ * allowed — it takes money back off the table, which a flag has no reason to
+ * block.
+ */
+export async function toggleMilestone(eventId: string, key: 'deposit' | 'invoice'): Promise<Said> {
+  const { user } = await requireModule('finance')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: { depositRaisedAt: true, invoiceRaisedAt: true, review: { select: { state: true } } },
+  })
+
+  const field = key === 'deposit' ? 'depositRaisedAt' : 'invoiceRaisedAt'
+  const raised = ev[field] !== null
+
+  if (!raised && ev.review?.state === 'FLAGGED') {
+    return said('This event is red-flagged — the invoice is held until finance clears it.', 'warn')
+  }
+
+  await db.event.update({ where: { id }, data: { [field]: raised ? null : new Date() } })
+
+  const label = key === 'deposit' ? 'the 25% deposit invoice' : 'the settlement invoice'
+  await record(id, user, raised ? `reversed ${label}` : `raised ${label}`)
+
+  refresh()
+  return said(
+    raised
+      ? 'Reversed — it is off the ledger again.'
+      : 'Raised. It shows on the event from now on.',
   )
 }
