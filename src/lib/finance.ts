@@ -29,9 +29,10 @@ export const CFG = {
   tokenPrice: 15,
   /** Cost of goods — comps are charged at this, not at till price. */
   stockCost: 0.402,
-  capMusic: 220,
-  capSeated: 150,
-  capApt: 40,
+  // Capacity is no longer here. It is a fact about a room, so it lives on the
+  // `Space` row and is read by `capacityOf` in ticketing.ts. These three
+  // constants had no reader once that moved, and the room they named — the
+  // Apartment — is no longer bookable.
 } as const
 
 /** Day-of-week share of the weekly cost base. Unknown day falls back to 10%. */

@@ -8,7 +8,8 @@ import { loadEventRecord } from '@/lib/event-record-data'
 import { canAdvance, LICENCE_WORD, type LicenceState } from '@/lib/event-record'
 import { STAGES } from '@/lib/constants'
 import { said, type Said } from '@/lib/toast'
-import { money } from '@/lib/format'
+import { dateLabel, money } from '@/lib/format'
+import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-data'
 import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
 
 /**
@@ -280,4 +281,67 @@ export async function reconcileActuals(
 
   refresh()
   return said('Reconciled. The settlement now reads off counted figures, not the model.')
+}
+
+/**
+ * The hold ladder.
+ *
+ * Placing, challenging, confirming and releasing all re-check the rule inside
+ * a transaction in holds-data.ts. These wrappers exist to gate the module and
+ * the event scope, and to write the activity line — the decisions are not
+ * taken here.
+ */
+export async function holdTheRoom(eventId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  // A hold defaults to the event's own room and date. Holding some other
+  // night is a different act and would need somewhere to say which.
+  const ev = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: { spaceId: true, date: true, space: { select: { name: true } } },
+  })
+
+  const out = await placeHold(id, ev.spaceId, ev.date)
+  if (!out.ok) return said(out.why, 'warn')
+
+  await record(id, user, `placed a hold on ${ev.space.name} for ${dateLabel(ev.date)}`)
+  refresh()
+  return said('Held. Nobody else can confirm that night while this stands.')
+}
+
+export async function takeTheNight(eventId: string, holdId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  const out = await confirmHold(holdId)
+  if (!out.ok) return said(out.why, 'warn')
+
+  await record(id, user, 'confirmed the room — every other hold on that night was released')
+  refresh()
+  return said('Confirmed. The room is yours and the other holds are released.')
+}
+
+export async function dropTheHold(eventId: string, holdId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  const out = await releaseHold(holdId)
+  if (!out.ok) return said(out.why, 'warn')
+
+  await record(id, user, 'released a hold — anyone behind it moved up')
+  refresh()
+  return said('Released. Whoever was behind it has moved up.')
+}
+
+export async function challengeTheHold(eventId: string, holdId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  const out = await challengeHold(holdId, id)
+  if (!out.ok) return said(out.why, 'warn')
+
+  await record(id, user, 'challenged the hold above this one')
+  refresh()
+  return said('Challenged. The first hold now has to take the night or give it up.')
 }

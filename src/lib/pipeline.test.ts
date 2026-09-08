@@ -139,23 +139,17 @@ describe('pipelineRows', () => {
     ev({ id: 'near', daysToDoor: 3, daysInStage: 1, ownerInitials: 'AK' }),
     ev({ id: 'far', daysToDoor: 60, daysInStage: 9, ownerInitials: 'MT' }),
     ev({ id: 'risky', daysToDoor: 20, daysInStage: 6, riskNote: 'stuck', ownerInitials: 'MT' }),
-    ev({
-      id: 'apt',
-      daysToDoor: 8,
-      daysInStage: 2,
-      spaceName: 'Apartment U1',
-      ownerInitials: 'AK',
-    }),
+    ev({ id: 'mid', daysToDoor: 8, daysInStage: 2, ownerInitials: 'AK' }),
     ev({ id: 'done', daysToDoor: -8, daysInStage: 2, concluded: true }),
   ]
-  const base = { status: 'all', space: 'all', sort: 'door', meInitials: 'MT' } as const
+  const base = { status: 'all', sort: 'door', meInitials: 'MT' } as const
 
   it('hides concluded events from every live view', () => {
     expect(pipelineRows(all, base).map((r) => r.id)).not.toContain('done')
   })
 
   it('sorts by days to door, soonest first', () => {
-    expect(pipelineRows(all, base).map((r) => r.id)).toEqual(['near', 'apt', 'risky', 'far'])
+    expect(pipelineRows(all, base).map((r) => r.id)).toEqual(['near', 'mid', 'risky', 'far'])
   })
 
   it('sorts by time stuck when asked', () => {
@@ -177,25 +171,20 @@ describe('pipelineRows', () => {
   it('filters to the next 30 days', () => {
     expect(pipelineRows(all, { ...base, status: 'soon' }).map((r) => r.id)).toEqual([
       'near',
-      'apt',
+      'mid',
       'risky',
     ])
-  })
-
-  it('composes a status filter with a space filter', () => {
-    const rows = pipelineRows(all, { ...base, status: 'soon', space: 'apt' })
-    expect(rows.map((r) => r.id)).toEqual(['apt'])
   })
 
   it('shows concluded events only under the Concluded filter', () => {
     expect(pipelineRows(all, { ...base, status: 'done' }).map((r) => r.id)).toEqual(['done'])
   })
 
-  it('lets Concluded override the space chips, as the prototype does', () => {
-    // Deliberate: "done" replaces the row set outright rather than narrowing
-    // it, so a space chip left selected does not hide concluded events.
-    const rows = pipelineRows(all, { ...base, status: 'done', space: 'apt' })
-    expect(rows.map((r) => r.id)).toEqual(['done'])
+  it('builds the Concluded set from every event, not from the live ones', () => {
+    // The quirk kept from the prototype: "done" replaces the row set outright
+    // rather than narrowing it. Concluded events are filtered out at the top,
+    // so this only returns anything because it re-reads from `all`.
+    expect(pipelineRows(all, { ...base, status: 'done' }).map((r) => r.id)).toEqual(['done'])
   })
 
   it('does not mutate the array it is given', () => {

@@ -11,7 +11,6 @@ import {
   stageCells,
   stageCounts,
   type SortKey,
-  type SpaceFilter,
   type StatusFilter,
 } from '@/lib/pipeline'
 import { days as dayLabel } from '@/lib/format'
@@ -29,12 +28,6 @@ const STATUS_CHIPS: { key: StatusFilter; label: string }[] = [
   { key: 'done', label: 'Concluded' },
 ]
 
-const SPACE_CHIPS: { key: SpaceFilter; label: string }[] = [
-  { key: 'all', label: 'Both spaces' },
-  { key: 'main', label: 'Main space' },
-  { key: 'apt', label: 'Apartment U1' },
-]
-
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
 export default async function PipelinePage({ searchParams }: PageProps<'/pipeline'>) {
@@ -44,17 +37,16 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
 
   const sp = await searchParams
   const status = (one(sp.status) ?? 'all') as StatusFilter
-  const space = (one(sp.space) ?? 'all') as SpaceFilter
   const sort = (one(sp.sort) ?? 'door') as SortKey
 
   const all = await loadPipeline(user)
-  const rows = pipelineRows(all, { status, space, sort, meInitials: user.initials })
+  const rows = pipelineRows(all, { status, sort, meInitials: user.initials })
   const heads = stageCounts(all)
   const metrics = pipelineMetrics(all)
   const labour = labourSplit(all)
 
-  const href = (next: Partial<{ status: string; space: string; sort: string }>) => {
-    const q = new URLSearchParams({ status, space, sort, ...next })
+  const href = (next: Partial<{ status: string; sort: string }>) => {
+    const q = new URLSearchParams({ status, sort, ...next })
     return `/pipeline?${q.toString()}`
   }
 
@@ -80,16 +72,6 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
             key={c.key}
             href={href({ status: c.key })}
             className={`${styles.chip} ${status === c.key ? styles.chipOn : ''}`}
-          >
-            {c.label}
-          </Link>
-        ))}
-        <span className={styles.chipDivider} />
-        {SPACE_CHIPS.map((c) => (
-          <Link
-            key={c.key}
-            href={href({ space: c.key })}
-            className={`${styles.chip} ${space === c.key ? styles.chipOn : ''}`}
           >
             {c.label}
           </Link>

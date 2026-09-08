@@ -4,12 +4,14 @@ import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
 import { SectionHeading } from '@/components/SectionHeading'
+import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
 import { advanceStage, setLead } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
 import { Actuals } from './Actuals'
+import { Holds } from './Holds'
 import styles from './event.module.css'
 import type { LeadRole } from '@/generated/prisma/client'
 
@@ -44,6 +46,10 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
     select: { id: true, name: true },
   })
   const leadOptions = people.map((p) => ({ personId: p.id, name: p.name }))
+
+  // The room ladder. Loaded here rather than folded into loadEventRecord:
+  // holds are about the room and the night, not about the event's own state.
+  const holds = await holdsForEvent(ev.id)
 
   const blocked = ev.gates.filter((g) => !g.ok)
 
@@ -346,6 +352,20 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
           </div>
 
           <DealPanel eventId={ev.id} state={ev.deal} note={ev.dealNote} />
+        </section>
+
+        {/* ------------------------------------------------------- room --- */}
+        <section id="room">
+          <SectionHeading
+            note={
+              holds.some((h) => h.state === 'confirmed')
+                ? 'the night is taken'
+                : 'nothing expires — a hold moves when somebody wants the date'
+            }
+          >
+            The room
+          </SectionHeading>
+          <Holds eventId={ev.id} holds={holds} dateLabel={ev.date} spaceName={ev.spaceName} />
         </section>
 
         {/* ----------------------------------------------------- actuals --- */}

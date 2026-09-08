@@ -19,6 +19,17 @@ import { PrismaClient, type Role, type ArtistStatus } from '../src/generated/pri
 import { DEFAULT_PERMS, type RoleKey } from '../src/lib/constants'
 import { ASSET_SET } from '../src/lib/design'
 import { shiftPlan, type RosterEvent } from '../src/lib/roster'
+import { capacityOf } from '../src/lib/ticketing'
+
+/**
+ * The one bookable room.
+ *
+ * Declared once and used both to create the Space row and to work out
+ * attendance defaults, so the seeded room and the figures derived from it
+ * cannot disagree.
+ */
+const MAIN_SPACE = { name: 'Main', capacity: 220, seatedCapacity: 150 }
+const MAIN_CAPACITY = { capacity: MAIN_SPACE.capacity, seatedCapacity: MAIN_SPACE.seatedCapacity }
 import { BEATS, PLATFORMS } from '../src/lib/promo'
 
 const connectionString = process.env.DATABASE_URL
@@ -193,7 +204,6 @@ const EVENTS: SeedEvent[] = [
     stageDays: 4,
     format: 'Live music',
     owner: 'MT',
-    space: 'Main + Apartment U1',
     kind: 'live',
     sound: 'wheke',
     licence: 'confirmed',
@@ -261,7 +271,6 @@ const EVENTS: SeedEvent[] = [
     stage: 2,
     stageDays: 9,
     format: 'Live music',
-    space: 'Main + Apartment U1',
     kind: 'live',
     risk: 'Confirmed 9d, no creative brief yet',
     riskKind: 'warn',
@@ -291,7 +300,6 @@ const EVENTS: SeedEvent[] = [
     stage: 1,
     stageDays: 1,
     format: 'Cabaret',
-    space: 'Apartment U1',
     std: 20,
     door: 25,
     kind: 'workshop',
@@ -310,7 +318,6 @@ const EVENTS: SeedEvent[] = [
     stage: 0,
     stageDays: 2,
     format: 'Cabaret',
-    space: 'Apartment U1',
     std: 0,
     door: 0,
     kind: 'workshop',
@@ -340,7 +347,6 @@ const EVENTS: SeedEvent[] = [
     stage: 4,
     stageDays: 3,
     format: 'Cabaret',
-    space: 'Apartment U1',
     kind: 'live',
     std: 22,
     door: 28,
@@ -427,9 +433,9 @@ function seedDate(today: Date, daysOut: number, dow: string): Date {
 // ----------------------------------------------------------------- shifts ---
 
 /** The seed's event shape, as the roster library wants it. */
-function rosterEventFor(e: SeedEvent, spaceName: string, lateBar: boolean): RosterEvent {
+function rosterEventFor(e: SeedEvent, lateBar: boolean): RosterEvent {
   return {
-    spaceName,
+    space: MAIN_CAPACITY,
     format: e.format,
     kind: e.kind,
     att: e.att ?? [0, 0, 0],
@@ -540,13 +546,11 @@ async function main() {
 
   console.log('spaces…')
   const spaceIds = new Map<string, string>()
-  for (const [name, capacity] of [
-    ['Main', 220],
-    ['Apartment U1', 40],
-    ['Main + Apartment U1', 220],
-  ] as [string, number][]) {
-    const row = await db.space.create({ data: { name, capacity } })
-    spaceIds.set(name, row.id)
+  // One bookable room. Capacity lives on the row — nothing reads it from a
+  // constant any more, so a second room is a seed entry, not a code change.
+  {
+    const row = await db.space.create({ data: MAIN_SPACE })
+    spaceIds.set(MAIN_SPACE.name, row.id)
   }
 
   console.log('events…')
@@ -554,7 +558,7 @@ async function main() {
     const spaceName = e.space ?? 'Main'
     const date = seedDate(today, e.days, e.dow)
     const lateBar = e.lateBar !== false
-    const cap = spaceName === 'Apartment U1' ? 40 : e.format === 'Cabaret' ? 150 : 220
+    const cap = capacityOf(MAIN_CAPACITY, e.format)
     const att: [number, number, number] = e.att ?? [
       Math.round(cap * 0.4),
       Math.round(cap * 0.62),
@@ -635,7 +639,7 @@ async function main() {
       })),
     })
 
-    const plan = shiftPlan(rosterEventFor(e, spaceName, lateBar))
+    const plan = shiftPlan(rosterEventFor(e, lateBar))
     const filled = e.filled ?? plan.length
     const assigned: { role: string; person: string }[] = []
     for (const [i, s] of plan.entries()) {

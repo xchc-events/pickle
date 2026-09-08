@@ -86,7 +86,7 @@ export interface TicketingLoad {
 const SCENARIO_LABELS = ['Quiet', 'Likely', 'Great'] as const
 
 const EVENT_INCLUDE = {
-  space: { select: { name: true } },
+  space: { select: { name: true, capacity: true, seatedCapacity: true } },
   artists: { select: { low: true, high: true, status: true } },
   shifts: { select: { hours: true, personId: true } },
   tasks: { select: { est: true, actual: true } },
@@ -108,7 +108,7 @@ export async function loadTicketing(
   })
 
   const queue: TicketQueueRow[] = rows.map((e) => {
-    const capacity = capacityOf(e.space.name, e.format)
+    const capacity = capacityOf(e.space, e.format)
     const pct = sellThrough(e.sold, capacity)
     const onSale = e.stage >= 4
 
@@ -137,7 +137,7 @@ export async function loadTicketing(
 
   const scen = scenarioOf(row.scen)
   const vals = financeVals(financeInputFor(row, scen, orgShareHours))
-  const capacity = capacityOf(row.space.name, row.format)
+  const capacity = capacityOf(row.space, row.format)
 
   const table = tierTable(row.std, row.door, normaliseMix(row.mix))
   const pace = paceOf({ sold: row.sold, breakeven: vals.breakeven })

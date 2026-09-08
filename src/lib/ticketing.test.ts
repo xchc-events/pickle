@@ -8,7 +8,7 @@ import {
   sellThrough,
   tierTable,
 } from './ticketing'
-import { CFG, avgTicket, tiers } from './finance'
+import { avgTicket, tiers } from './finance'
 
 /**
  * Ticketing.
@@ -23,26 +23,30 @@ import { CFG, avgTicket, tiers } from './finance'
  */
 
 describe('capacityOf', () => {
-  it('seats the main room for music', () => {
-    expect(capacityOf('Main', 'DJs')).toBe(CFG.capMusic)
+  /**
+   * Capacity is a fact about a room, so it is read off the room's row.
+   *
+   * It used to come from constants, with the function matching the literal
+   * string 'Apartment U1' — so adding a room needed a code change and
+   * `Space.capacity` was read by nothing. These fixtures are deliberately not
+   * the venue's real figures: a test that passes only for 220 and 150 would
+   * still pass against hard-coded constants.
+   */
+  const main = { capacity: 220, seatedCapacity: 150 }
+  const other = { capacity: 90, seatedCapacity: 64 }
+
+  it("uses the room's standing capacity for a standing format", () => {
+    expect(capacityOf(main, 'DJs')).toBe(220)
+    expect(capacityOf(main, 'Live music')).toBe(220)
   })
 
-  it('drops the main room when it is laid out cabaret', () => {
-    expect(capacityOf('Main', 'Cabaret')).toBe(CFG.capSeated)
-    expect(CFG.capSeated).toBeLessThan(CFG.capMusic)
+  it("uses the room's seated capacity when it is laid out cabaret", () => {
+    expect(capacityOf(main, 'Cabaret')).toBe(150)
   })
 
-  it('caps the apartment at the room, whatever the format', () => {
-    expect(capacityOf('Apartment U1', 'DJs')).toBe(CFG.capApt)
-    expect(capacityOf('Apartment U1', 'Cabaret')).toBe(CFG.capApt)
-  })
-
-  it('treats both rooms together as the music capacity', () => {
-    expect(capacityOf('Main + Apartment U1', 'DJs')).toBe(CFG.capMusic)
-  })
-
-  it('falls back to the music capacity for a room it does not know', () => {
-    expect(capacityOf('Somewhere new', 'DJs')).toBe(CFG.capMusic)
+  it('reads both figures off the row, not off constants', () => {
+    expect(capacityOf(other, 'DJs')).toBe(90)
+    expect(capacityOf(other, 'Cabaret')).toBe(64)
   })
 })
 

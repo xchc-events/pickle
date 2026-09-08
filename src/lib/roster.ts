@@ -1,4 +1,4 @@
-import { capacityOf } from './ticketing'
+import { capacityOf, type SpaceCapacity } from './ticketing'
 
 /**
  * Rostering.
@@ -53,7 +53,8 @@ export function windowFor(role: string, lateBar: boolean): [number, number] {
 }
 
 export interface RosterEvent {
-  spaceName: string
+  /** The room, carrying its own capacities. See `capacityOf` in ticketing.ts. */
+  space: SpaceCapacity
   format: string
   kind: string
   /** Attendance by scenario: [quiet, likely, great]. */
@@ -61,8 +62,6 @@ export interface RosterEvent {
   /** False when the bar shuts early. */
   lateBar: boolean
 }
-
-const isApt = (e: RosterEvent) => e.spaceName === 'Apartment U1'
 
 /**
  * How many people the room is expected to hold on the night.
@@ -76,7 +75,7 @@ function likelyCrowd(e: RosterEvent): number {
   // One capacity rule, shared with Ticketing. Two copies would drift the
   // first time the venue changes a layout, and this one decides whether a
   // second bar staff is paid for.
-  const cap = capacityOf(e.spaceName, e.format)
+  const cap = capacityOf(e.space, e.format)
   const likely = e.att[1] ?? 0
   return likely > 0 ? likely : Math.round(cap * 0.62)
 }
@@ -88,20 +87,6 @@ function likelyCrowd(e: RosterEvent): number {
  * night are two separate people and two separate shifts.
  */
 export function rolesFor(e: RosterEvent): string[] {
-  // The upstairs room seats forty and runs early — one of each, no doubling
-  // up. Crowd size does not enter into it; the room is the limit.
-  if (isApt(e)) {
-    return [
-      'Duty manager',
-      'Bar staff',
-      'Sound — Lead',
-      'Door',
-      'Care team',
-      'Set-up crew',
-      'Clean-up crew',
-    ]
-  }
-
   const workshop = e.kind === 'workshop'
   const roles = ['Duty manager', 'Bar staff']
 
@@ -135,8 +120,9 @@ export function shiftPlan(e: RosterEvent): PlannedShift[] {
     const [start, hours] = windowFor(role, e.lateBar)
 
     // A workshop's sound op is there for the session, not a full show call.
+    // The three-hour variant was the upstairs room's, and went with it.
     if (workshop && role === 'Sound — Lead') {
-      return { role, start, hours: isApt(e) ? 3 : 4 }
+      return { role, start, hours: 4 }
     }
 
     return { role, start, hours }
