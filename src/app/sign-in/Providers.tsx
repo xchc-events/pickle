@@ -1,4 +1,4 @@
-import { signIn } from '@/lib/auth'
+import { requestSignInLink } from './actions'
 import styles from './sign-in.module.css'
 
 /**
@@ -12,19 +12,14 @@ import styles from './sign-in.module.css'
  * everybody to `/pipeline` would 404 the promoters, who do not have it, so
  * the redirect goes to `/` and the app's own layout puts each person where
  * their permissions actually reach.
+ *
+ * The action lives in `./actions.ts` rather than inline, because what it has
+ * to do — catch Auth.js's rethrown errors so a refusal reads as a sentence
+ * instead of a crash — is worth testing, and an inline closure cannot be.
  */
 export function SignInByEmail() {
   return (
-    <form
-      action={async (formData: FormData) => {
-        'use server'
-        await signIn('resend', {
-          email: String(formData.get('email') ?? ''),
-          redirectTo: '/',
-        })
-      }}
-      className={styles.emailForm}
-    >
+    <form action={requestSignInLink} className={styles.emailForm}>
       <label className={styles.emailLabel} htmlFor="signin-email">
         Your email address
       </label>

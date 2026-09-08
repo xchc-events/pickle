@@ -175,6 +175,15 @@ export function userProblems(u: UserShape): string[] {
 export const LINK_COOLDOWN_SECONDS = 60
 
 /**
+ * A refusal carries the seconds as a number, not only inside its sentence.
+ *
+ * The sign-in page renders its own copy and cannot parse a count back out of
+ * prose, so the number travels separately. `why` stays for the places that
+ * want one ready-made sentence — the provider's own throw, and the log.
+ */
+export type LinkVerdict = { ok: true } | { ok: false; why: string; seconds: number }
+
+/**
  * Whether to send another sign-in link to this address.
  *
  * This is an availability guard rather than a secrecy one. Every link is a
@@ -187,16 +196,17 @@ export const LINK_COOLDOWN_SECONDS = 60
  * why — failing open on a nonsense value is the right direction here, because
  * the worst case is one extra email.
  */
-export function mayRequestLink(lastSentAt: Date | null, now: Date): Verdict {
+export function mayRequestLink(lastSentAt: Date | null, now: Date): LinkVerdict {
   if (!lastSentAt) return { ok: true }
 
   const elapsed = (now.getTime() - lastSentAt.getTime()) / 1000
   if (elapsed < 0) return { ok: true }
   if (elapsed >= LINK_COOLDOWN_SECONDS) return { ok: true }
 
-  const left = Math.ceil(LINK_COOLDOWN_SECONDS - elapsed)
+  const seconds = Math.ceil(LINK_COOLDOWN_SECONDS - elapsed)
   return {
     ok: false,
-    why: `A link was already sent to that address. Check the inbox, or try again in ${left} seconds.`,
+    seconds,
+    why: `A link was already sent to that address. Check the inbox, or try again in ${seconds} seconds.`,
   }
 }

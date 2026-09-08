@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { ROLE_LABEL, MODULES, type ModuleKey } from '@/lib/constants'
 import { roleKeyOf, authConfigured, stubAllowed } from '@/lib/session'
+import { LINK_COOLDOWN_SECONDS } from '@/lib/auth-rules'
 import { initialsOf } from '@/lib/format'
 import { Brand } from '@/components/Brand'
 import { Avatar } from '@/components/Avatar'
@@ -21,10 +22,28 @@ const REASON: Record<string, string> = {
     'Sign-in is not configured on this install. An administrator needs to set the Resend keys — see the README.',
 }
 
+/**
+ * The seconds left on the cooldown, if the URL is carrying a sensible one.
+ *
+ * The value arrives in a query string, so it is whatever somebody typed.
+ * Clamped to the cooldown rather than trusted: the page states it as fact,
+ * and a link promising a four hour wait is a way to talk somebody out of
+ * trying to sign in.
+ */
+function cooldownLeft(raw: string | string[] | undefined): number | null {
+  if (typeof raw !== 'string') return null
+
+  const seconds = Number.parseInt(raw, 10)
+  if (!Number.isInteger(seconds) || seconds < 1) return null
+
+  return Math.min(seconds, LINK_COOLDOWN_SECONDS)
+}
+
 export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
   const sp = await searchParams
   const error = typeof sp.error === 'string' ? sp.error : null
   const sent = sp.sent === '1'
+  const wait = cooldownLeft(sp.wait)
 
   return (
     <main className={styles.wrap}>
@@ -34,6 +53,12 @@ export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
       {error ? (
         <p className={styles.error} role="alert">
           {REASON[error] ?? 'That did not work. Try again, or ask an administrator at the venue.'}
+        </p>
+      ) : null}
+
+      {wait !== null ? (
+        <p className={styles.error} role="alert">
+          A link was already sent to that address. Check the inbox, or try again in {wait} seconds.
         </p>
       ) : null}
 

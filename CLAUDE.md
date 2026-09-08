@@ -48,13 +48,17 @@ The devcontainer brings up Postgres; outside it you need one on :5432 matching
 - Trunk-based: short-lived branches off `main`, small PRs, merged often.
 - Branches: `feat/`, `fix/`, `chore/` + a few words.
 - Never commit or push unless asked.
-- `docs/design-handoff/` is the source of truth for behaviour, and is read-only —
-  it is the vendor's artefact, not our code.
+- `docs/design-handoff/` was the source of truth for initial design, but it is
+  no longer always the most relevant source of truth. The rest of the docs in that
+  folder should be consulted and the most recent taken as the most important.
+  Raise any conflicts between different documents before implementing on them.
 
 ## Working style
 
-Give yourself something to check against before you start — a test, the type
-checker, a failing assertion. "Looks done" is not a signal.
+Fully test driven development. Tests should show up with clear naming conventions
+and pass/fail indicators in terminal when a server is deployed either locally or in production.
+If there are any legacy functions or critical components that do not have tests written for them
+then tests will be written as they are found lacking.
 
 For anything touching money, hours or permissions: plan first, and write the
 test before the implementation.
