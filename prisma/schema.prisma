@@ -169,6 +169,52 @@ model Space {
   /// makes, not arithmetic on the standing figure.
   seatedCapacity Int @default(150)
   events   Event[]
+  holds    Hold[]
+}
+
+/// Where a hold stands.
+enum HoldState {
+  HELD
+  RELEASED
+  /// This hold became the booking. At most one per room per night.
+  CONFIRMED
+}
+
+/// A claim on a room for a night.
+///
+/// The venue had no availability model at all before this: an event carried
+/// one date and one space and nothing checked whether the room was taken, so
+/// two events could be booked into the same room on the same Saturday.
+///
+/// A hold belongs to an event and to one night, so a festival taking the room
+/// for three days is three rows, and a second room is a fourth. Ranking is
+/// right of first refusal — a 2nd hold challenges the 1st rather than booking
+/// over it.
+///
+/// There is no expiry. The ladder is challenge-driven by decision: nothing
+/// expires on a timer, so there is no background job and no hold that quietly
+/// evaporates while a promoter believes they still have the room.
+model Hold {
+  id      String    @id @default(cuid())
+  eventId String
+  event   Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  spaceId String
+  space   Space     @relation(fields: [spaceId], references: [id])
+  /// The night held. An evening, not an instant — same reasoning as the run
+  /// times on Event.
+  date    DateTime
+  /// 1 = first hold. Only meaningful while HELD; released rows keep their old
+  /// number rather than being renumbered, so the history stays readable.
+  rank    Int
+  state   HoldState @default(HELD)
+  /// The event waiting on this hold, once somebody has challenged it.
+  challengedByEventId String?
+  challengedAt        DateTime?
+  releasedAt          DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([spaceId, date])
+  @@index([eventId])
 }
 
 enum BookingModel {
@@ -330,6 +376,7 @@ model Event {
   beats     Beat[]
   files     StoredFile[]
   grants    AccessGrant[]
+  holds     Hold[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

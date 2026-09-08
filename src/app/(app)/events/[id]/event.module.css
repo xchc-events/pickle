@@ -727,3 +727,80 @@
   opacity: 0.6;
   cursor: default;
 }
+
+/* -------------------------------------------------------------- holds --- */
+/* The ladder on a room for a night. Nothing expires, so a challenged hold has
+   to say who is waiting — that is the only pressure in the system. */
+
+.holds {
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.holdNone {
+  margin: 0 0 12px;
+  color: var(--color-neutral-400);
+  max-width: 62ch;
+}
+
+.hold {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.holdBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.holdLabel {
+  color: var(--color-neutral-200);
+}
+
+.holdNote {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.holdActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.holdBtn {
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent-200);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.holdGhost {
+  background: transparent;
+  border: 1px solid var(--color-neutral-700);
+  color: var(--color-neutral-200);
+  border-radius: var(--radius-sm);
+  padding: 7px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.holdBtn:disabled,
+.holdGhost:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
