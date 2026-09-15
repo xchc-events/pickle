@@ -3,6 +3,7 @@ import { BUILT_MODULES, STAGES } from './constants'
 import {
   advanceLabel,
   canAdvance,
+  canChangeEventRecord,
   gatesDoneLabel,
   gatesFor,
   gatesMessage,
@@ -447,6 +448,31 @@ describe('the gate summary', () => {
     expect(advanceLabel(0)).toBe('Move to Negotiating')
     expect(advanceLabel(6)).toBe('Move to Payout')
     expect(advanceLabel(7)).toBe('Complete')
+  })
+})
+
+/**
+ * Reading the record is not keeping it.
+ *
+ * `eventScope` lets an external promoter open their own organisation's events,
+ * and Pipeline is one of their two modules, so every action on this page used
+ * to be one POST away from them: agreeing their own terms, locking their own
+ * date, moving their own show on to sale. What the handoff does let them
+ * answer for — agreeing or querying the terms, signing off the artwork —
+ * belongs in Sign-offs, in their own words, not on the venue's controls.
+ */
+describe('who may change the event record', () => {
+  it('lets anybody inside the venue change it', () => {
+    expect(canChangeEventRecord({ external: false }).ok).toBe(true)
+  })
+
+  it('refuses an external promoter, though their scope lets them read it', () => {
+    expect(canChangeEventRecord({ external: true }).ok).toBe(false)
+  })
+
+  it('tells them who can make the change, not only that they cannot', () => {
+    const v = canChangeEventRecord({ external: true })
+    expect(v.ok === false && v.why).toMatch(/coordinator/i)
   })
 })
 

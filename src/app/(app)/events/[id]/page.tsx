@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
+import { canChangeEventRecord } from '@/lib/event-record'
 import { SectionHeading } from '@/components/SectionHeading'
 import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
@@ -10,6 +11,7 @@ import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
 import { advanceStage, setLead } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
+import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
 import { Holds } from './Holds'
 import { barRefusal } from '@/lib/bar'
@@ -31,6 +33,10 @@ import type { LeadRole } from '@/generated/prisma/client'
  * Editing lives where it belongs. Ticket prices are set in Ticketing, shifts
  * in Roster, artwork in Design; this page links to them rather than growing a
  * second writer for the same field.
+ *
+ * An external promoter opens this page for their own shows and reads it. The
+ * controls, and the links into modules they cannot open, are absent for them
+ * — not disabled — and the actions refuse them regardless.
  */
 export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   const { user, modules } = await requireModule('pipeline')
@@ -41,16 +47,30 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   const ev = await loadEventRecord(user, id)
   if (!ev) notFound()
 
-  const people = await db.person.findMany({
-    where: { active: true },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true },
-  })
+  // The verdict every action on this page reaches, taken here too so that a
+  // control the action would refuse is never drawn — the same reason the
+  // Finance page asks canReveal before it offers a Reveal button.
+  const canChange = canChangeEventRecord(user).ok
+
+  // The staff list only feeds the lead pickers, so it is not read for
+  // somebody who gets none. The venue's people are not a promoter's to browse.
+  const people = canChange
+    ? await db.person.findMany({
+        where: { active: true },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      })
+    : []
   const leadOptions = people.map((p) => ({ personId: p.id, name: p.name }))
 
   // The room ladder. Loaded here rather than folded into loadEventRecord:
   // holds are about the room and the night, not about the event's own state.
-  const holds = await holdsForEvent(ev.id)
+  //
+  // Not loaded at all for somebody outside the venue. A ladder is every
+  // booking that wants this room on this night, and a challenger's name is
+  // another organisation's event — neither is inside a promoter's scope, and
+  // scope is applied in the query, not by leaving something out of the view.
+  const holds = canChange ? await holdsForEvent(ev.id) : []
 
   const blocked = ev.gates.filter((g) => !g.ok)
 
@@ -60,7 +80,8 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         <div className={styles.headMain}>
           <Link href="/pipeline" className={styles.back}>
             <i className="ph ph-arrow-left" aria-hidden="true" />
-            Pipeline
+            {/* What the sidebar and the pipeline call it for them. */}
+            {user.external ? 'Your events' : 'Pipeline'}
           </Link>
           <div className={styles.titleRow}>
             <h1 className={styles.title}>{ev.name}</h1>
@@ -81,33 +102,35 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
           </p>
         </div>
 
-        <div className={styles.headActions}>
-          <Link href={`/ticketing?event=${ev.id}`} className="btn btn-ghost">
-            <i className="ph ph-ticket" aria-hidden="true" />
-            Ticketing
-          </Link>
-          <Link href={`/design?event=${ev.id}`} className="btn btn-ghost">
-            <i className="ph ph-tag" aria-hidden="true" />
-            Design
-          </Link>
-          <Link href={`/tech?event=${ev.id}`} className="btn btn-ghost">
-            <i className="ph ph-sliders" aria-hidden="true" />
-            Tech
-          </Link>
-          {ev.concluded ? null : (
-            <ActionButton
-              action={advanceStage.bind(null, ev.id)}
-              className={ev.canAdvance ? 'btn btn-primary' : 'btn btn-secondary'}
-              title={
-                ev.canAdvance
-                  ? ev.advanceLabel
-                  : `${blocked.length} gate${blocked.length === 1 ? '' : 's'} still to clear`
-              }
-            >
-              {ev.advanceLabel}
-            </ActionButton>
-          )}
-        </div>
+        {canChange ? (
+          <div className={styles.headActions}>
+            <Link href={`/ticketing?event=${ev.id}`} className="btn btn-ghost">
+              <i className="ph ph-ticket" aria-hidden="true" />
+              Ticketing
+            </Link>
+            <Link href={`/design?event=${ev.id}`} className="btn btn-ghost">
+              <i className="ph ph-tag" aria-hidden="true" />
+              Design
+            </Link>
+            <Link href={`/tech?event=${ev.id}`} className="btn btn-ghost">
+              <i className="ph ph-sliders" aria-hidden="true" />
+              Tech
+            </Link>
+            {ev.concluded ? null : (
+              <ActionButton
+                action={advanceStage.bind(null, ev.id)}
+                className={ev.canAdvance ? 'btn btn-primary' : 'btn btn-secondary'}
+                title={
+                  ev.canAdvance
+                    ? ev.advanceLabel
+                    : `${blocked.length} gate${blocked.length === 1 ? '' : 's'} still to clear`
+                }
+              >
+                {ev.advanceLabel}
+              </ActionButton>
+            )}
+          </div>
+        ) : null}
       </header>
 
       <div className={styles.body}>
@@ -124,22 +147,30 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                   <i className={`ph ${l.icon}`} aria-hidden="true" />
                   {l.label} lead
                 </span>
-                {/* Bound, not wrapped in an arrow: a closure created here is
-                    an ordinary function, and a Server Component may only hand
-                    a Client Component a server action itself. */}
-                <LeadPicker
-                  action={setLead.bind(null, ev.id, l.role.toUpperCase() as LeadRole)}
-                  value={l.personId ?? ''}
-                  options={leadOptions}
-                  label={`${l.label} lead`}
-                />
+                {canChange ? (
+                  /* Bound, not wrapped in an arrow: a closure created here is
+                     an ordinary function, and a Server Component may only hand
+                     a Client Component a server action itself. */
+                  <LeadPicker
+                    action={setLead.bind(null, ev.id, l.role.toUpperCase() as LeadRole)}
+                    value={l.personId ?? ''}
+                    options={leadOptions}
+                    label={`${l.label} lead`}
+                  />
+                ) : (
+                  <span className={styles.factValue}>
+                    {l.name ?? <span className={styles.warn}>nobody yet</span>}
+                  </span>
+                )}
               </div>
             ))}
           </div>
-          <p className={styles.note}>
-            A lead is a person, not a typed-in name — renaming them in Admin renames them on every
-            brief, chase and timesheet at once.
-          </p>
+          {canChange ? (
+            <p className={styles.note}>
+              A lead is a person, not a typed-in name — renaming them in Admin renames them on every
+              brief, chase and timesheet at once.
+            </p>
+          ) : null}
 
           <div className={styles.facts}>
             {ev.facts.map((f) => (
@@ -166,7 +197,11 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             <div className={styles.fact}>
               <span className={styles.factKey}>Date</span>
               <span className={styles.factValue}>
-                <DateLock eventId={ev.id} tbc={ev.dateTbc} />
+                {canChange ? (
+                  <DateLock eventId={ev.id} tbc={ev.dateTbc} />
+                ) : (
+                  <span className={ev.dateTbc ? styles.warn : undefined}>{ev.date}</span>
+                )}
               </span>
               <span className={styles.factNote}>
                 {ev.dateTbc ? 'still a best guess — Enquiry holds on it' : 'held in the calendar'}
@@ -174,13 +209,17 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             </div>
           </div>
 
-          <RunTimes
-            eventId={ev.id}
-            doors={ev.doors}
-            barClose={ev.barClose}
-            allOut={ev.allOut}
-            late={ev.licenceLate}
-          />
+          {canChange ? (
+            <RunTimes
+              eventId={ev.id}
+              doors={ev.doors}
+              barClose={ev.barClose}
+              allOut={ev.allOut}
+              late={ev.licenceLate}
+            />
+          ) : (
+            <RunTimesReadout doors={ev.doors} barClose={ev.barClose} allOut={ev.allOut} />
+          )}
 
           {/* The gates. */}
           <div className={styles.gates}>
@@ -198,7 +237,10 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 />
                 <span className={styles.gateLabel}>{g.label}</span>
                 <span className={styles.gateWhy}>{g.ok ? '' : g.why}</span>
-                {g.ok ? (
+                {/* A promoter reads what holds their show up. The fix is the
+                    venue's, and every screen it links to is one they cannot
+                    open — a dead link reads as a step they could take. */}
+                {g.ok || !canChange ? (
                   <span className={styles.gateGap} />
                 ) : (
                   <Link
@@ -227,9 +269,11 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 <span className={styles.tierShare}>{t.share}</span>
               </span>
             ))}
-            <Link href={`/ticketing?event=${ev.id}`} className={styles.tierLink}>
-              set them in Ticketing
-            </Link>
+            {canChange ? (
+              <Link href={`/ticketing?event=${ev.id}`} className={styles.tierLink}>
+                set them in Ticketing
+              </Link>
+            ) : null}
           </div>
         </section>
 
@@ -244,7 +288,11 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             A bar past midnight needs a special licence, applied for at least 20 working days out.
             The bar close above is what decides it — change that and this changes with it.
           </p>
-          <LicencePicker eventId={ev.id} value={ev.licence} late={ev.licenceLate} />
+          {canChange ? (
+            <LicencePicker eventId={ev.id} value={ev.licence} late={ev.licenceLate} />
+          ) : (
+            <LicenceReadout value={ev.licence} />
+          )}
         </section>
 
         {/* ----------------------------------------------------- artists --- */}
@@ -352,28 +400,43 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             </div>
           </div>
 
-          <DealPanel eventId={ev.id} state={ev.deal} note={ev.dealNote} />
+          {/* The panel records the promoter's answer on the venue's side —
+              "They agreed", "Put it back to them". It is not the promoter's
+              own way to agree, which the handoff puts in Sign-offs. */}
+          {canChange ? (
+            <DealPanel eventId={ev.id} state={ev.deal} note={ev.dealNote} />
+          ) : (
+            <DealReadout state={ev.deal} note={ev.dealNote} />
+          )}
         </section>
 
         {/* ------------------------------------------------------- room --- */}
-        <section id="room">
-          <SectionHeading
-            note={
-              holds.some((h) => h.state === 'confirmed')
-                ? 'the night is taken'
-                : 'nothing expires — a hold moves when somebody wants the date'
-            }
-          >
-            The room
-          </SectionHeading>
-          <Holds eventId={ev.id} holds={holds} dateLabel={ev.date} spaceName={ev.spaceName} />
-        </section>
+        {/* The venue's alone — see where `holds` is loaded. */}
+        {canChange ? (
+          <section id="room">
+            <SectionHeading
+              note={
+                holds.some((h) => h.state === 'confirmed')
+                  ? 'the night is taken'
+                  : 'nothing expires — a hold moves when somebody wants the date'
+              }
+            >
+              The room
+            </SectionHeading>
+            <Holds eventId={ev.id} holds={holds} dateLabel={ev.date} spaceName={ev.spaceName} />
+          </section>
+        ) : null}
 
         {/* ----------------------------------------------------- actuals --- */}
         {/* Only from show week. Before the night there is nothing to count,
             and a form offering to reconcile an event that has not happened
-            invites somebody to model it twice. */}
-        {(ev.stage >= 6 || ev.concluded) && (
+            invites somebody to model it twice.
+
+            Never for somebody outside the venue. The section is the form,
+            and the till's figures are not among what the handoff shows a
+            promoter; the gate above already tells them whether the night
+            has been counted. */}
+        {canChange && (ev.stage >= 6 || ev.concluded) && (
           <section id="actuals">
             <SectionHeading
               note={
@@ -482,9 +545,11 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               </li>
             ))}
           </ul>
-          <Link href={`/promo?event=${ev.id}`} className="btn btn-ghost">
-            Work the promo plan
-          </Link>
+          {canChange ? (
+            <Link href={`/promo?event=${ev.id}`} className="btn btn-ghost">
+              Work the promo plan
+            </Link>
+          ) : null}
         </section>
 
         {/* ---------------------------------------------------- activity --- */}

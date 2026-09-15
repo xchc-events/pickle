@@ -1,4 +1,5 @@
 import { STAGES } from './constants'
+import type { Verdict } from './payments'
 
 /**
  * The event record, and the stage gates that govern it.
@@ -458,4 +459,30 @@ export function gatesMessage(gates: Gate[], stage: number): string {
   return blocked.length === 1
     ? `One thing holds this up: ${blocked[0]!.label.toLowerCase()}.`
     : `${blocked.length} things hold this up, starting with ${blocked[0]!.label.toLowerCase()}.`
+}
+
+// ------------------------------------------------------------------- who ---
+
+/**
+ * Whether this user may change the event record.
+ *
+ * Every action on the record is the venue's: advancing it, naming its leads,
+ * its licence, its run times, where the terms stand, its date, the night's
+ * takings and the hold on the room. An external promoter can open the record
+ * — `eventScope` hands them their own organisation's events, and Pipeline is
+ * one of their two modules — but reading it is where that stops, whatever
+ * their permission rows say. What the handoff has them answer for, agreeing or
+ * querying the terms and signing off artwork, belongs in Sign-offs.
+ *
+ * The page asks the same question, so a control this refuses is absent rather
+ * than a button that always says no.
+ */
+export function canChangeEventRecord(user: { external: boolean }): Verdict {
+  if (user.external) {
+    return {
+      ok: false,
+      why: 'Nothing changed — the event record is kept by the venue. Your coordinator can make this change.',
+    }
+  }
+  return { ok: true }
 }
