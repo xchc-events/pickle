@@ -1,0 +1,582 @@
+/* Bar. The table of a night against its budget is the screen — the reasons,
+   what sold and the months all exist to explain a row of it. */
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px 15px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  font-size: 21px;
+  letter-spacing: -0.015em;
+  margin: 0 0 3px;
+}
+
+.sub {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  margin: 0;
+}
+
+.kicker {
+  color: var(--color-neutral-600);
+}
+
+.views {
+  display: flex;
+  gap: 7px;
+}
+
+/* The prototype's view chips: an accent border and a tint when chosen. */
+.view {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-neutral-800);
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+
+.view:hover {
+  color: var(--color-neutral-200);
+}
+
+.viewOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent-100);
+}
+
+.good {
+  color: var(--st-good);
+}
+
+.warn {
+  color: var(--st-warn);
+}
+
+.stop {
+  color: var(--st-stop);
+}
+
+.plain {
+  color: var(--color-neutral-500);
+}
+
+/* --- the event rail ----------------------------------------------------- */
+
+.queue {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.queueItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 168px;
+  padding: 9px 15px;
+  border-right: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-300);
+}
+
+.queueItem:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
+.queueOn {
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+  color: var(--color-neutral-100);
+}
+
+.queueName {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.queueDate,
+.queueNote {
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.queueDate {
+  color: var(--color-neutral-600);
+}
+
+.queueNote b {
+  font-weight: 500;
+  color: var(--color-neutral-200);
+}
+
+/* --- body --------------------------------------------------------------- */
+
+.body {
+  padding: 18px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty {
+  margin: 0;
+  padding: 22px 28px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+  max-width: 62ch;
+}
+
+.eventHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.eventName {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+.eventMeta {
+  font-size: 12px;
+  color: var(--color-neutral-600);
+}
+
+.windowTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 22px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.note,
+.warnNote,
+.footnote {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.55;
+  max-width: 72ch;
+}
+
+.note,
+.footnote {
+  color: var(--color-neutral-600);
+}
+
+.warnNote {
+  color: var(--st-warn);
+}
+
+.callout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 11px 13px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-300);
+}
+
+.callout p {
+  margin: 0;
+}
+
+.callout b {
+  font-weight: 500;
+  color: var(--color-neutral-100);
+}
+
+/* --- tables ------------------------------------------------------------- */
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.table th,
+.table td {
+  padding: 7px 10px 7px 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  text-align: left;
+  vertical-align: baseline;
+}
+
+.table thead th {
+  border-top: 0;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--color-neutral-600);
+}
+
+.table td {
+  color: var(--color-neutral-200);
+}
+
+.rowLabel {
+  font-weight: 400;
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.cellSub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+  margin-top: 1px;
+}
+
+.totalRow th,
+.totalRow td {
+  border-top: 1px solid var(--color-neutral-700);
+  padding-top: 9px;
+}
+
+.totalRow .rowLabel {
+  color: var(--color-neutral-100);
+  font-weight: 500;
+}
+
+.totalRow td:nth-child(2),
+.totalRow td:nth-child(3) {
+  color: var(--color-neutral-100);
+  font-weight: 500;
+}
+
+.driver {
+  color: var(--color-neutral-400);
+  white-space: nowrap;
+}
+
+/* --- why ---------------------------------------------------------------- */
+
+.effects {
+  display: flex;
+  flex-direction: column;
+}
+
+.effect {
+  display: grid;
+  grid-template-columns: 150px auto 1fr;
+  align-items: baseline;
+  gap: 14px;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+}
+
+.effect:first-child {
+  border-top: 0;
+}
+
+.effectLabel {
+  font-size: 12.5px;
+  color: var(--color-neutral-300);
+}
+
+.effectValue {
+  font-size: 13px;
+  text-align: right;
+  min-width: 70px;
+}
+
+.effectNote {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.effectTotal {
+  border-top: 1px solid var(--color-neutral-700);
+  padding-top: 9px;
+}
+
+.effectTotal .effectLabel {
+  color: var(--color-neutral-100);
+}
+
+/* --- aside -------------------------------------------------------------- */
+
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 14px 15px;
+}
+
+.cardPlain {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.cardTitle,
+.cardTitlePlain {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.cardTitle {
+  color: var(--color-accent);
+}
+
+.cardTitlePlain {
+  color: var(--color-neutral-500);
+}
+
+.cardNote,
+.asideNote {
+  margin: 9px 0 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+}
+
+.asideNote {
+  margin: 0;
+}
+
+.fact {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.factLabel {
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+}
+
+.factValue {
+  font-size: 12px;
+  color: var(--color-neutral-200);
+}
+
+.link {
+  color: var(--color-accent);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* --- closing the bar ---------------------------------------------------- */
+
+.closeStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--color-neutral-200);
+}
+
+.closeStatus i {
+  color: var(--color-neutral-500);
+}
+
+.close {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.closeTill {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.closeTill :global(.btn) {
+  font-size: 12px;
+}
+
+.closeNote,
+.closeWarn {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.closeNote {
+  color: var(--color-neutral-500);
+}
+
+.closeWarn {
+  color: var(--st-warn);
+}
+
+.closePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.closeFigures {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-neutral-300);
+}
+
+.closeFigures b {
+  font-weight: 500;
+  color: var(--color-neutral-100);
+}
+
+.closeSave {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-accent-100);
+  background: var(--color-accent-700);
+  border: 1px solid var(--color-accent-600);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.closeSave:hover:not(:disabled) {
+  background: var(--color-accent-600);
+}
+
+.closeSave:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.closeHand {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 9px;
+}
+
+.closeHand summary {
+  cursor: pointer;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+}
+
+.closeHand[open] summary {
+  margin-bottom: 9px;
+}
+
+.closeGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.closeField {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.closeLabel {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-neutral-500);
+}
+
+.closeInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+}
+
+.closeInputWrap:focus-within {
+  border-color: var(--color-accent-500);
+}
+
+.closePrefix {
+  color: var(--color-neutral-500);
+  font-size: 12px;
+}
+
+.closeInput {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: var(--color-neutral-100);
+  font: inherit;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 0;
+}
+
+.closeInput:focus {
+  outline: none;
+}
+
+.closeHint {
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+@media (max-width: 1000px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .effect {
+    grid-template-columns: 120px auto;
+  }
+
+  .effectNote {
+    grid-column: 1 / -1;
+  }
+}

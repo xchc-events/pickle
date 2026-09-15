@@ -20,6 +20,8 @@ import { DEFAULT_PERMS, type RoleKey } from '../src/lib/constants'
 import { ASSET_SET } from '../src/lib/design'
 import { shiftPlan, type RosterEvent } from '../src/lib/roster'
 import { capacityOf } from '../src/lib/ticketing'
+import { financeVals } from '../src/lib/finance'
+import { barBudgetFrom, isBarRole } from '../src/lib/bar'
 
 /**
  * The one bookable room.
@@ -502,6 +504,8 @@ async function main() {
   await db.eventLead.deleteMany()
   await db.financeReview.deleteMany()
   await db.actual.deleteMany()
+  await db.barSale.deleteMany()
+  await db.barBudget.deleteMany()
   await db.event.deleteMany()
   await db.space.deleteMany()
   await db.availability.deleteMany()
@@ -599,7 +603,11 @@ async function main() {
         scen: 1,
         sold: e.sold ?? 0,
         barHead: e.barHead ?? 20,
+        // The prototype's own run times. Without doors there is no service
+        // window, and without one a bar cannot be read off the till.
+        doors: lateBar ? '8:00pm' : '7:00pm',
         barClose: lateBar ? '12:00am' : '11:00pm',
+        allOut: lateBar ? '1:00am' : '11:30pm',
         gear: e.gear ?? 200,
         adv: e.adv ?? 100,
         sound: e.sound ?? 'inhouse',
@@ -679,6 +687,54 @@ async function main() {
           },
         })
       }
+    }
+
+    // The bar budget, for every event already on sale — locked as the move to
+    // On sale locks it in the product (src/app/(app)/events/[id]/actions.ts),
+    // off the settlement's own figures. Only `att`, `scen` and `barHead` reach
+    // the two figures a budget takes from `financeVals` — heads and the bar
+    // margin line — so the rest of the input is zero rather than assembled for
+    // a projection nothing here reads. Nobody's initials, as with the actuals:
+    // the seed locked nothing.
+    if (e.stage >= 4) {
+      const barHead = e.barHead ?? 20
+      const vals = financeVals({
+        dow: date.getDay(),
+        std: 0,
+        door: 0,
+        mix: [0.25, 0.25, 0.25, 0.25],
+        att,
+        scen: 1,
+        barHead,
+        gear: 0,
+        adv: 0,
+        sound: null,
+        crew: 0,
+        tok: 0,
+        split: 0,
+        artists: [],
+        shifts: [],
+        tasks: [],
+        addons: [],
+        orgShareHours: 0,
+      })
+      const labourHours = plan.filter((s) => isBarRole(s.role)).reduce((n, s) => n + s.hours, 0)
+      // When it went on sale: the day it entered the stage for an event still
+      // there; three weeks before the night for one that has moved on, but
+      // never later than the stage it is in now began.
+      const lockedAt =
+        e.stage === 4
+          ? addDays(today, -e.stageDays)
+          : new Date(Math.min(addDays(today, -e.stageDays).getTime(), addDays(date, -21).getTime()))
+
+      await db.barBudget.create({
+        data: {
+          eventId: created.id,
+          ...barBudgetFrom({ vals, barHead, labourHours }),
+          basis: 'ON_SALE',
+          lockedAt,
+        },
+      })
     }
 
     // Department leads. The prototype hands them out by stage: ticketing at

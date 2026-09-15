@@ -92,6 +92,7 @@ export const BUILT_MODULES: readonly ModuleKey[] = [
   'admin',
   'hours',
   'ticketing',
+  'bar',
 ]
 
 export type RoleKey = 'coordinator' | 'design' | 'tech' | 'bar' | 'admin' | 'promoter'
