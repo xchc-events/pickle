@@ -5,7 +5,12 @@ import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
-import { canAdvance, LICENCE_WORD, type LicenceState } from '@/lib/event-record'
+import {
+  canAdvance,
+  canChangeEventRecord,
+  LICENCE_WORD,
+  type LicenceState,
+} from '@/lib/event-record'
 import { STAGES } from '@/lib/constants'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
@@ -24,6 +29,17 @@ import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
  * Each re-checks the module and the event scope for itself. An action is a
  * POST endpoint reachable by anyone who knows it exists — the page that drew
  * the button is not a security boundary. Same reasoning as design/actions.ts.
+ *
+ * Neither check is enough on its own. An external promoter carries Pipeline
+ * and is in scope for their own organisation's events, so both let them
+ * through, and neither asks whether they may *change* what they can read.
+ * `canChangeEventRecord` does, between the two: after the module check, so a
+ * role without Pipeline still gets the 404 and learns nothing; before the
+ * event lookup, because the answer does not depend on which event it is. It
+ * is refused with a toast rather than a 404 — the record is theirs to read,
+ * so there is no existence left to hide, only an explanation owed — the same
+ * way Admin refuses an external account. actions.test.ts calls every export
+ * here as a promoter, so an action added without the check fails there.
  *
  * What is *not* here matters as much as what is. Ticket prices, shifts, hours
  * and asset states are edited in their own modules, which already own those
@@ -48,6 +64,8 @@ const LICENCE_DB: Record<LicenceState, Licence> = {
  */
 export async function advanceStage(eventId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const rec = await loadEventRecord(user, id)
@@ -92,6 +110,8 @@ export async function setLead(
   personId: string | null,
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   if (personId === null) {
@@ -127,6 +147,8 @@ export async function setLead(
  */
 export async function setLicence(eventId: string, state: LicenceState): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const value = LICENCE_DB[state]
@@ -151,6 +173,8 @@ export async function setRunTime(
   value: string,
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   await db.event.update({ where: { id }, data: { [field]: value || null } })
@@ -175,6 +199,8 @@ export async function setRunTime(
  */
 export async function setDeal(eventId: string, state: DealState, note: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const trimmed = note.trim()
@@ -211,6 +237,8 @@ export async function setDeal(eventId: string, state: DealState, note: string): 
 /** Lock the date, or put it back to TBC. */
 export async function setDateTbc(eventId: string, tbc: boolean): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   await db.event.update({ where: { id }, data: { dateTbc: tbc } })
@@ -244,6 +272,8 @@ export async function countDoor(
   figures: { tickets: number; ticketRev: number },
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const clean = cleanDoor(figures)
@@ -289,6 +319,8 @@ export async function closeBar(
   figures: { barTake: number; barProfit: number },
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const clean = cleanBar(figures)
@@ -327,6 +359,8 @@ export async function closeBar(
  */
 export async function holdTheRoom(eventId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   // A hold defaults to the event's own room and date. Holding some other
@@ -346,6 +380,8 @@ export async function holdTheRoom(eventId: string): Promise<Said> {
 
 export async function takeTheNight(eventId: string, holdId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const out = await confirmHold(holdId)
@@ -358,6 +394,8 @@ export async function takeTheNight(eventId: string, holdId: string): Promise<Sai
 
 export async function dropTheHold(eventId: string, holdId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const out = await releaseHold(holdId)
@@ -370,6 +408,8 @@ export async function dropTheHold(eventId: string, holdId: string): Promise<Said
 
 export async function challengeTheHold(eventId: string, holdId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
   const out = await challengeHold(holdId, id)
