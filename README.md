@@ -103,7 +103,9 @@ off in Admin ends the session they already have open. A token cannot be taken
 back; a row can.
 
 **Resend setup:** resend.com → add and verify the sending domain → API keys.
-`EMAIL_FROM` must be on that verified domain, e.g. `XCHC <no-reply@xchc.co.nz>`.
+`EMAIL_FROM` must be on that verified domain, e.g. `XCHC <no-reply@send.minim.nz>`.
+Sign-in email deliberately sends from a Minim domain rather than `xchc.co.nz`,
+because XCHC's web presence may move off that domain around launch.
 
 Links live one hour, and an address can only be sent one a minute
 (`LINK_COOLDOWN_SECONDS` in `auth-rules.ts`) — every link is a real email
