@@ -618,37 +618,58 @@ model FinanceReview {
   when    DateTime?
 }
 
-/// Once an event concludes, actuals replace projections.
 /// Where a reconciled figure came from.
 ///
-/// Hand-entered today, a till system later. The distinction is stored from the
-/// start rather than bolted on when the integration lands: a POS-read figure
-/// and a typed one carry different authority, and a settlement that cannot
-/// tell them apart cannot be audited.
+/// A POS-read figure and a typed one carry different authority, and a
+/// settlement that cannot tell them apart cannot be audited. POS means read off
+/// Epos Now, the venue's till, by the server; MANUAL means somebody typed it.
 enum ActualSource {
   MANUAL
   POS
 }
 
+/// Once an event concludes, actuals replace projections.
+///
+/// Two halves, reconciled separately. The door is counted by the coordinator
+/// off Gather.rsvp and the door sheet, on the event record; the bar is closed
+/// by the bar manager off the till, in Bar. Until they were split the four
+/// figures were one all-or-nothing row behind the Pipeline permission, so the
+/// person holding the till read could not enter it.
+///
+/// A half is its two figures together or not at all — enforced by a CHECK
+/// constraint in the migration, because Prisma cannot express one. The
+/// settlement substitutes whichever halves are in and leaves the rest
+/// projected; the gate out of Show week waits for both. See src/lib/actuals.ts.
 model Actual {
   id         String @id @default(cuid())
   eventId    String @unique
   event      Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  /// Final count and gross takings, GST **inclusive** — what the door and the
-  /// till actually took. `settlement.ts` divides by CFG.gst exactly as the
-  /// projection does, so a settled night and a projected one are comparable.
-  tickets    Int    @default(0)
-  ticketRev  Float  @default(0)
-  barTake    Float  @default(0)
+
+  // --- the door ---
+  /// People through the door, counted — not tickets sold.
+  tickets    Int?
+  /// Ticket takings, GST **inclusive**. `countedVals` divides by CFG.gst
+  /// exactly as the projection does, so a counted night and a projected one
+  /// stay comparable.
+  ticketRev  Float?
+  doorSource       ActualSource?
+  /// Who counted it. Denormalised like `Activity.who`, so it keeps reading
+  /// correctly for somebody who has since left.
+  doorReconciledBy String?
+  doorReconciledAt DateTime?
+
+  // --- the bar ---
+  /// Gross over the bar, GST **inclusive** — what the till took.
+  barTake    Float?
   /// Bar profit after stock cost, GST **exclusive** — this goes onto the bar
   /// margin line untouched, so it must arrive in the same terms as `barMarg`.
-  barProfit  Float  @default(0)
-
-  source       ActualSource @default(MANUAL)
-  /// Who reconciled it. Denormalised like `Activity.who`, so it keeps reading
-  /// correctly for somebody who has since left.
-  reconciledBy String?
-  reconciledAt DateTime     @default(now())
+  barProfit  Float?
+  /// MANUAL when somebody typed the figures. POS is reserved for figures the
+  /// server reads off Epos Now itself — nothing writes POS yet, and a client
+  /// must never be able to claim it for numbers it sent.
+  barSource        ActualSource?
+  barReconciledBy  String?
+  barReconciledAt  DateTime?
 }
 
 // ---------------------------------------------------------------- payees ---

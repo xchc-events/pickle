@@ -17,6 +17,10 @@ import styles from './finance.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
+/** How a half of the night got its figures — the authority behind them. */
+const sourceWords = (source: 'MANUAL' | 'POS' | null) =>
+  source === 'POS' ? ', read off Epos Now' : source === 'MANUAL' ? ', entered by hand' : ''
+
 /**
  * Finance — the paying-people half.
  *
@@ -116,7 +120,9 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
                 note={
                   settlement.reconciled
                     ? 'counted from the door and the till, not modelled'
-                    : 'projected — the figures move until the actuals are in'
+                    : settlement.door || settlement.bar
+                      ? `${settlement.door ? 'the door' : 'the bar'} is counted — the rest is still the model`
+                      : 'projected — the figures move until the actuals are in'
                 }
               >
                 Settlement
@@ -124,10 +130,16 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
 
               <SettlementSheet lines={settlement.lines} />
 
-              {settlement.reconciled && settlement.reconciledBy && (
+              {(settlement.door?.by || settlement.bar?.by) && (
                 <p className={styles.settleStamp}>
-                  Reconciled by {settlement.reconciledBy}
-                  {settlement.source === 'MANUAL' ? ', entered by hand' : ', read from the till'}
+                  {[
+                    settlement.door?.by &&
+                      `Door counted by ${settlement.door.by}${sourceWords(settlement.door.source)}`,
+                    settlement.bar?.by &&
+                      `Bar closed by ${settlement.bar.by}${sourceWords(settlement.bar.source)}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
               )}
             </>

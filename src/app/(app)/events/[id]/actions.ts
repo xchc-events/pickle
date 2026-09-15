@@ -10,6 +10,7 @@ import { STAGES } from '@/lib/constants'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
 import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-data'
+import { cleanBar, cleanDoor } from '@/lib/actuals'
 import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
 
 /**
@@ -223,64 +224,97 @@ export async function setDateTbc(eventId: string, tbc: boolean): Promise<Said> {
 }
 
 /**
- * Reconcile the night: what the door and the till actually took.
+ * Count the door: how many came through it, and what the tickets took.
  *
- * This is the write the product was missing. `hasActual` gates the last
- * transition — Show week → Payout — and nothing outside `prisma/seed.ts` could
- * create the row it counts, so an event created in the product could never
- * settle. The gate was unreachable rather than merely unmet.
+ * The door half of the night. The two halves used to be one all-or-nothing
+ * write; they are separate now because they are reconciled by different
+ * people off different sources — the door off Gather.rsvp, the bar off the
+ * till — and neither should have to wait for the other or be able to
+ * overwrite it. `countDoor` never writes a bar figure and `closeBar` never
+ * writes a door one.
  *
- * Figures arrive as the venue states them: ticket and bar takings GST
- * **inclusive**, because that is what the door and the till report, and bar
- * profit GST **exclusive**, because it is already a margin. `settlement.ts`
- * divides the first two by CFG.gst exactly as the projection does, so a
- * counted night and a projected one stay comparable. Getting these terms
- * wrong is silent, so they are stated on the form as well as here.
- *
- * `source` is stored from the start. A till integration will write POS rows
- * beside these hand-entered ones, and a settlement that cannot say which is
- * which cannot be audited.
+ * Takings arrive GST **inclusive**, because that is what Gather.rsvp and the
+ * door sheet report; `countedVals` divides by CFG.gst exactly as the
+ * projection does. Refused rather than clamped when a figure is negative or
+ * not a number — see `cleanDoor` — because every one of these reaches the
+ * settlement and then a person.
  */
-export async function reconcileActuals(
+export async function countDoor(
   eventId: string,
-  figures: { tickets: number; ticketRev: number; barTake: number; barProfit: number },
+  figures: { tickets: number; ticketRev: number },
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
   const id = await requireEvent(user, eventId)
 
-  // Negative takings are a typo, not a night. Refused rather than stored,
-  // because every one of these reaches the settlement and then a person.
-  const clean = {
-    tickets: Math.max(0, Math.trunc(figures.tickets)),
-    ticketRev: Math.max(0, figures.ticketRev),
-    barTake: Math.max(0, figures.barTake),
-    barProfit: Math.max(0, figures.barProfit),
-  }
+  const clean = cleanDoor(figures)
+  if (!clean.ok) return said(clean.why, 'warn')
 
-  if (!Number.isFinite(clean.ticketRev) || !Number.isFinite(clean.barProfit)) {
-    return said('Those figures do not read as numbers — nothing was saved.', 'warn')
-  }
-
-  await db.actual.upsert({
+  const stamp = { doorSource: 'MANUAL' as const, doorReconciledBy: user.initials }
+  const saved = await db.actual.upsert({
     where: { eventId: id },
-    create: {
-      eventId: id,
-      ...clean,
-      source: 'MANUAL',
-      reconciledBy: user.initials,
-      reconciledAt: new Date(),
-    },
-    update: { ...clean, source: 'MANUAL', reconciledBy: user.initials, reconciledAt: new Date() },
+    create: { eventId: id, ...clean.value, ...stamp, doorReconciledAt: new Date() },
+    update: { ...clean.value, ...stamp, doorReconciledAt: new Date() },
+    select: { barTake: true, barProfit: true },
   })
 
   await record(
     id,
     user,
-    `reconciled the night — ${clean.tickets} in, ${money(clean.ticketRev)} on the door, ${money(clean.barTake)} over the bar`,
+    `counted the door — ${clean.value.tickets} in, ${money(clean.value.ticketRev)} in ticket takings`,
   )
 
   refresh()
-  return said('Reconciled. The settlement now reads off counted figures, not the model.')
+  const barClosed = saved.barTake != null && saved.barProfit != null
+  return said(
+    barClosed
+      ? 'Door counted. With the bar already closed, the settlement now reads off counted figures, not the model.'
+      : 'Door counted — the ticket line reads off it now. The bar margin stays the model until the bar is closed.',
+  )
+}
+
+/**
+ * Close the bar: what the till took, and what was left after stock.
+ *
+ * The bar half of the night. Here, behind the Pipeline permission, until the
+ * Bar module is built — then the bar manager closes it there, off the till,
+ * under the Bar permission, which is who the till read belongs to.
+ *
+ * Takings arrive GST **inclusive**, as the till reports them; profit after
+ * stock arrives GST **exclusive**, because it is already a margin and goes on
+ * the bar margin line untouched. `cleanBar` refuses a profit larger than the
+ * take ex GST, which is what those two terms swapped over looks like.
+ */
+export async function closeBar(
+  eventId: string,
+  figures: { barTake: number; barProfit: number },
+): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const id = await requireEvent(user, eventId)
+
+  const clean = cleanBar(figures)
+  if (!clean.ok) return said(clean.why, 'warn')
+
+  const stamp = { barSource: 'MANUAL' as const, barReconciledBy: user.initials }
+  const saved = await db.actual.upsert({
+    where: { eventId: id },
+    create: { eventId: id, ...clean.value, ...stamp, barReconciledAt: new Date() },
+    update: { ...clean.value, ...stamp, barReconciledAt: new Date() },
+    select: { tickets: true, ticketRev: true },
+  })
+
+  await record(
+    id,
+    user,
+    `closed the bar — ${money(clean.value.barTake)} over the bar, ${money(clean.value.barProfit)} after stock`,
+  )
+
+  refresh()
+  const doorCounted = saved.tickets != null && saved.ticketRev != null
+  return said(
+    doorCounted
+      ? 'Bar closed. With the door already counted, the settlement now reads off counted figures, not the model.'
+      : 'Bar closed — the bar margin reads off the till now. Tickets stay the model until the door is counted.',
+  )
 }
 
 /**

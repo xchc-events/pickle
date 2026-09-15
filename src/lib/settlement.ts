@@ -51,10 +51,16 @@ export interface SettlementContext {
   /** Share of the surplus going to their people, 0–1. */
   split: number
   /**
-   * Whether actuals are in. A projection and a settled night are different
-   * claims and must not read the same — somebody signs the second one.
+   * Whether the door has been counted. A projection and a counted night are
+   * different claims and must not read the same — somebody signs the second.
    */
-  reconciled: boolean
+  ticketsCounted: boolean
+  /**
+   * Whether the bar has been closed. Counted separately from the door: they
+   * are reconciled by different people, and a sheet with one in and the other
+   * out has to say which is which. See src/lib/actuals.ts.
+   */
+  barCounted: boolean
   /** Assumed spend per head at the bar, GST inclusive — the handoff's $x/head. */
   barHead: number
   /** Gross ticket takings, GST inclusive, for the GST note only. */
@@ -93,7 +99,7 @@ export function settlementLines(v: FinanceVals, ctx: SettlementContext): Settlem
     deduction: true,
   })
 
-  const counted = ctx.reconciled ? 'counted' : 'projected'
+  const counted = ctx.ticketsCounted ? 'counted' : 'projected'
 
   return [
     plain(
@@ -106,7 +112,7 @@ export function settlementLines(v: FinanceVals, ctx: SettlementContext): Settlem
       'bar',
       'Bar margin',
       v.barMarg,
-      ctx.reconciled
+      ctx.barCounted
         ? 'what the bar actually made after stock'
         : `${money(ctx.barHead)}/head at ${pct(CFG.barMargin)}, projected`,
     ),

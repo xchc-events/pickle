@@ -2,66 +2,135 @@
 
 import { useState, useTransition } from 'react'
 import { useToast } from '@/components/Toast'
-import { reconcileActuals } from './actions'
+import type { Said } from '@/lib/toast'
+import { closeBar, countDoor } from './actions'
 import styles from './event.module.css'
 
 /**
- * Reconciling the night.
+ * Reconciling the night, in its two halves.
  *
- * The last thing that happens to an event, and until now the one thing it
- * could not do: `hasActual` gated Show week → Payout and no screen could write
- * the row, so a real booking could never settle.
+ * The door and the bar are counted by different people off different sources
+ * — the door off Gather.rsvp and the door sheet, the bar off the till — so
+ * each is its own form and its own write. Counting the door does not wait on
+ * the bar, and closing the bar cannot overwrite a door somebody already
+ * counted. The settlement reads whichever halves are in; the gate out of the
+ * event waits for both.
  *
  * The GST terms are stated on each field rather than left to a convention.
- * Door and bar takings are what was rung up, GST included; bar profit is
- * already a margin and is not. Getting that wrong moves the settlement
- * silently, and the person it moves against is standing there.
+ * Getting them wrong moves the settlement silently, and the person it moves
+ * against is standing there.
  */
 export function Actuals({
   eventId,
-  initial,
+  door,
+  bar,
 }: {
   eventId: string
-  initial: { tickets: number; ticketRev: number; barTake: number; barProfit: number } | null
+  door: { tickets: number; ticketRev: number } | null
+  bar: { barTake: number; barProfit: number } | null
+}) {
+  return (
+    <div className={styles.actuals}>
+      <Half
+        title="The door"
+        fields={[
+          { key: 'tickets', label: 'People in', note: 'counted on the door, not tickets sold' },
+          {
+            key: 'ticketRev',
+            label: 'Ticket takings',
+            note: 'GST included — what was actually taken',
+            money: true,
+          },
+        ]}
+        initial={door}
+        saveLabel={door ? 'Update the door count' : 'Count the door'}
+        save={(v) => countDoor(eventId, { tickets: v.tickets!, ticketRev: v.ticketRev! })}
+      />
+      <Half
+        title="The bar"
+        fields={[
+          {
+            key: 'barTake',
+            label: 'Bar take',
+            note: 'GST included — gross over the bar',
+            money: true,
+          },
+          {
+            key: 'barProfit',
+            label: 'Bar profit',
+            note: 'after stock, GST excluded',
+            money: true,
+          },
+        ]}
+        initial={bar}
+        saveLabel={bar ? 'Update the bar close' : 'Close the bar'}
+        save={(v) => closeBar(eventId, { barTake: v.barTake!, barProfit: v.barProfit! })}
+      />
+    </div>
+  )
+}
+
+interface Field {
+  key: string
+  label: string
+  note: string
+  money?: boolean
+}
+
+function Half({
+  title,
+  fields,
+  initial,
+  saveLabel,
+  save,
+}: {
+  title: string
+  fields: Field[]
+  initial: Record<string, number> | null
+  saveLabel: string
+  save: (values: Record<string, number>) => Promise<Said>
 }) {
   const say = useToast()
   const [pending, start] = useTransition()
-  const [v, setV] = useState({
-    tickets: initial?.tickets?.toString() ?? '',
-    ticketRev: initial?.ticketRev?.toString() ?? '',
-    barTake: initial?.barTake?.toString() ?? '',
-    barProfit: initial?.barProfit?.toString() ?? '',
-  })
-
-  const field = (key: keyof typeof v, label: string, note: string, prefix?: string) => (
-    <label className={styles.actualField} key={key}>
-      <span className={styles.factKey}>{label}</span>
-      <span className={styles.actualInputWrap}>
-        {prefix && <span className={styles.actualPrefix}>{prefix}</span>}
-        <input
-          className={styles.actualInput}
-          type="number"
-          min="0"
-          step={key === 'tickets' ? '1' : '0.01'}
-          inputMode="decimal"
-          value={v[key]}
-          disabled={pending}
-          onChange={(e) => setV({ ...v, [key]: e.target.value })}
-        />
-      </span>
-      <span className={styles.actualNote}>{note}</span>
-    </label>
+  const [v, setV] = useState<Record<string, string>>(
+    Object.fromEntries(fields.map((f) => [f.key, initial?.[f.key]?.toString() ?? ''])),
   )
 
-  const num = (s: string) => (s.trim() === '' ? 0 : Number(s))
+  // An empty box is not a zero. Sending NaN lets the server refuse it in
+  // words, rather than recording a night that took nothing.
+  const num = (s: string) => (s.trim() === '' ? Number.NaN : Number(s))
 
   return (
-    <div className={styles.actuals}>
+    <div className={styles.actualHalf}>
+      <span className={styles.actualHalfTitle}>
+        <i
+          className={`ph ${initial ? 'ph-check-circle' : 'ph-circle-dashed'}`}
+          aria-hidden="true"
+        />
+        {title}
+        <span className={styles.actualHalfState}>{initial ? 'in' : 'not in yet'}</span>
+      </span>
+
       <div className={styles.actualGrid}>
-        {field('tickets', 'People in', 'counted on the door, not tickets sold')}
-        {field('ticketRev', 'Door takings', 'GST included — what was actually taken', '$')}
-        {field('barTake', 'Bar take', 'GST included — gross over the bar', '$')}
-        {field('barProfit', 'Bar profit', 'after stock, GST excluded', '$')}
+        {fields.map((f) => (
+          <label className={styles.actualField} key={f.key}>
+            <span className={styles.factKey}>{f.label}</span>
+            <span className={styles.actualInputWrap}>
+              {f.money && <span className={styles.actualPrefix}>$</span>}
+              <input
+                className={styles.actualInput}
+                type="number"
+                min="0"
+                step={f.money ? '0.01' : '1'}
+                inputMode="decimal"
+                value={v[f.key]}
+                disabled={pending}
+                onChange={(e) => setV({ ...v, [f.key]: e.target.value })}
+              />
+            </span>
+            <span className={styles.actualNote}>{f.note}</span>
+          </label>
+        ))}
       </div>
 
       <button
@@ -70,18 +139,11 @@ export function Actuals({
         disabled={pending}
         onClick={() =>
           start(async () =>
-            say(
-              await reconcileActuals(eventId, {
-                tickets: num(v.tickets),
-                ticketRev: num(v.ticketRev),
-                barTake: num(v.barTake),
-                barProfit: num(v.barProfit),
-              }),
-            ),
+            say(await save(Object.fromEntries(fields.map((f) => [f.key, num(v[f.key] ?? '')])))),
           )
         }
       >
-        {initial ? 'Update the reconciliation' : 'Reconcile the night'}
+        {saveLabel}
       </button>
     </div>
   )

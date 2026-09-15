@@ -728,6 +728,36 @@
   cursor: default;
 }
 
+/* Two halves, two writes. Each says whether it is in, because a settlement
+   with the bar closed and the door still out is a real, common state. */
+.actualHalf {
+  padding: 14px 0 18px;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+}
+
+.actualHalf:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.actualHalfTitle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+}
+
+.actualHalfTitle i {
+  color: var(--color-neutral-500);
+}
+
+.actualHalfState {
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
 /* -------------------------------------------------------------- holds --- */
 /* The ladder on a room for a night. Nothing expires, so a challenged hold has
    to say who is waiting — that is the only pressure in the system. */

@@ -4,6 +4,7 @@ import { financeVals, type FinanceEvent, type Scenario } from './finance'
 import { daysBetween, type PipelineEvent } from './pipeline'
 import { initialsOf } from './format'
 import { eventScope } from './scope'
+import { halvesOf } from './actuals'
 import type { SessionUser } from './session'
 
 /**
@@ -93,6 +94,10 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
 
     const ext = externals.find((u) => u.promoter && (e.promoter ?? '').includes(u.promoter))
 
+    // "took $X" is only true of a whole night. With one half still out it
+    // would be a counted figure plus nothing, read as the take.
+    const halves = halvesOf(e.actual)
+
     return {
       id: e.id,
       name: e.name,
@@ -112,7 +117,7 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
       extCoordInitials: ext ? (ext.person?.initials ?? initialsOf(ext.name ?? ext.email)) : null,
       extCoordName: ext?.name ?? ext?.person?.name ?? null,
       surplus: v.ours,
-      actualTotal: e.actual ? e.actual.ticketRev + e.actual.barProfit : null,
+      actualTotal: halves.door && halves.bar ? halves.door.ticketRev + halves.bar.barProfit : null,
       hours: v.hours,
       taskHours: e.tasks.map((t) => ({ team: t.name, hours: t.actual ?? t.est })),
       onSiteHours: e.shifts.filter((s) => s.personId).reduce((a, s) => a + s.hours, 0),

@@ -23,7 +23,8 @@ const ctx: SettlementContext = {
   monthEvents: 3,
   billNames: 2,
   split: 0.4,
-  reconciled: false,
+  ticketsCounted: false,
+  barCounted: false,
   barHead: 16,
   grossTickets: 5350,
   grossBar: 3200,
@@ -150,9 +151,27 @@ describe('settlementLines', () => {
    */
   it('says the figures are projected until actuals are in', () => {
     expect(byKey('tickets').note).toMatch(/project/i)
+    expect(byKey('bar').note).toMatch(/project/i)
 
-    const done = settlementLines(vals, { ...ctx, reconciled: true })
+    const done = settlementLines(vals, { ...ctx, ticketsCounted: true, barCounted: true })
     expect(done.find((l) => l.key === 'tickets')!.note).not.toMatch(/project/i)
+    expect(done.find((l) => l.key === 'bar')!.note).not.toMatch(/project/i)
+  })
+
+  /**
+   * The door and the bar are counted by different people, at different times.
+   * A sheet with the bar closed and the door still out must say exactly that —
+   * one line counted, one still the model — rather than calling the whole
+   * night counted or the whole night projected.
+   */
+  it('marks each half counted on its own', () => {
+    const barOnly = settlementLines(vals, { ...ctx, barCounted: true })
+    expect(barOnly.find((l) => l.key === 'tickets')!.note).toMatch(/project/i)
+    expect(barOnly.find((l) => l.key === 'bar')!.note).not.toMatch(/project/i)
+
+    const doorOnly = settlementLines(vals, { ...ctx, ticketsCounted: true })
+    expect(doorOnly.find((l) => l.key === 'tickets')!.note).not.toMatch(/project/i)
+    expect(doorOnly.find((l) => l.key === 'bar')!.note).toMatch(/project/i)
   })
 })
 
