@@ -77,7 +77,11 @@ export interface FinanceEvent {
   dow: number
   std: number
   door: number
-  /** [supporter, standard, subsidised, door]. */
+  /**
+   * [subsidised, standard, supporter, door] — the order `avgTicket` below
+   * reads, pairing `mix[0]` with `tiers().sub`. Named once in `MIX_LABELS`
+   * (ticketing.ts), which explains why the order is worth stating.
+   */
   mix: [number, number, number, number]
   /** Attendance by scenario. */
   att: [number, number, number]

@@ -60,6 +60,28 @@ describe('tiers', () => {
 })
 
 describe('avgTicket', () => {
+  /**
+   * The mix order, stated as a test rather than only as a comment.
+   *
+   * `FinanceEvent.mix` was documented as [supporter, standard, subsidised,
+   * door] — backwards — for two weeks after every other copy of that order was
+   * corrected. Read that way, a supporter pays 80% of standard instead of 120%,
+   * and the mix feeds the average ticket price straight into the P&L. Putting
+   * the whole mix on one slot at a time makes the order the only thing that
+   * can make this pass.
+   */
+  it('reads the mix as subsidised, standard, supporter, door', () => {
+    const e = { std: 25, door: 35 }
+    const t = tiers(e)
+    expect(avgTicket({ ...e, mix: [1, 0, 0, 0] })).toBe(t.sub)
+    expect(avgTicket({ ...e, mix: [0, 1, 0, 0] })).toBe(t.std)
+    expect(avgTicket({ ...e, mix: [0, 0, 1, 0] })).toBe(t.sup)
+    expect(avgTicket({ ...e, mix: [0, 0, 0, 1] })).toBe(t.door)
+    // The two ends are what the backwards comment would have swapped.
+    expect(t.sub).toBeLessThan(t.std)
+    expect(t.sup).toBeGreaterThan(t.std)
+  })
+
   it('weights the four tiers by the mix', () => {
     // sub 20*0.15 + std 25*0.5 + sup 30*0.2 + door 30*0.15 = 3 + 12.5 + 6 + 4.5
     expect(avgTicket({ std: 25, door: 30, mix: [0.15, 0.5, 0.2, 0.15] })).toBeCloseTo(26, 10)
