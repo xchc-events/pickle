@@ -15,7 +15,9 @@ import { STAGES } from '@/lib/constants'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
 import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-data'
-import { cleanBar, cleanDoor } from '@/lib/actuals'
+import { cleanDoor } from '@/lib/actuals'
+import { budgetToLock } from '@/lib/bar-data'
+import { nightFromBudget } from '@/lib/bar'
 import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
 
 /**
@@ -89,18 +91,48 @@ export async function advanceStage(eventId: string): Promise<Said> {
   }
 
   const next = rec.stage + 1
-  await db.event.update({
+  const move = db.event.update({
     where: { id },
     // stageEnteredAt resets so days-in-stage counts from now. It is never
     // stored as a duration, so it cannot go stale.
     data: { stage: next, stageEnteredAt: new Date() },
   })
+
+  // The bar budget locks in the same transaction as the move to On sale, so
+  // every event that goes on sale has one, frozen at what was believed then.
+  // `update: {}` leaves a budget that already exists exactly as it was — a
+  // budget is never rewritten. See src/lib/bar.ts.
+  const budget = STAGES[next] === 'On sale' ? await budgetToLock(id) : null
+  if (budget) {
+    await db.$transaction([
+      move,
+      db.barBudget.upsert({
+        where: { eventId: id },
+        create: { eventId: id, ...budget, basis: 'ON_SALE', lockedBy: user.initials },
+        update: {},
+      }),
+    ])
+  } else {
+    await move
+  }
+
   await record(id, user, `moved this to ${STAGES[next]}`)
 
+  if (budget) {
+    const night = nightFromBudget(budget)
+    await record(
+      id,
+      user,
+      `locked the bar budget — ${budget.heads} heads at ${money(budget.spendPerHead)}, ${money(night.take)} over the bar, ${money(night.margin)} after stock`,
+    )
+    refresh()
+    return said(
+      `Now at On sale — tickets can go live, and the bar budget is locked at ${money(night.margin)} after stock. The bar is measured against that from here.`,
+    )
+  }
+
   refresh()
-  return said(
-    `Now at ${STAGES[next]} — ${STAGES[next] === 'On sale' ? 'tickets can go live' : 'the next set of gates applies'}.`,
-  )
+  return said(`Now at ${STAGES[next]} — the next set of gates applies.`)
 }
 
 /** Assign or clear a department lead. */
@@ -254,11 +286,11 @@ export async function setDateTbc(eventId: string, tbc: boolean): Promise<Said> {
 /**
  * Count the door: how many came through it, and what the tickets took.
  *
- * The door half of the night. The two halves used to be one all-or-nothing
- * write; they are separate now because they are reconciled by different
- * people off different sources — the door off Gather.rsvp, the bar off the
- * till — and neither should have to wait for the other or be able to
- * overwrite it. `countDoor` never writes a bar figure and `closeBar` never
+ * The door half of the night. The bar half is closed in Bar, off the till,
+ * under the Bar permission — see src/app/(app)/bar/actions.ts. They are
+ * reconciled by different people off different sources, the door off
+ * Gather.rsvp and the bar off Epos Now, so neither waits for the other and
+ * neither can overwrite it: this never writes a bar figure, and Bar never
  * writes a door one.
  *
  * Takings arrive GST **inclusive**, because that is what Gather.rsvp and the
@@ -299,53 +331,6 @@ export async function countDoor(
     barClosed
       ? 'Door counted. With the bar already closed, the settlement now reads off counted figures, not the model.'
       : 'Door counted — the ticket line reads off it now. The bar margin stays the model until the bar is closed.',
-  )
-}
-
-/**
- * Close the bar: what the till took, and what was left after stock.
- *
- * The bar half of the night. Here, behind the Pipeline permission, until the
- * Bar module is built — then the bar manager closes it there, off the till,
- * under the Bar permission, which is who the till read belongs to.
- *
- * Takings arrive GST **inclusive**, as the till reports them; profit after
- * stock arrives GST **exclusive**, because it is already a margin and goes on
- * the bar margin line untouched. `cleanBar` refuses a profit larger than the
- * take ex GST, which is what those two terms swapped over looks like.
- */
-export async function closeBar(
-  eventId: string,
-  figures: { barTake: number; barProfit: number },
-): Promise<Said> {
-  const { user } = await requireModule('pipeline')
-  const verdict = canChangeEventRecord(user)
-  if (!verdict.ok) return said(verdict.why, 'stop')
-  const id = await requireEvent(user, eventId)
-
-  const clean = cleanBar(figures)
-  if (!clean.ok) return said(clean.why, 'warn')
-
-  const stamp = { barSource: 'MANUAL' as const, barReconciledBy: user.initials }
-  const saved = await db.actual.upsert({
-    where: { eventId: id },
-    create: { eventId: id, ...clean.value, ...stamp, barReconciledAt: new Date() },
-    update: { ...clean.value, ...stamp, barReconciledAt: new Date() },
-    select: { tickets: true, ticketRev: true },
-  })
-
-  await record(
-    id,
-    user,
-    `closed the bar — ${money(clean.value.barTake)} over the bar, ${money(clean.value.barProfit)} after stock`,
-  )
-
-  refresh()
-  const doorCounted = saved.tickets != null && saved.ticketRev != null
-  return said(
-    doorCounted
-      ? 'Bar closed. With the door already counted, the settlement now reads off counted figures, not the model.'
-      : 'Bar closed — the bar margin reads off the till now. Tickets stay the model until the door is counted.',
   )
 }
 

@@ -758,6 +758,24 @@
   color: var(--color-neutral-600);
 }
 
+/* The bar half, closed in Bar. Read here, never edited. */
+.actualBar {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-neutral-400);
+  max-width: 78ch;
+}
+
+.actualBarLink {
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.actualBarLink:hover {
+  text-decoration: underline;
+}
+
 /* -------------------------------------------------------------- holds --- */
 /* The ladder on a room for a night. Nothing expires, so a challenged hold has
    to say who is waiting — that is the only pressure in the system. */

@@ -40,6 +40,9 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/activity', () => ({ record: stop('record') }))
 vi.mock('next/cache', () => ({ refresh: stop('refresh') }))
 vi.mock('@/lib/event-record-data', () => ({ loadEventRecord: stop('loadEventRecord') }))
+// Advancing to On sale locks the bar budget in the same transaction. For a
+// promoter that lock must never be reached, so it stops the test like the rest.
+vi.mock('@/lib/bar-data', () => ({ budgetToLock: stop('budgetToLock') }))
 vi.mock('@/lib/holds-data', () => ({
   placeHold: stop('placeHold'),
   confirmHold: stop('confirmHold'),
@@ -69,7 +72,6 @@ const ARGS: Record<string, unknown[]> = {
   setDeal: ['AGREED', ''],
   setDateTbc: [false],
   countDoor: [{ tickets: 180, ticketRev: 4500 }],
-  closeBar: [{ barTake: 3200, barProfit: 1900 }],
   holdTheRoom: [],
   takeTheNight: ['hold_theirs'],
   dropTheHold: ['hold_theirs'],
@@ -129,7 +131,10 @@ describe('the actions under test', () => {
         'setDeal',
         'setDateTbc',
         'countDoor',
-        'closeBar',
+        // `closeBar` is not here because it is not here: closing the bar moved
+        // to the Bar module, under the Bar permission. Its refusal of outside
+        // accounts moved with it and is checked the same way, every export, in
+        // src/app/(app)/bar/actions.test.ts.
         'holdTheRoom',
         'takeTheNight',
         'dropTheHold',
