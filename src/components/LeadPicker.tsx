@@ -11,6 +11,10 @@ import styles from './LeadPicker.module.css'
  * The options are people, not typed-in names — renaming somebody in Admin
  * renames them here, on their shifts and on their timesheets at once, because
  * there is only one record of a person.
+ *
+ * "Unassigned" reaches the action as an empty string, never null — a select's
+ * value is always a string. Every action wired to this must read '' as taking
+ * the lead off; set-lead.test.ts and set-design-lead.test.ts hold both to it.
  */
 export function LeadPicker({
   action,
