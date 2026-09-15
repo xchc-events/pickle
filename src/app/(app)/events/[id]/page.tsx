@@ -244,7 +244,10 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                   <span className={styles.gateGap} />
                 ) : (
                   <Link
-                    href={`/${g.screen === 'event' ? `events/${ev.id}` : g.screen}`}
+                    // With the event, so the fix opens on this night rather
+                    // than on whichever the module would show first — which
+                    // for Bar is the next night, not the one to close.
+                    href={g.screen === 'event' ? `/events/${ev.id}` : `/${g.screen}?event=${ev.id}`}
                     className="btn btn-ghost"
                   >
                     Fix it

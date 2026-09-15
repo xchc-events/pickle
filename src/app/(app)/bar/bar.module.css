@@ -3,11 +3,19 @@
 
 .header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 20px;
+  gap: 12px 20px;
   padding: 20px 28px 15px;
   border-bottom: 1px solid var(--color-divider);
+}
+
+/* The title block takes the room and the view chips wrap under it, rather
+   than the subtitle being squeezed into a column beside them. */
+.header > div {
+  flex: 1 1 320px;
+  min-width: 0;
 }
 
 .title {
@@ -262,6 +270,27 @@
   font-size: 10.5px;
   color: var(--color-neutral-600);
   margin-top: 1px;
+}
+
+/* A tone has to win over the cell's own colour, which is more specific than a
+   bare class — otherwise an under reads the same as an over. */
+.table td.good,
+.cellSub.good {
+  color: var(--st-good);
+}
+
+.table td.warn,
+.cellSub.warn {
+  color: var(--st-warn);
+}
+
+.table td.stop,
+.cellSub.stop {
+  color: var(--st-stop);
+}
+
+.table td.plain {
+  color: var(--color-neutral-500);
 }
 
 .totalRow th,

@@ -117,6 +117,44 @@ stands in. It is unavailable in production (`stubAllowed` in `session.ts`) and
 the sessions it grants are marked `authenticated: false`, so it can drive every
 module but can never open a payment detail — see `canReveal` in `payments.ts`.
 
+## The bar, Epos Now and Xero
+
+Three systems, one job each, so nothing is typed twice and nothing reaches Xero
+twice:
+
+| Fact                                         | Owned by                               | Pickle                                       |
+| -------------------------------------------- | -------------------------------------- | -------------------------------------------- |
+| Products, prices, cost prices, stock, orders | Epos Now                               | reads, never writes                          |
+| Every bar sale                               | Epos Now                               | reads a night's sales when the bar is closed |
+| Bar sales in the accounts                    | Epos Now's own Xero app, at till close | never posts them                             |
+| Supplier bills                               | Xero                                   | never touches them                           |
+| The bar budget, variance and months          | Pickle                                 | owns                                         |
+
+**Bar** answers three questions. What did we think a night would do — a budget
+locked when the event goes on sale, off the settlement's own bar line. What did
+it do and why — the night's till read against that budget, split into turnout,
+spend per head, margin and labour, adding up exactly. And what does the run of
+nights mean for the months ahead — overs and unders by month, and the nights
+still to come re-priced at recent rates.
+
+Epos Now is read-only and optional. Without it, Bar still works and a bar is
+closed by hand. To connect it, create an **API device** in the Epos Now Back
+Office (Web Integrations → REST API) and set:
+
+- `EPOSNOW_API_KEY` and `EPOSNOW_API_SECRET` — that device's access credentials.
+- `EPOSNOW_LOCATION_ID` — optional. If the account covers more than one site,
+  only sales from tills at this location count towards the bar.
+
+Then check it reaches the account before anybody closes a bar off it:
+
+```bash
+npm run eposnow:smoke
+```
+
+It reads yesterday off the till. Compare its take with Epos Now's own End of Day
+report, and the first sale's time with when the bar opened — that is how you
+confirm Epos Now reads the service window in NZ time, which the code assumes.
+
 ## The design handoff
 
 `docs/design-handoff/README.md` is the specification. The HTML in

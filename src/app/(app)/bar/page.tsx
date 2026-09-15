@@ -16,7 +16,12 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
 const pct = (n: number) => `${Math.round(n * 1000) / 10}%`
 const cents = (n: number | null) => (n === null ? '—' : `$${n.toFixed(2)}`)
-const signed = (n: number) => `${n < 0 ? '−' : '+'}${money(Math.abs(n))}`
+/**
+ * `+$212`, `−$38`. A difference that rounds to nothing reads as a dash rather
+ * than "−$0" — a sign on a zero invites somebody to ask which way it went.
+ */
+const signed = (n: number) =>
+  Math.abs(n) < 0.5 ? '—' : `${n < 0 ? '−' : '+'}${money(Math.abs(n))}`
 
 /**
  * Bar.
@@ -164,7 +169,13 @@ function EventDetail({ event: e, eposConnected }: { event: BarDetail; eposConnec
 
           {e.actual ? (
             <>
-              <SectionHeading note="read off Epos Now when the bar was closed">
+              <SectionHeading
+                note={
+                  e.sales.length > 0
+                    ? 'read off Epos Now when the bar was closed'
+                    : 'only a bar closed off the till has one'
+                }
+              >
                 What sold
               </SectionHeading>
               <Sold detail={e} />
@@ -326,9 +337,13 @@ function NightTable({
                   {diff === null
                     ? ''
                     : r.label === 'Through the door'
-                      ? `${diff > 0 ? '+' : diff < 0 ? '−' : ''}${Math.abs(diff)}`
+                      ? diff === 0
+                        ? '—'
+                        : `${diff > 0 ? '+' : '−'}${Math.abs(diff)}`
                       : r.label === 'Spend per head'
-                        ? `${diff < 0 ? '−' : '+'}$${Math.abs(diff).toFixed(2)}`
+                        ? Math.abs(diff) < 0.005
+                          ? '—'
+                          : `${diff < 0 ? '−' : '+'}$${Math.abs(diff).toFixed(2)}`
                         : signed(diff)}
                 </td>
               </tr>
