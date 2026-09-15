@@ -757,7 +757,20 @@ async function main() {
     })
 
     if (e.actual) {
-      await db.actual.create({ data: { eventId: created.id, ...e.actual } })
+      // Both halves, entered by hand, as they would have been on the night.
+      // Nobody's initials: the seed did not count anything, and a stamp naming
+      // somebody would be a claim about a person that is not true.
+      const at = addDays(date, 1)
+      await db.actual.create({
+        data: {
+          eventId: created.id,
+          ...e.actual,
+          doorSource: 'MANUAL',
+          doorReconciledAt: at,
+          barSource: 'MANUAL',
+          barReconciledAt: at,
+        },
+      })
     }
 
     await db.financeReview.create({

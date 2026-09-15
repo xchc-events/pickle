@@ -167,7 +167,10 @@ export interface GateEvent {
   hoursLogged: number
   /** Tasks carrying a non-zero actual. */
   tasksWithActual: number
-  hasActual: boolean
+  /** The door half of the night is reconciled — see src/lib/actuals.ts. */
+  doorCounted: boolean
+  /** The bar half of the night is reconciled, off the till or by hand. */
+  barClosed: boolean
   /** Fee floor and ceiling, from `financeVals`. Never recomputed here. */
   floor: number
   ceil: number
@@ -375,8 +378,9 @@ export function gatesFor(e: GateEvent): Gate[] {
         'Doors and everyone-out drive every shift',
         'event',
       ),
-      // Also the event record: bar close is a run time, set here. Same reason
-      // as 'Actuals in' below — Bar is not built, so linking there is a dead end.
+      // The event record, not Bar, even though the prototype links Bar: bar
+      // close is a run time and is set on the event record, and Bar is not
+      // built yet either.
       g('Bar session set', !!e.barClose, 'The bar breakdown needs a service window', 'event'),
     ],
     // 7 Payout
@@ -387,10 +391,23 @@ export function gatesFor(e: GateEvent): Gate[] {
         'Nobody has logged their time',
         'hours',
       ),
-      // Points at the event record, not the Bar module: reconciling happens
-      // here, and Bar is not built. A gate that deep-links to a screen nobody
-      // can open is worse than no link — it reads as a fixable step and is not.
-      g('Actuals in', e.hasActual, 'Bar take and final ticket count not reconciled', 'event'),
+      // Two halves, reconciled separately — see src/lib/actuals.ts. The gate
+      // waits for both and names whichever is missing.
+      //
+      // Both halves are entered on the event record for now. The prototype
+      // links this gate to Bar; once Bar is built it takes the bar half, and
+      // the link for an open bar moves there with it. Until then a link to Bar
+      // would be a dead end.
+      g(
+        'Actuals in',
+        e.doorCounted && e.barClosed,
+        !e.doorCounted && !e.barClosed
+          ? 'Bar take and final ticket count not reconciled'
+          : !e.barClosed
+            ? 'Bar take not reconciled'
+            : 'Final ticket count not reconciled',
+        'event',
+      ),
     ],
   ]
 

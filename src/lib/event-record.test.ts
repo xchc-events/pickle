@@ -55,7 +55,8 @@ const ev = (over: Partial<GateEvent> = {}): GateEvent => ({
   shifts: [{ assigned: true, pencilled: false }],
   hoursLogged: 3,
   tasksWithActual: 1,
-  hasActual: true,
+  doorCounted: true,
+  barClosed: true,
   floor: 500,
   ceil: 1200,
   ...over,
@@ -372,7 +373,43 @@ describe('stage 7 — payout', () => {
   })
 
   it('holds until the bar take and ticket count are reconciled', () => {
-    expect(gate(pay({ hasActual: false }), 'Actuals in').ok).toBe(false)
+    const g = gate(pay({ doorCounted: false, barClosed: false }), 'Actuals in')
+    expect(g.ok).toBe(false)
+    expect(g.why).toBe('Bar take and final ticket count not reconciled')
+  })
+
+  /**
+   * The door and the bar are reconciled separately, by different people. One
+   * half in is not the night counted — the settlement would still be reading
+   * the model for the other — so the gate waits for both, and names the one
+   * still missing rather than repeating the sentence for both.
+   */
+  it('holds a night with the door counted and the bar still open', () => {
+    const g = gate(pay({ barClosed: false }), 'Actuals in')
+    expect(g.ok).toBe(false)
+    expect(g.why).toBe('Bar take not reconciled')
+  })
+
+  it('holds a night with the bar closed and the door still uncounted', () => {
+    const g = gate(pay({ doorCounted: false }), 'Actuals in')
+    expect(g.ok).toBe(false)
+    expect(g.why).toBe('Final ticket count not reconciled')
+  })
+
+  it('clears once both halves are in', () => {
+    expect(gate(pay(), 'Actuals in').ok).toBe(true)
+  })
+
+  /**
+   * The fix link goes where the missing half is entered. Both halves are on
+   * the event record until Bar is built — the prototype links this gate to
+   * Bar, and a link to a module nobody can open reads as a fixable step when
+   * it is not.
+   */
+  it('sends the fix to the event record, where both halves are entered', () => {
+    expect(gate(pay({ barClosed: false }), 'Actuals in').screen).toBe('event')
+    expect(gate(pay({ doorCounted: false, barClosed: false }), 'Actuals in').screen).toBe('event')
+    expect(gate(pay({ doorCounted: false }), 'Actuals in').screen).toBe('event')
   })
 })
 
@@ -421,12 +458,19 @@ describe('the gate summary', () => {
  * "Actuals in" pointed at `bar`, which is not in BUILT_MODULES — and since
  * nothing could write an `Actual` row either, the last gate in the product was
  * unreachable and its only affordance was a dead link.
+ *
+ * Some gates choose their link from the event's state, so this walks the
+ * failing side of those too — a link only reachable when a gate fails is the
+ * one that matters.
  */
 describe('gate deep links', () => {
   it('every gate points at the event record or a module that is built', () => {
     const targets = new Set<string>()
     for (let stage = 0; stage < STAGES.length; stage++) {
       for (const g of gatesFor(ev({ stage }))) targets.add(g.screen)
+      for (const g of gatesFor(ev({ stage, doorCounted: false, barClosed: false }))) {
+        targets.add(g.screen)
+      }
     }
 
     const allowed = new Set<string>(['event', ...BUILT_MODULES])

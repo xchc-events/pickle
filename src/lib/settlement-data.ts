@@ -1,8 +1,9 @@
 import 'server-only'
 import { db } from './db'
-import { CFG, financeVals } from './finance'
+import { financeVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './finance-input'
 import { settlementLines, type SettlementLine } from './settlement'
+import { countedVals, halvesOf, isReconciled } from './actuals'
 import {
   approveLabel,
   milestonesFor,
@@ -23,10 +24,11 @@ import { COV, COV_FALLBACK } from './finance'
  * from the screens that set its price. That is the whole reason the assembly
  * was extracted; see src/lib/finance-input.ts.
  *
- * Once actuals are in, the counted figures replace the projected ones. They
- * are substituted at the edge here rather than inside `financeVals`, which
- * stays the untouched specification: a settled night and a projected one are
- * the same arithmetic over different inputs, not different arithmetic.
+ * Once actuals are in, the counted figures replace the projected ones — each
+ * half on its own, because the door and the bar are reconciled separately.
+ * They are substituted at the edge by `countedVals` rather than inside
+ * `financeVals`, which stays the untouched specification: a settled night and a
+ * projected one are the same arithmetic over different inputs.
  */
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -52,18 +54,25 @@ export interface ReviewPanel {
   retained: number
 }
 
+/** Who reconciled one half of the night, when, and off what. */
+export interface HalfStamp {
+  by: string | null
+  at: Date | null
+  /** POS when the server read it off Epos Now; MANUAL when somebody typed it. */
+  source: 'MANUAL' | 'POS' | null
+}
+
 export interface Settlement {
   lines: SettlementLine[]
   model: BookingModelKey
   review: ReviewPanel
   milestones: Milestone[]
-  /** True once an Actual row exists — the sheet is counted, not projected. */
+  /** True once both halves are in — the whole sheet is counted, not projected. */
   reconciled: boolean
-  /** Who reconciled it and when, for the attribution line. */
-  reconciledBy: string | null
-  reconciledAt: Date | null
-  /** MANUAL today; POS once a till is connected. */
-  source: string | null
+  /** The door half's attribution. Null until the door is counted. */
+  door: HalfStamp | null
+  /** The bar half's attribution. Null until the bar is closed. */
+  bar: HalfStamp | null
 }
 
 export async function settlementFor(eventId: string): Promise<Settlement | null> {
@@ -86,29 +95,14 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
   const input = financeInputFor(row, scenarioOf(row.scen), orgShareHours)
 
   const actual = row.actual
-  const reconciled = actual != null
+  const halves = halvesOf(actual)
+  const reconciled = isReconciled(halves)
 
   // A counted night is the same model with counted inputs. Attendance and the
   // average come off the door; the bar margin is what the bar actually made.
+  // A half not yet in stays projected — see countedVals.
   const vals = financeVals(input)
-  const counted = reconciled
-    ? {
-        ...vals,
-        att: actual.tickets,
-        avg: actual.tickets > 0 ? actual.ticketRev / actual.tickets : 0,
-        ticketsEx: actual.ticketRev / CFG.gst,
-        barMarg: actual.barProfit,
-      }
-    : vals
-
-  if (reconciled) {
-    // Everything downstream of income moves with it, so re-derive rather than
-    // leaving a sheet whose total contradicts its own lines.
-    counted.income = counted.ticketsEx + counted.barMarg
-    counted.surplus = counted.income - counted.fixed
-    counted.theirShare = Math.max(0, counted.surplus) * input.split
-    counted.ours = counted.surplus - counted.theirShare
-  }
+  const counted = countedVals(vals, input.split, halves)
 
   const [people, monthEvents] = await Promise.all([
     db.hourEntry
@@ -125,10 +119,14 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
     monthEvents,
     billNames: input.artists.filter((a) => a.status !== 'declined').length,
     split: input.split,
-    reconciled,
+    ticketsCounted: halves.door !== null,
+    barCounted: halves.bar !== null,
     barHead: row.barHead,
-    grossTickets: reconciled ? actual.ticketRev : counted.att * counted.avg,
-    grossBar: reconciled ? actual.barTake : counted.att * row.barHead,
+    grossTickets: halves.door ? halves.door.ticketRev : counted.att * counted.avg,
+    // A projected bar is priced off the projected heads, not the counted door:
+    // `financeVals` drew the bar margin line from `vals.att`, and the GST note
+    // has to describe that same figure.
+    grossBar: halves.bar ? halves.bar.barTake : vals.att * row.barHead,
   })
 
   const model: BookingModelKey = row.model === 'DRY' ? 'dry' : 'curator'
@@ -162,9 +160,18 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
       review: state,
     }),
     reconciled,
-    reconciledBy: actual?.reconciledBy ?? null,
-    reconciledAt: actual?.reconciledAt ?? null,
-    source: actual?.source ?? null,
+    door:
+      actual && halves.door
+        ? {
+            by: actual.doorReconciledBy,
+            at: actual.doorReconciledAt,
+            source: actual.doorSource,
+          }
+        : null,
+    bar:
+      actual && halves.bar
+        ? { by: actual.barReconciledBy, at: actual.barReconciledAt, source: actual.barSource }
+        : null,
   }
 }
 

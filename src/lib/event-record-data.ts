@@ -10,6 +10,7 @@ import { channelCards } from './promo'
 import { assetSpec } from './design'
 import { STAGES, NICK } from './constants'
 import { daysBetween } from './pipeline'
+import { halvesOf, type BarClose, type DoorCount } from './actuals'
 import {
   advanceLabel,
   canAdvance,
@@ -159,8 +160,13 @@ export interface EventRecord {
   orgCost: string
   margin: string
   marginHealth: 'loss' | 'thin' | 'healthy'
-  /** What the night actually took, once somebody has reconciled it. */
-  actuals: { tickets: number; ticketRev: number; barTake: number; barProfit: number } | null
+  /** The door half of the night, once counted. See src/lib/actuals.ts. */
+  doorHalf: DoorCount | null
+  /**
+   * The bar half of the night, once closed. Not `barClose` — that is the run
+   * time the bar shuts at, above.
+   */
+  barHalf: BarClose | null
 
   sold: number
   capacity: number
@@ -358,20 +364,23 @@ export async function loadEventRecord(
     })),
     hoursLogged: row.hours.length,
     tasksWithActual: row.tasks.filter((t) => (t.actual ?? 0) > 0).length,
-    hasActual: false,
+    doorCounted: false,
+    barClosed: false,
     floor: vals.floor,
     ceil: vals.ceil,
   }
 
   // Actual is a one-to-one the finance select does not carry, so it needs its
-  // own read. The figures come back with it rather than just the count: the
-  // reconcile form on this page edits them, and a form that could only create
+  // own read. The figures come back with it rather than just whether they
+  // exist: the forms on this page edit them, and a form that could only create
   // would make a typo permanent.
-  const actuals = await db.actual.findUnique({
+  const actual = await db.actual.findUnique({
     where: { eventId: row.id },
     select: { tickets: true, ticketRev: true, barTake: true, barProfit: true },
   })
-  gateInput.hasActual = actuals !== null
+  const halves = halvesOf(actual)
+  gateInput.doorCounted = halves.door !== null
+  gateInput.barClosed = halves.bar !== null
 
   const gates = gatesFor(gateInput)
   const capacity = capacityOf(row.space, row.format)
@@ -492,7 +501,8 @@ export async function loadEventRecord(
     orgCost: money(vals.orgCost),
     margin: `${Math.round(health.margin * 100)}%`,
     marginHealth: health.health,
-    actuals,
+    doorHalf: halves.door,
+    barHalf: halves.bar,
 
     sold: row.sold,
     capacity,

@@ -376,14 +376,14 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
           <section id="actuals">
             <SectionHeading
               note={
-                ev.actuals
+                ev.doorHalf && ev.barHalf
                   ? 'the settlement reads off these, not the model'
-                  : 'until these are in, the event cannot reach Payout'
+                  : 'until both halves are in, the event cannot reach Payout'
               }
             >
               What the night took
             </SectionHeading>
-            <Actuals eventId={ev.id} initial={ev.actuals} />
+            <Actuals eventId={ev.id} door={ev.doorHalf} bar={ev.barHalf} />
           </section>
         )}
 
