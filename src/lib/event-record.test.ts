@@ -401,14 +401,14 @@ describe('stage 7 — payout', () => {
   })
 
   /**
-   * The fix link goes where the missing half is entered. Both halves are on
-   * the event record until Bar is built — the prototype links this gate to
-   * Bar, and a link to a module nobody can open reads as a fixable step when
-   * it is not.
+   * The fix link goes where the missing half is entered: the bar is closed in
+   * Bar, off the till, and the door is counted on the event record. The
+   * prototype linked this gate to Bar; that link is back now Bar exists, for
+   * the half Bar owns.
    */
-  it('sends the fix to the event record, where both halves are entered', () => {
-    expect(gate(pay({ barClosed: false }), 'Actuals in').screen).toBe('event')
-    expect(gate(pay({ doorCounted: false, barClosed: false }), 'Actuals in').screen).toBe('event')
+  it('sends the fix to Bar while the bar is open, and to the event record for the door', () => {
+    expect(gate(pay({ barClosed: false }), 'Actuals in').screen).toBe('bar')
+    expect(gate(pay({ doorCounted: false, barClosed: false }), 'Actuals in').screen).toBe('bar')
     expect(gate(pay({ doorCounted: false }), 'Actuals in').screen).toBe('event')
   })
 })

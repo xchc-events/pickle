@@ -392,12 +392,9 @@ export function gatesFor(e: GateEvent): Gate[] {
         'hours',
       ),
       // Two halves, reconciled separately — see src/lib/actuals.ts. The gate
-      // waits for both and names whichever is missing.
-      //
-      // Both halves are entered on the event record for now. The prototype
-      // links this gate to Bar; once Bar is built it takes the bar half, and
-      // the link for an open bar moves there with it. Until then a link to Bar
-      // would be a dead end.
+      // waits for both, names whichever is missing, and links to where that
+      // half is entered: Bar while the bar is open, as the prototype had it,
+      // and the event record for the door.
       g(
         'Actuals in',
         e.doorCounted && e.barClosed,
@@ -406,7 +403,7 @@ export function gatesFor(e: GateEvent): Gate[] {
           : !e.barClosed
             ? 'Bar take not reconciled'
             : 'Final ticket count not reconciled',
-        'event',
+        e.barClosed ? 'event' : 'bar',
       ),
     ],
   ]
