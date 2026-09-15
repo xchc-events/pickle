@@ -356,6 +356,11 @@ export async function closeBar(
  * a transaction in holds-data.ts. These wrappers exist to gate the module and
  * the event scope, and to write the activity line — the decisions are not
  * taken here.
+ *
+ * Scoping the event does not scope the hold: the hold id comes from the
+ * browser too, and could name any hold on any night. So the writers are handed
+ * the scoped event with it, and refuse a hold that is not that event's — which
+ * is also what keeps each activity line on the event the hold belongs to.
  */
 export async function holdTheRoom(eventId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
@@ -384,7 +389,7 @@ export async function takeTheNight(eventId: string, holdId: string): Promise<Sai
   if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
-  const out = await confirmHold(holdId)
+  const out = await confirmHold(holdId, id)
   if (!out.ok) return said(out.why, 'warn')
 
   await record(id, user, 'confirmed the room — every other hold on that night was released')
@@ -398,7 +403,7 @@ export async function dropTheHold(eventId: string, holdId: string): Promise<Said
   if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
-  const out = await releaseHold(holdId)
+  const out = await releaseHold(holdId, id)
   if (!out.ok) return said(out.why, 'warn')
 
   await record(id, user, 'released a hold — anyone behind it moved up')
