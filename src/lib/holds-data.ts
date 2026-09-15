@@ -3,8 +3,11 @@ import { Prisma } from '@/generated/prisma/client'
 import { db } from './db'
 import {
   ALREADY_CONFIRMED,
+  challengeRefusal,
   confirmRefusal,
+  firstHold,
   isDoubleBooking,
+  NO_LONGER_STANDING,
   retryOnConflict,
   holdLabel,
   nextRank,
@@ -77,6 +80,23 @@ async function ladderFor(
   return rows.map(toRow)
 }
 
+/**
+ * Where one of this event's holds sits, or null.
+ *
+ * The hold id arrives from the browser; the event id is the one the action
+ * scoped. The scope goes into the query, the way `requireEvent` scopes an
+ * event, so another event's hold comes back exactly like a hold that is not
+ * there and its night is never read. The refusals in holds.ts check ownership
+ * again against the ladder, so this query is not the only thing standing
+ * between a foreign id and a write.
+ */
+function ownSlot(tx: Pick<Prisma.TransactionClient, 'hold'>, holdId: string, eventId: string) {
+  return tx.hold.findUnique({
+    where: { id: holdId, eventId },
+    select: { spaceId: true, date: true, rank: true },
+  })
+}
+
 export interface HoldView {
   id: string
   date: Date
@@ -122,7 +142,7 @@ export async function holdsForEvent(eventId: string): Promise<HoldView[]> {
       label: holdLabel(h.rank),
       state: toRow(h).state,
       challengedBy: challenger?.name ?? null,
-      canConfirm: confirmRefusal(ladder, h.id) === null,
+      canConfirm: confirmRefusal(ladder, h.id, eventId) === null,
     })
   }
   return views
@@ -153,10 +173,13 @@ export async function placeHold(
  * Every other hold on the slot is released in the same transaction — they lost
  * the date the moment this one took it, and leaving them standing would show
  * two events holding a room that only one of them has.
+ *
+ * `eventId` is the event the caller was scoped to; a hold that is not its own
+ * is refused as gone.
  */
-export async function confirmHold(holdId: string): Promise<HoldOutcome> {
+export async function confirmHold(holdId: string, eventId: string): Promise<HoldOutcome> {
   try {
-    return await confirmInside(holdId)
+    return await confirmInside(holdId, eventId)
   } catch (err) {
     // Lost a race: another confirmation for this night committed between our
     // read and our write, and the index refused ours. Same words as the
@@ -166,16 +189,13 @@ export async function confirmHold(holdId: string): Promise<HoldOutcome> {
   }
 }
 
-function confirmInside(holdId: string): Promise<HoldOutcome> {
+function confirmInside(holdId: string, eventId: string): Promise<HoldOutcome> {
   return ladderTransaction(async (tx) => {
-    const hold = await tx.hold.findUnique({
-      where: { id: holdId },
-      select: { spaceId: true, date: true },
-    })
-    if (!hold) return { ok: false as const, why: 'That hold is no longer standing.' }
+    const hold = await ownSlot(tx, holdId, eventId)
+    if (!hold) return { ok: false as const, why: NO_LONGER_STANDING }
 
     const ladder = await ladderFor(tx, hold.spaceId, hold.date)
-    const why = confirmRefusal(ladder, holdId)
+    const why = confirmRefusal(ladder, holdId, eventId)
     if (why) return { ok: false as const, why }
 
     await tx.hold.update({
@@ -190,17 +210,14 @@ function confirmInside(holdId: string): Promise<HoldOutcome> {
   })
 }
 
-/** Give up the night, and move everyone below up one. */
-export async function releaseHold(holdId: string): Promise<HoldOutcome> {
+/** Give up the night, and move everyone below up one. Only the event's own hold. */
+export async function releaseHold(holdId: string, eventId: string): Promise<HoldOutcome> {
   return ladderTransaction(async (tx) => {
-    const hold = await tx.hold.findUnique({
-      where: { id: holdId },
-      select: { spaceId: true, date: true, rank: true },
-    })
-    if (!hold) return { ok: false as const, why: 'That hold is no longer standing.' }
+    const hold = await ownSlot(tx, holdId, eventId)
+    if (!hold) return { ok: false as const, why: NO_LONGER_STANDING }
 
     const ladder = await ladderFor(tx, hold.spaceId, hold.date)
-    const why = releaseRefusal(ladder, holdId)
+    const why = releaseRefusal(ladder, holdId, eventId)
     if (why) return { ok: false as const, why }
 
     await tx.hold.update({
@@ -221,28 +238,24 @@ export async function releaseHold(holdId: string): Promise<HoldOutcome> {
  * This is the only thing that makes a stale hold move, because nothing
  * expires. It marks the 1st hold as challenged and names who is waiting; the
  * incumbent then confirms or releases.
+ *
+ * `eventId` is both the event that owns the lower hold and the one named as
+ * waiting, so a challenge only ever goes out in the name of the event queued
+ * behind.
  */
-export async function challengeHold(holdId: string, byEventId: string): Promise<HoldOutcome> {
+export async function challengeHold(holdId: string, eventId: string): Promise<HoldOutcome> {
   return ladderTransaction(async (tx) => {
-    const mine = await tx.hold.findUnique({
-      where: { id: holdId },
-      select: { spaceId: true, date: true, rank: true, eventId: true },
-    })
-    if (!mine) return { ok: false as const, why: 'That hold is no longer standing.' }
-    if (mine.rank === 1) {
-      return {
-        ok: false as const,
-        why: 'You already hold this night first — nothing to challenge.',
-      }
-    }
+    const mine = await ownSlot(tx, holdId, eventId)
+    if (!mine) return { ok: false as const, why: NO_LONGER_STANDING }
 
     const ladder = await ladderFor(tx, mine.spaceId, mine.date)
-    const first = ladder.find((h) => h.rank === 1 && h.state === 'held')
-    if (!first) return { ok: false as const, why: 'There is no standing hold above yours.' }
+    const why = challengeRefusal(ladder, holdId, eventId)
+    if (why) return { ok: false as const, why }
 
+    // challengeRefusal has just found a 1st hold standing.
     await tx.hold.update({
-      where: { id: first.id },
-      data: { challengedByEventId: byEventId, challengedAt: new Date() },
+      where: { id: firstHold(ladder)!.id },
+      data: { challengedByEventId: eventId, challengedAt: new Date() },
     })
     return { ok: true as const }
   })

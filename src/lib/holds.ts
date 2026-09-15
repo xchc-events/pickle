@@ -35,12 +35,37 @@ export interface HoldRow {
  */
 export const ALREADY_CONFIRMED = 'That night is already confirmed for another event.'
 
+/**
+ * What a coordinator reads for a hold that is gone — and for one that was
+ * never their event's to touch.
+ *
+ * The hold id arrives from the browser, so it can name any hold on any night.
+ * The two cases share one sentence, said before anything about the hold's
+ * state, so an id off another event's ladder tells the caller nothing about
+ * that ladder — not even that the id is real.
+ */
+export const NO_LONGER_STANDING = 'That hold is no longer standing.'
+
 /** The partial unique index added in `20260915000000_hold_one_confirmed_per_night`. */
 export const ONE_CONFIRMED_INDEX = 'Hold_one_confirmed_per_night'
 
 const live = (holds: HoldRow[]): HoldRow[] => holds.filter((h) => h.state === 'held')
 const confirmed = (holds: HoldRow[]): HoldRow | undefined =>
   holds.find((h) => h.state === 'confirmed')
+
+/** The hold, if it is on this ladder and belongs to this event. */
+const ownHold = (holds: HoldRow[], holdId: string, eventId: string): HoldRow | undefined =>
+  holds.find((h) => h.id === holdId && h.eventId === eventId)
+
+/**
+ * The hold with first refusal on the night, if one is standing.
+ *
+ * Standing, not just numbered 1: a released hold keeps its old rank so the
+ * history stays readable.
+ */
+export function firstHold(holds: HoldRow[]): HoldRow | undefined {
+  return live(holds).find((h) => h.rank === 1)
+}
 
 /** "1st hold", "2nd hold", "3rd hold" — how the room is actually spoken about. */
 export function holdLabel(rank: number): string {
@@ -81,33 +106,62 @@ export function placeRefusal(holds: HoldRow[], eventId: string): string | null {
  * Only the first hold may confirm. That is right of first refusal, and it is
  * the reason ranking exists at all: a second hold does not step over a first,
  * it challenges, and the first either takes the date or gives it up.
+ *
+ * `eventId` is the event the caller was scoped to, and only its own hold can
+ * confirm. Anyone else's is refused as gone before the night is looked at —
+ * confirming it would take that event's room and release every other hold on
+ * the night.
  */
-export function confirmRefusal(holds: HoldRow[], holdId: string): string | null {
+export function confirmRefusal(holds: HoldRow[], holdId: string, eventId: string): string | null {
+  const hold = ownHold(holds, holdId, eventId)
+  if (!hold) return NO_LONGER_STANDING
+
   const taken = confirmed(holds)
   if (taken) return ALREADY_CONFIRMED
 
-  const hold = holds.find((h) => h.id === holdId)
-  if (!hold || hold.state !== 'held') return 'That hold is no longer standing.'
+  if (hold.state !== 'held') return NO_LONGER_STANDING
 
   if (hold.rank !== 1) {
-    const first = live(holds).find((h) => h.rank === 1)
-    return first
+    return firstHold(holds)
       ? 'The 1st hold has first refusal — challenge it rather than booking over it.'
       : 'That hold is not the 1st hold.'
   }
   return null
 }
 
-/** Why a hold cannot be released, or null if it can. */
-export function releaseRefusal(holds: HoldRow[], holdId: string): string | null {
-  const hold = holds.find((h) => h.id === holdId)
-  if (!hold) return 'That hold is no longer standing.'
+/**
+ * Why a hold cannot be released, or null if it can.
+ *
+ * Only by the event it belongs to: letting somebody else's hold go would move
+ * everyone behind it up a place on a night that is not this event's to rearrange.
+ */
+export function releaseRefusal(holds: HoldRow[], holdId: string, eventId: string): string | null {
+  const hold = ownHold(holds, holdId, eventId)
+  if (!hold) return NO_LONGER_STANDING
   if (hold.state === 'confirmed') {
     // Releasing a confirmed booking is a cancellation — a different act, with
     // different consequences, that does not happen by this door.
     return 'That night is confirmed. Cancelling a booking is not the same as dropping a hold.'
   }
   if (hold.state === 'released') return 'That hold has already been released.'
+  return null
+}
+
+/**
+ * Why a hold cannot challenge the 1st hold on its night, or null if it can.
+ *
+ * A challenge puts the incumbent on notice and names who is waiting, and the
+ * one named is the event asking. So the lower hold has to be that event's own:
+ * with somebody else's, any event could put a night's incumbent on notice in
+ * its own name without being queued for the night at all. A released hold has
+ * given the night up and is not waiting on anything, so it cannot challenge
+ * either.
+ */
+export function challengeRefusal(holds: HoldRow[], holdId: string, eventId: string): string | null {
+  const hold = ownHold(holds, holdId, eventId)
+  if (!hold || hold.state === 'released') return NO_LONGER_STANDING
+  if (hold.rank === 1) return 'You already hold this night first — nothing to challenge.'
+  if (!firstHold(holds)) return 'There is no standing hold above yours.'
   return null
 }
 
