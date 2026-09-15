@@ -29,6 +29,15 @@ export interface HoldRow {
   challengedByEventId: string | null
 }
 
+/**
+ * What a coordinator reads when the night has gone to someone else — whether
+ * a refusal caught it first or the database index caught a race.
+ */
+export const ALREADY_CONFIRMED = 'That night is already confirmed for another event.'
+
+/** The partial unique index added in `20260915000000_hold_one_confirmed_per_night`. */
+export const ONE_CONFIRMED_INDEX = 'Hold_one_confirmed_per_night'
+
 const live = (holds: HoldRow[]): HoldRow[] => holds.filter((h) => h.state === 'held')
 const confirmed = (holds: HoldRow[]): HoldRow | undefined =>
   holds.find((h) => h.state === 'confirmed')
@@ -59,7 +68,7 @@ export function nextRank(holds: HoldRow[]): number {
 /** Why a new hold cannot be placed on this night, or null if it can. */
 export function placeRefusal(holds: HoldRow[], eventId: string): string | null {
   const taken = confirmed(holds)
-  if (taken) return 'That night is already confirmed for another event.'
+  if (taken) return ALREADY_CONFIRMED
   if (live(holds).some((h) => h.eventId === eventId)) {
     return 'This event already holds that night.'
   }
@@ -75,7 +84,7 @@ export function placeRefusal(holds: HoldRow[], eventId: string): string | null {
  */
 export function confirmRefusal(holds: HoldRow[], holdId: string): string | null {
   const taken = confirmed(holds)
-  if (taken) return 'That night is already confirmed for another event.'
+  if (taken) return ALREADY_CONFIRMED
 
   const hold = holds.find((h) => h.id === holdId)
   if (!hold || hold.state !== 'held') return 'That hold is no longer standing.'
@@ -116,4 +125,67 @@ export function promoteAfterRelease(
     .filter((h) => h.rank > releasedRank)
     .sort((a, b) => a.rank - b.rank)
     .map((h) => ({ id: h.id, rank: h.rank - 1 }))
+}
+
+/**
+ * Whether an error is the database refusing a second confirmed hold.
+ *
+ * The refusals above run inside a transaction, but under READ COMMITTED two
+ * coordinators confirming the same free night at once can both read an empty
+ * slot. The index catches the second write; this recognises its error so the
+ * loser is told the night is taken rather than shown a crash.
+ *
+ * Duck-typed rather than importing Prisma, so it stays pure and testable. The
+ * shape is Prisma 7.10 with the pg driver adapter, captured by triggering the
+ * violation for real — it is not the classic `meta.target` shape. Matching on
+ * the index name, not on P2002 alone, keeps an unrelated unique violation from
+ * being reported to a coordinator as "the night is taken".
+ */
+export function isDoubleBooking(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const e = err as {
+    code?: unknown
+    meta?: { driverAdapterError?: { cause?: { constraint?: { index?: unknown } } } }
+  }
+  return (
+    e.code === 'P2002' &&
+    e.meta?.driverAdapterError?.cause?.constraint?.index === ONE_CONFIRMED_INDEX
+  )
+}
+
+/**
+ * Whether Postgres aborted a transaction for a write conflict or deadlock.
+ *
+ * It arrives in two shapes, both captured from real races rather than read
+ * off documentation:
+ *
+ *   - A deadlock comes back through Prisma as `code: 'P2034'`.
+ *   - A Serializable transaction that loses comes back as the pg adapter's own
+ *     `DriverAdapterError`, with no `code` at all and SQLSTATE 40001 under
+ *     `cause.kind: 'TransactionWriteConflict'`.
+ *
+ * Matching only the first let 38 of 40 concurrent placements crash.
+ */
+export function isWriteConflict(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const e = err as { code?: unknown; cause?: { kind?: unknown } }
+  return e.code === 'P2034' || e.cause?.kind === 'TransactionWriteConflict'
+}
+
+/**
+ * Run a transaction again when Postgres aborts it for a conflict.
+ *
+ * The retried attempt reads the ladder afresh, so the loser of a race sees
+ * the night already confirmed and is refused in words rather than crashed.
+ * Bounded, because a conflict that survives three attempts is not a race any
+ * more and should be seen rather than looped over.
+ */
+export async function retryOnConflict<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (!isWriteConflict(err) || i >= attempts) throw err
+    }
+  }
 }

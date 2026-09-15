@@ -1,7 +1,11 @@
 import 'server-only'
+import { Prisma } from '@/generated/prisma/client'
 import { db } from './db'
 import {
+  ALREADY_CONFIRMED,
   confirmRefusal,
+  isDoubleBooking,
+  retryOnConflict,
   holdLabel,
   nextRank,
   placeRefusal,
@@ -13,14 +17,29 @@ import {
 /**
  * Reading and writing the hold ladder.
  *
- * Every mutation re-reads the ladder for the slot **inside a transaction** and
- * re-applies the rule there. The pure functions in holds.ts decide; this only
- * makes sure they decide against what is in the database at the moment of the
- * write, rather than against what the page rendered.
+ * Every mutation re-reads the ladder for the slot inside a **Serializable**
+ * transaction and re-applies the rule there. The pure functions in holds.ts
+ * decide; this makes sure they decide against the database at the moment of
+ * the write rather than against what the page rendered.
  *
- * That matters most for confirming: two coordinators confirming the same room
- * would both pass a check made before the transaction opened.
+ * Serializable, not the default READ COMMITTED, because the default was
+ * measured to be unsafe. Two concurrent placements on a free night both read
+ * an empty ladder and both took rank 1; confirming both at once then
+ * double-booked the room once in 40 races and crashed the loser with a
+ * deadlock in the other 39. Serializable turns those into P2034 aborts,
+ * `retryOnConflict` re-runs the loser against the committed ladder, and it is
+ * refused in words.
+ *
+ * The partial unique index `Hold_one_confirmed_per_night` stays underneath as
+ * the guarantee that does not depend on this file being right.
  */
+
+const SERIALIZABLE = { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+
+/** A hold-ladder transaction: Serializable, and re-run if Postgres aborts it for a conflict. */
+function ladderTransaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return retryOnConflict(() => db.$transaction(fn, SERIALIZABLE))
+}
 
 const toRow = (h: {
   id: string
@@ -46,7 +65,7 @@ const SLOT_SELECT = {
 
 /** Everything standing on one room for one night, oldest rank first. */
 async function ladderFor(
-  tx: Pick<typeof db, 'hold'>,
+  tx: Pick<Prisma.TransactionClient, 'hold'>,
   spaceId: string,
   date: Date,
 ): Promise<HoldRow[]> {
@@ -116,7 +135,7 @@ export async function placeHold(
   spaceId: string,
   date: Date,
 ): Promise<HoldOutcome> {
-  return db.$transaction(async (tx) => {
+  return ladderTransaction(async (tx) => {
     const ladder = await ladderFor(tx, spaceId, date)
     const why = placeRefusal(ladder, eventId)
     if (why) return { ok: false as const, why }
@@ -136,7 +155,19 @@ export async function placeHold(
  * two events holding a room that only one of them has.
  */
 export async function confirmHold(holdId: string): Promise<HoldOutcome> {
-  return db.$transaction(async (tx) => {
+  try {
+    return await confirmInside(holdId)
+  } catch (err) {
+    // Lost a race: another confirmation for this night committed between our
+    // read and our write, and the index refused ours. Same words as the
+    // refusal a moment later would have given.
+    if (isDoubleBooking(err)) return { ok: false, why: ALREADY_CONFIRMED }
+    throw err
+  }
+}
+
+function confirmInside(holdId: string): Promise<HoldOutcome> {
+  return ladderTransaction(async (tx) => {
     const hold = await tx.hold.findUnique({
       where: { id: holdId },
       select: { spaceId: true, date: true },
@@ -161,7 +192,7 @@ export async function confirmHold(holdId: string): Promise<HoldOutcome> {
 
 /** Give up the night, and move everyone below up one. */
 export async function releaseHold(holdId: string): Promise<HoldOutcome> {
-  return db.$transaction(async (tx) => {
+  return ladderTransaction(async (tx) => {
     const hold = await tx.hold.findUnique({
       where: { id: holdId },
       select: { spaceId: true, date: true, rank: true },
@@ -192,7 +223,7 @@ export async function releaseHold(holdId: string): Promise<HoldOutcome> {
  * incumbent then confirms or releases.
  */
 export async function challengeHold(holdId: string, byEventId: string): Promise<HoldOutcome> {
-  return db.$transaction(async (tx) => {
+  return ladderTransaction(async (tx) => {
     const mine = await tx.hold.findUnique({
       where: { id: holdId },
       select: { spaceId: true, date: true, rank: true, eventId: true },
