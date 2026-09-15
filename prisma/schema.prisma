@@ -377,6 +377,8 @@ model Event {
   files     StoredFile[]
   grants    AccessGrant[]
   holds     Hold[]
+  barBudget BarBudget?
+  barSales  BarSale[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -664,12 +666,85 @@ model Actual {
   /// Bar profit after stock cost, GST **exclusive** — this goes onto the bar
   /// margin line untouched, so it must arrive in the same terms as `barMarg`.
   barProfit  Float?
-  /// MANUAL when somebody typed the figures. POS is reserved for figures the
-  /// server reads off Epos Now itself — nothing writes POS yet, and a client
-  /// must never be able to claim it for numbers it sent.
+  /// MANUAL when somebody typed the figures; POS when the server read them off
+  /// Epos Now itself, in `closeBarFromTill`. A client can never claim POS for
+  /// numbers it sent — that action takes no figures.
   barSource        ActualSource?
   barReconciledBy  String?
   barReconciledAt  DateTime?
+}
+
+// ------------------------------------------------------------------- bar ---
+//
+// The bar answers three questions: what do we think will happen, how did we
+// actually do and why, and what does that mean for the months ahead. Epos Now
+// — the venue's till — owns products, stock, orders and every sale, and its
+// own Xero app sends bar sales to Xero. Nothing below orders stock or posts a
+// sale; it is the budget, and the snapshot of a night's sales that explains
+// the variance against it. See src/lib/bar.ts.
+
+/// How a bar budget came to be locked.
+enum BarBudgetBasis {
+  /// Locked by the move to On sale — the normal case.
+  ON_SALE
+  /// Locked by hand for an event that was already on sale before bar budgets
+  /// existed. It says so, so nobody mistakes it for what was believed then.
+  LATE
+}
+
+/// What the bar was expected to do on a night, frozen when the event goes on
+/// sale.
+///
+/// Locked rather than read live off the projection: a projection drifts
+/// towards whatever happened as people edit the scenario, and a variance
+/// measured against it shrinks to nothing. The figures are the settlement's
+/// own bar line at the moment of locking, with the rates they were worked at,
+/// so a later change to the model cannot rewrite what was believed. One per
+/// event, and never updated.
+model BarBudget {
+  id           String         @id @default(cuid())
+  eventId      String         @unique
+  event        Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// People expected through the door — the scenario the settlement read.
+  heads        Int
+  /// GST inclusive.
+  spendPerHead Float
+  /// Bar margin after stock, GST exclusive: `financeVals().barMarg` at lock.
+  margin       Float
+  stockCostPct Float
+  /// Planned duty manager and bar staff hours.
+  labourHours  Float
+  loadedRate   Float
+  basis        BarBudgetBasis @default(ON_SALE)
+  /// Initials of whoever moved the event on sale, or locked it late.
+  lockedBy     String?
+  lockedAt     DateTime       @default(now())
+}
+
+/// One product's sales at a night's bar, read off Epos Now when the bar was
+/// closed.
+///
+/// A snapshot that always matches the bar half the settlement reads: replaced
+/// when the bar is closed off the till again, removed when it is closed by
+/// hand. Epos Now stays the record of the sales; this is what the bar screen's
+/// "why" is read from, without asking the till again every time it renders.
+model BarSale {
+  id            String  @id @default(cuid())
+  eventId       String
+  event         Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /// Epos Now's Product.Id. Null for an open-price sale with no product.
+  eposProductId Int?
+  name          String
+  category      String?
+  units         Float
+  /// GST inclusive, after item discounts.
+  revenue       Float
+  revenueEx     Float
+  /// GST exclusive. Zero when Epos Now held no cost price — see `costKnown`.
+  cost          Float
+  costKnown     Boolean
+
+  @@index([eventId])
 }
 
 // ---------------------------------------------------------------- payees ---

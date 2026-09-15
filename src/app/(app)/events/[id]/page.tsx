@@ -14,6 +14,7 @@ import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
 import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
 import { Holds } from './Holds'
+import { barRefusal } from '@/lib/bar'
 import styles from './event.module.css'
 import type { LeadRole } from '@/generated/prisma/client'
 
@@ -38,7 +39,7 @@ import type { LeadRole } from '@/generated/prisma/client'
  * — not disabled — and the actions refuse them regardless.
  */
 export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
-  const { user } = await requireModule('pipeline')
+  const { user, modules } = await requireModule('pipeline')
   const { id } = await params
 
   // Scoped in the query. An event outside this user's reach 404s rather than
@@ -446,7 +447,12 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             >
               What the night took
             </SectionHeading>
-            <Actuals eventId={ev.id} door={ev.doorHalf} bar={ev.barHalf} />
+            <Actuals
+              eventId={ev.id}
+              door={ev.doorHalf}
+              bar={ev.barHalf}
+              barHref={modules.includes('bar') && !barRefusal(user) ? `/bar?event=${ev.id}` : null}
+            />
           </section>
         )}
 
