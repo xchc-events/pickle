@@ -51,3 +51,44 @@ export const initialsOf = (name: string): string =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('') || '\u2014'
+
+/**
+ * "Safari on a Mac" — enough to tell one signed-in browser from another in a
+ * person's own list. Display only: a user agent is whatever the browser chose
+ * to say, so nothing is ever decided by it.
+ */
+export function deviceOf(userAgent: string | null): string {
+  const ua = userAgent ?? ''
+
+  // Most specific first: Edge and Opera also say Chrome, and Chrome says Safari.
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\//.test(ua)
+      ? 'Opera'
+      : /Firefox\/|FxiOS\//.test(ua)
+        ? 'Firefox'
+        : /Chrome\/|CriOS\//.test(ua)
+          ? 'Chrome'
+          : /Version\/.*Safari\//.test(ua)
+            ? 'Safari'
+            : null
+
+  const platform = /iPhone/.test(ua)
+    ? 'an iPhone'
+    : /iPad/.test(ua)
+      ? 'an iPad'
+      : /Android/.test(ua)
+        ? 'Android'
+        : /Macintosh/.test(ua)
+          ? 'a Mac'
+          : /Windows/.test(ua)
+            ? 'Windows'
+            : /CrOS/.test(ua)
+              ? 'ChromeOS'
+              : /Linux/.test(ua)
+                ? 'Linux'
+                : null
+
+  if (!browser) return 'An unknown browser'
+  return platform ? `${browser} on ${platform}` : browser
+}

@@ -1,90 +1,83 @@
+import Link from 'next/link'
+import type { Metadata } from 'next'
 import { db } from '@/lib/db'
 import { ROLE_LABEL, MODULES, type ModuleKey } from '@/lib/constants'
-import { roleKeyOf, authConfigured, stubAllowed } from '@/lib/session'
-import { LINK_COOLDOWN_SECONDS } from '@/lib/auth-rules'
+import { currentUser, roleKeyOf, stubAllowed } from '@/lib/session'
+import { emailConfigured } from '@/lib/email'
 import { initialsOf } from '@/lib/format'
 import { Brand } from '@/components/Brand'
 import { Avatar } from '@/components/Avatar'
-import { signInAs } from '../actions'
-import { SignInByEmail } from './Providers'
+import { signInAs, signOut } from '../actions'
+import { PasswordForm } from './PasswordForm'
+import { LinkForm } from './LinkForm'
 import styles from './sign-in.module.css'
 
-// Reads the user table on every request: a signed-in list baked at build time
-// would go stale the moment anyone is added or deactivated.
+// Reads the session and the user table on every request: a page baked at build
+// time would go stale the moment anyone is added or deactivated.
 export const dynamic = 'force-dynamic'
 
-const REASON: Record<string, string> = {
-  AccessDenied:
-    'That address has no account here, or its account has been switched off. Accounts are made by an administrator at the venue — there is no sign-up.',
-  Verification:
-    'That link has been used already, or it expired, or one was sent to that address a moment ago. Check the inbox, then ask for a new one.',
-  Configuration:
-    'Sign-in is not configured on this install. An administrator needs to set the Resend keys — see the README.',
-}
+export const metadata: Metadata = { title: 'Sign in · PicklePicklePickle' }
 
 /**
- * The seconds left on the cooldown, if the URL is carrying a sensible one.
+ * The way in.
  *
- * The value arrives in a query string, so it is whatever somebody typed.
- * Clamped to the cooldown rather than trusted: the page states it as fact,
- * and a link promising a four hour wait is a way to talk somebody out of
- * trying to sign in.
+ * A password first, because that is what most people will use most days. The
+ * emailed link sits under it, folded away — still there for somebody who has
+ * not set a password, whose password is throttled, or who simply prefers it —
+ * and it needs no JavaScript to unfold.
+ *
+ * There is no sign-up link, because there is no sign-up.
  */
-function cooldownLeft(raw: string | string[] | undefined): number | null {
-  if (typeof raw !== 'string') return null
-
-  const seconds = Number.parseInt(raw, 10)
-  if (!Number.isInteger(seconds) || seconds < 1) return null
-
-  return Math.min(seconds, LINK_COOLDOWN_SECONDS)
-}
-
-export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
-  const sp = await searchParams
-  const error = typeof sp.error === 'string' ? sp.error : null
-  const sent = sp.sent === '1'
-  const wait = cooldownLeft(sp.wait)
+export default async function SignIn() {
+  const already = await currentUser()
 
   return (
     <main className={styles.wrap}>
       <Brand />
       <h1 className={styles.title}>Sign in</h1>
 
-      {error ? (
-        <p className={styles.error} role="alert">
-          {REASON[error] ?? 'That did not work. Try again, or ask an administrator at the venue.'}
+      {already ? (
+        <div className={styles.already}>
+          <span>
+            You are signed in as <strong>{already.name}</strong>
+            {already.authenticated ? '' : ' through the development picker'}.
+          </span>
+          <span className={styles.alreadyActions}>
+            <Link href="/" className={styles.aside}>
+              Carry on
+            </Link>
+            <form action={signOut}>
+              <button type="submit" className={styles.asideButton}>
+                Sign out
+              </button>
+            </form>
+          </span>
+        </div>
+      ) : null}
+
+      <PasswordForm />
+
+      <details className={styles.alt}>
+        <summary className={styles.altSummary}>Email me a sign-in link instead</summary>
+        <div className={styles.altBody}>
+          <LinkForm purpose="SIGN_IN" />
+        </div>
+      </details>
+
+      {!emailConfigured() ? (
+        <p className={styles.note}>
+          {stubAllowed
+            ? 'Email is not set up on this install, so links are written to the dev server’s log instead of being sent.'
+            : 'Email is not set up on this install, so links cannot be sent. Ask an administrator.'}
         </p>
       ) : null}
 
-      {wait !== null ? (
-        <p className={styles.error} role="alert">
-          A link was already sent to that address. Check the inbox, or try again in {wait} seconds.
-        </p>
-      ) : null}
+      <p className={styles.blurb}>
+        There is no sign-up here. Accounts are made by an administrator at the venue, and the first
+        password comes from the invitation they send.
+      </p>
 
-      {sent ? (
-        <p className={styles.sent} role="status">
-          Check your email — the link signs you in, works once, and expires in an hour.
-        </p>
-      ) : null}
-
-      {authConfigured ? (
-        <>
-          <p className={styles.blurb}>
-            Use the address the venue added for you. There is no sign-up here and no password to
-            remember.
-          </p>
-          <div className={styles.providers}>
-            <SignInByEmail />
-          </div>
-        </>
-      ) : (
-        <p className={styles.blurb}>
-          Real sign-in is not configured on this install yet — see the README for the Resend keys.
-        </p>
-      )}
-
-      {stubAllowed ? <RolePicker realAuth={authConfigured} /> : null}
+      {stubAllowed ? <RolePicker /> : null}
     </main>
   )
 }
@@ -99,7 +92,7 @@ export default async function SignIn({ searchParams }: PageProps<'/sign-in'>) {
  * because a session it grants is marked unauthenticated: it can drive every
  * module but it can never open a bank account.
  */
-async function RolePicker({ realAuth }: { realAuth: boolean }) {
+async function RolePicker() {
   const users = await db.user.findMany({
     where: { active: true },
     include: { person: true },
@@ -118,9 +111,7 @@ async function RolePicker({ realAuth }: { realAuth: boolean }) {
     <section className={styles.dev}>
       <div className={styles.devHead}>
         <span className={styles.devTag}>development only</span>
-        <span className={styles.devNote}>
-          {realAuth ? 'Alongside real sign-in above.' : 'Standing in for real sign-in.'}
-        </span>
+        <span className={styles.devNote}>Alongside real sign-in above.</span>
       </div>
 
       <div className={styles.list}>
@@ -157,7 +148,7 @@ async function RolePicker({ realAuth }: { realAuth: boolean }) {
       <p className={styles.foot}>
         No password: the role is held in a cookie, and anyone who can set that cookie can be anyone.
         A session from here is marked unauthenticated, so it drives every module but cannot open a
-        payment detail.
+        payment detail — or change a password.
       </p>
     </section>
   )

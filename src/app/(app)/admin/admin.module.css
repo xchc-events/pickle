@@ -87,7 +87,10 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.4fr) minmax(150px, 1fr) minmax(140px, 1fr) auto auto;
+  /* The status column is a fixed width: every row is its own grid, so an
+     `auto` column there would size to each row's text and knock the selects
+     out of line. */
+  grid-template-columns: minmax(160px, 1.4fr) minmax(150px, 1fr) minmax(140px, 1fr) 176px auto;
   align-items: center;
   gap: 14px;
   padding: 9px 12px;
@@ -168,7 +171,8 @@
   white-space: nowrap;
 }
 
-.sessions {
+.sessions,
+.inlineAction.sessions {
   font-size: 10px;
   color: var(--color-accent-400);
 }
@@ -264,4 +268,36 @@
 
 .addButton:disabled {
   opacity: 0.6;
+}
+
+/* A small action that reads as part of the status it changes. */
+.inlineAction {
+  font: inherit;
+  font-size: 11px;
+  color: var(--st-warn);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: right;
+}
+
+.inlineAction:hover:not(:disabled) {
+  color: var(--color-accent-200);
+  text-decoration: underline;
+}
+
+.inlineAction:disabled {
+  opacity: 0.5;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  align-self: center;
+  font-size: 12px;
+  color: var(--color-neutral-400);
+  cursor: pointer;
 }

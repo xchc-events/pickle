@@ -28,7 +28,6 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://pickle:pickle@localhost:5432/pickle?schema=public
-      AUTH_SECRET: ci-only-not-a-real-secret
       AUTH_URL: http://localhost:3000
 
     steps:
@@ -60,9 +59,8 @@ jobs:
     name: Production build
     runs-on: ubuntu-latest
     env:
-      # The build only needs these to exist, not to resolve.
+      # The build only needs this to exist, not to resolve.
       DATABASE_URL: postgresql://pickle:pickle@localhost:5432/pickle?schema=public
-      AUTH_SECRET: ci-only-not-a-real-secret
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
