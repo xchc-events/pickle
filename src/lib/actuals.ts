@@ -12,7 +12,7 @@ import { CFG, type FinanceVals } from './finance'
  *
  * Each half is in only when both of its figures are. The settlement
  * substitutes whichever halves are in and leaves the rest projected; the gate
- * out of Show week waits for both.
+ * on putting a night to bed waits for both.
  *
  * Pure over plain shapes, so the substitution is tested rather than trusted.
  */

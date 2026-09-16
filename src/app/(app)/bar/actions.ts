@@ -260,10 +260,14 @@ export async function closeBarFromTill(eventId: string): Promise<Said> {
 /**
  * Lock a budget for an event that went on sale before bar budgets existed.
  *
- * Every event that moves to On sale now locks one in the same transaction. The
- * ones already past it have nothing to be measured against; this gives them a
+ * Every event now locks one in the same transaction as its tickets first
+ * going live on Gather.rsvp — see `pushChannel` in the Promotion actions. The
+ * ones already on sale have nothing to be measured against; this gives them a
  * budget at today's projection and marks it LATE, so nobody mistakes it for
  * what was believed when tickets went live.
+ *
+ * "On sale" is Gather.rsvp being live. It used to be a stage; each event now
+ * carries a status per part, and that is the one the tickets part reads.
  */
 export async function lockBudgetLate(eventId: string): Promise<Said> {
   const g = await gate(eventId)
@@ -271,11 +275,14 @@ export async function lockBudgetLate(eventId: string): Promise<Said> {
 
   const ev = await db.event.findUniqueOrThrow({
     where: { id: g.id },
-    select: { stage: true, barBudget: { select: { id: true } } },
+    select: {
+      channels: { where: { channel: 'gather' }, select: { live: true } },
+      barBudget: { select: { id: true } },
+    },
   })
   if (ev.barBudget)
     return said('This night already has a budget. A budget is never rewritten.', 'warn')
-  if (ev.stage < 4) {
+  if (!ev.channels.some((c) => c.live)) {
     return said(
       'This locks by itself when the event goes on sale — there is nothing to lock yet.',
       'warn',

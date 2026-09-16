@@ -40,9 +40,6 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/activity', () => ({ record: stop('record') }))
 vi.mock('next/cache', () => ({ refresh: stop('refresh') }))
 vi.mock('@/lib/event-record-data', () => ({ loadEventRecord: stop('loadEventRecord') }))
-// Advancing to On sale locks the bar budget in the same transaction. For a
-// promoter that lock must never be reached, so it stops the test like the rest.
-vi.mock('@/lib/bar-data', () => ({ budgetToLock: stop('budgetToLock') }))
 vi.mock('@/lib/holds-data', () => ({
   placeHold: stop('placeHold'),
   confirmHold: stop('confirmHold'),
@@ -65,7 +62,8 @@ const EVENT = 'evt_slow_fold'
  * read, so it is refused all the same.
  */
 const ARGS: Record<string, unknown[]> = {
-  advanceStage: [],
+  advanceBooking: ['negotiating'],
+  putToBed: [],
   setLead: ['TICKETING', 'person_mere'],
   setLicence: ['confirmed'],
   setRunTime: ['barClose', '2:00am'],
@@ -128,7 +126,8 @@ describe('the actions under test', () => {
   it('includes every action the event record page can reach', () => {
     expect(names).toEqual(
       expect.arrayContaining([
-        'advanceStage',
+        'advanceBooking',
+        'putToBed',
         'setLead',
         'setLicence',
         'setRunTime',

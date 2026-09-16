@@ -229,7 +229,8 @@ export interface DesignQueueEvent {
   id: string
   name: string
   dateLabel: string
-  stage: number
+  /** Whether the booking is confirmed. Design takes events before it is. */
+  confirmed: boolean
   assets: EventAsset[]
   leadName: string | null
   riskNote: string | null
@@ -247,18 +248,23 @@ export interface DesignQueueRow {
 
 /**
  * The queue note. "No brief yet" is its own state and outranks a count:
- * an event sitting at Confirmed with nothing started is a different problem
- * from one halfway through its set.
+ * a confirmed event with nothing started is a different problem from one
+ * halfway through its set.
+ *
+ * An unconfirmed booking is never "no brief yet". Design takes events from
+ * the enquiry on, because a promoter's artwork can arrive with it, but a
+ * brief chased for a show that may not happen is work done on nothing — so
+ * the note says the booking is unconfirmed where it would give the date.
  */
 export function designQueueRow(e: DesignQueueEvent): DesignQueueRow {
   const left = ASSET_KEYS.filter((k) => stateOf(e.assets, k) !== 'approved').length
   const started = ASSET_KEYS.some((k) => stateOf(e.assets, k) !== 'draft')
-  const noBrief = e.stage === 2 && !started
+  const noBrief = e.confirmed && !started
 
   const note = noBrief
     ? 'no brief yet'
     : left
-      ? `${left} of ${ASSET_SET.length} left · ${e.dateLabel}`
+      ? `${left} of ${ASSET_SET.length} left · ${e.confirmed ? e.dateLabel : 'unconfirmed'}`
       : 'all signed off'
 
   const noteTone: Tone = noBrief

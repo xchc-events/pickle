@@ -328,6 +328,18 @@ enum BookingModel {
   CURATOR
 }
 
+/// Where the booking itself stands.
+///
+/// The only part of an event that is moved by hand. The other seven — design,
+/// promo, tickets, licence, tech, roster, settlement — have no status column:
+/// each is worked out from the records its own module keeps, so it cannot
+/// disagree with them. See src/lib/parts.ts.
+enum BookingStatus {
+  ENQUIRY
+  NEGOTIATING
+  CONFIRMED
+}
+
 /// Severity of the reason an event is flagged on the pipeline.
 enum RiskKind {
   WARN
@@ -389,11 +401,19 @@ model Event {
   promoterPayee Payee? @relation("EventPromoter", fields: [promoterId], references: [id])
   internal  Boolean  @default(false)
 
-  /// 0 enquiry … 7 settled. Transitions are gated — see `gatesFor` in
-  /// src/lib/event-record.ts.
-  stage     Int          @default(0)
-  /// When the event entered its current stage. Days-in-stage derives from
+  /// Where the booking stands. Moving it on is gated — see `nextMove` in
+  /// src/lib/parts.ts — and it only ever moves forward.
+  bookingStatus      BookingStatus @default(ENQUIRY)
+  /// When the booking reached its current status. Days-at-status derives from
   /// this — it is never stored, so it cannot go stale.
+  bookingStatusSince DateTime      @default(now())
+
+  /// Superseded by `bookingStatus` and the parts in src/lib/parts.ts, which
+  /// gave every event a status per part in place of one stage it moved
+  /// through in order. Kept for one release so the backfill can be checked
+  /// against it, then dropped. Nothing reads or writes it.
+  stage     Int          @default(0)
+  /// Superseded with `stage`, by `bookingStatusSince`.
   stageEnteredAt DateTime @default(now())
   concluded Boolean      @default(false)
   model     BookingModel @default(CURATOR)
@@ -490,6 +510,7 @@ model Event {
   updatedAt DateTime @updatedAt
 
   @@index([stage])
+  @@index([bookingStatus])
   @@index([date])
   @@index([promoter])
   @@index([promoterId])
