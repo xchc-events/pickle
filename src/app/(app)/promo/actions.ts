@@ -5,6 +5,10 @@ import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { BEATS, platformSpec } from '@/lib/promo'
+import { canGoOnSale, type BookingStatus } from '@/lib/parts'
+import { budgetToLock } from '@/lib/bar-data'
+import { nightFromBudget } from '@/lib/bar'
+import { money } from '@/lib/format'
 import { said, type Said } from '@/lib/toast'
 
 /**
@@ -21,12 +25,35 @@ import { said, type Said } from '@/lib/toast'
  * A manual channel records *who* ticked it off. That is the whole point of
  * the distinction: an auto-sync channel is answerable to the record, and a
  * manual one is answerable to a person.
+ *
+ * Gather.rsvp is the exception to "any channel, any time". It is where
+ * tickets are sold, and tickets do not go on sale until the booking is
+ * confirmed — the one order between an event's parts that still refuses.
+ * Every other listing may go out ahead of the booking; see src/lib/parts.ts.
+ *
+ * Its first push is also the moment the event goes on sale, which is when the
+ * bar budget locks. That used to happen on the move to the On sale stage;
+ * with the stages gone, it happens here, in the same transaction as the push.
  */
 export async function pushChannel(eventId: string, channel: string): Promise<Said> {
   const { user } = await requireModule('promo')
   const id = await requireEvent(user, eventId)
   const spec = platformSpec(channel)
   if (!spec) return said('We do not post to that.', 'stop')
+
+  const tickets =
+    channel === 'gather'
+      ? await db.event.findUniqueOrThrow({
+          where: { id },
+          select: { bookingStatus: true, barBudget: { select: { id: true } } },
+        })
+      : null
+  if (tickets) {
+    const sale = canGoOnSale({ booking: tickets.bookingStatus.toLowerCase() as BookingStatus })
+    if (!sale.ok) {
+      return said(`Nothing went live. ${sale.why} — confirm it on the event record first.`, 'stop')
+    }
+  }
 
   const existing = await db.channelPush.findUnique({
     where: { eventId_channel: { eventId: id, channel } },
@@ -41,11 +68,30 @@ export async function pushChannel(eventId: string, channel: string): Promise<Sai
     at: new Date(),
   }
 
-  await db.channelPush.upsert({
+  const push = db.channelPush.upsert({
     where: { eventId_channel: { eventId: id, channel } },
     create: { eventId: id, channel, ...data },
     update: data,
   })
+
+  // Tickets going on sale for the first time lock the bar budget, frozen at
+  // what was believed then — unless one exists already, from an earlier
+  // listing that was taken down. `update: {}` leaves a budget exactly as it
+  // was even if two pushes land at once: a budget is never rewritten. See
+  // src/lib/bar.ts.
+  const budget = tickets && first && !tickets.barBudget ? await budgetToLock(id) : null
+  if (budget) {
+    await db.$transaction([
+      push,
+      db.barBudget.upsert({
+        where: { eventId: id },
+        create: { eventId: id, ...budget, basis: 'ON_SALE', lockedBy: user.initials },
+        update: {},
+      }),
+    ])
+  } else {
+    await push
+  }
 
   await record(
     id,
@@ -54,6 +100,19 @@ export async function pushChannel(eventId: string, channel: string): Promise<Sai
       ? `marked ${spec.name} posted by hand`
       : `${first ? 'listed on' : 'pushed changes to'} ${spec.name}`,
   )
+
+  if (budget) {
+    const night = nightFromBudget(budget)
+    await record(
+      id,
+      user,
+      `locked the bar budget — ${budget.heads} heads at ${money(budget.spendPerHead)}, ${money(night.take)} over the bar, ${money(night.margin)} after stock`,
+    )
+    refresh()
+    return said(
+      `Tickets are on sale on ${spec.name}, and the bar budget is locked at ${money(night.margin)} after stock. The bar is measured against that from here.`,
+    )
+  }
 
   refresh()
   return said(

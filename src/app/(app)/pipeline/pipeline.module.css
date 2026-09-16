@@ -89,8 +89,10 @@
   overflow-x: auto;
 }
 
+/* Wider than the stage track needed: each cell now holds a word or two
+   rather than a tick. */
 .matrix {
-  min-width: 1050px;
+  min-width: 1120px;
 }
 
 .headRow {
@@ -201,42 +203,74 @@
   color: var(--st-stop);
 }
 
+/* A part's cell: its status, and a figure under it where there is one. The
+   five tones say where the part stands on its own — none of them is about
+   the part to its left. */
 .cell {
-  height: 26px;
+  height: 32px;
+  min-width: 0;
+  padding: 0 4px;
   border-radius: 5px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 10.5px;
+  gap: 1px;
   border: 1px solid transparent;
+  line-height: 1.15;
 }
 
-.done {
-  background: var(--color-accent-900);
-  border-color: var(--color-accent-800);
-  color: var(--color-accent-500);
+.cellStatus {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  font-size: 10.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.current {
-  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
-  border-color: var(--color-accent);
+.cellDetail {
+  max-width: 100%;
+  font-size: 9.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+}
+
+/* Finished. */
+.tone_good {
+  background: var(--st-good-dim);
+  border-color: color-mix(in srgb, var(--st-good) 40%, transparent);
+  color: var(--st-good);
+}
+
+/* Under way. */
+.tone_plain {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: var(--color-accent-700);
   color: var(--color-accent-100);
 }
 
-.ahead {
+/* Not started, or nothing to do on this event. */
+.tone_dim {
   background: transparent;
   border: 1px dashed var(--color-neutral-800);
-  color: transparent;
+  color: var(--color-neutral-600);
 }
 
-.warn .cellRisk {
-  background: color-mix(in srgb, var(--st-warn) 24%, transparent);
+/* Wants somebody's attention. */
+.tone_warn {
+  background: var(--st-warn-dim);
   border-color: var(--st-warn);
   color: var(--st-warn);
 }
 
-.stop .cellRisk {
-  background: color-mix(in srgb, var(--st-stop) 24%, transparent);
+/* Blocked outright. */
+.tone_stop {
+  background: var(--st-stop-dim);
   border-color: var(--st-stop);
   color: var(--st-stop);
 }
@@ -289,6 +323,35 @@
   padding: 26px 0;
   font-size: 12.5px;
   color: var(--color-neutral-600);
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--color-divider);
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.legendHint {
+  margin-left: auto;
 }
 
 /* --- below the matrix ----------------------------------------------- */

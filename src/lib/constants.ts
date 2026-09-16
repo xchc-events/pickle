@@ -2,47 +2,15 @@
  * Constants ported from the design prototype's script block
  * (docs/design-handoff/design/Pickle Prototype.dc.html, near line 2866).
  *
- * These are specification, like src/lib/finance.ts: the stage names, the
- * nicknames and the default permission sets are the product's own vocabulary.
- * Changing one changes what the venue calls things.
- */
-
-/** The eight stages an event moves through, enquiry to payout. */
-export const STAGES = [
-  'Enquiry',
-  'Negotiating',
-  'Confirmed',
-  'Design',
-  'On sale',
-  'Rostering',
-  'Show week',
-  'Payout',
-] as const
-
-/** The internal nicknames for each stage. Used on the event record. */
-export const NICK = [
-  'Fresh',
-  'Brining',
-  'Sealed',
-  'Labelling',
-  'On the Shelf',
-  'Crewing',
-  'Cracked',
-  'Tasting Notes',
-] as const
-
-/**
- * How many days an event should spend in each stage before someone looks at
- * it. 99 means "no target" — an event sits in On sale and Show week for as
- * long as the calendar says.
+ * These are specification, like src/lib/finance.ts: the module names and the
+ * default permission sets are the product's own vocabulary. Changing one
+ * changes what the venue calls things.
  *
- * In the prototype this array is declared but never read: the seed carries a
- * hand-written `risk` string instead. The rule it encodes is real, though —
- * `daysInStage > STAGE_TARGET[stage]` picks out exactly the seed events that
- * carry a risk note, and Home describes the at-risk count as "past their
- * stage target". See `isPastStageTarget` in src/lib/pipeline.ts.
+ * The eight stage names, their nicknames and their day targets used to live
+ * here too. Since 16 September 2026 an event carries a status per part rather
+ * than sitting at one stage; the booking kept the first three stages' names,
+ * nicknames and targets, and the parts the rest — all in src/lib/parts.ts.
  */
-export const STAGE_TARGET = [3, 7, 4, 5, 99, 4, 99, 7] as const
 
 export type ModuleKey =
   | 'home'

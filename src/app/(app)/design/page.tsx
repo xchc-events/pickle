@@ -103,7 +103,7 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                 <p className={`${styles.leadNote} ${event.leadName ? '' : styles.warn}`}>
                   {event.leadName
                     ? `${event.leadName} owns every asset on this event — sign-offs, re-cuts and the hours below all land on them.`
-                    : 'Nobody leads design on this event. The stage gate holds it here until someone does.'}
+                    : 'Nobody leads design on this event. Its design cannot be signed off until someone does.'}
                 </p>
               </div>
 

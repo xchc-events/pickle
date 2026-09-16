@@ -169,8 +169,8 @@ export default async function PromoPage({ searchParams }: PageProps<'/promo'>) {
                 </ActionButton>
               ))}
               <p className={styles.panelFoot}>
-                The first two beats are a stage gate — the event will not move off On sale until
-                they are worked.
+                The first two beats are gated — promotion is not finished on this event until they
+                are worked.
               </p>
             </section>
 

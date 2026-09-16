@@ -1,20 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import {
+  attentionOf,
   daysBetween,
-  isPastStageTarget,
   labourSplit,
   metaLine,
+  partHeads,
+  partTitle,
   pipelineMetrics,
   pipelineRows,
   pipelineSubline,
   projection,
-  stageCells,
-  stageCounts,
   type PipelineEvent,
 } from './pipeline'
+import { PARTS, type PartKey, type PartState } from './parts'
 import { eventScope } from './scope'
 import { initialsOf, money } from './format'
-import { STAGE_TARGET } from './constants'
+
+/**
+ * Eight finished parts, with whichever ones a test cares about overridden.
+ * The pipeline reads parts that src/lib/parts.ts has already worked out, so
+ * these tests hand it the result rather than the records behind it.
+ */
+const parts = (over: Partial<Record<PartKey, Partial<PartState>>> = {}): PartState[] =>
+  PARTS.map((p) => ({
+    ...p,
+    status: 'done',
+    detail: null,
+    tone: 'good',
+    applies: true,
+    clear: true,
+    done: true,
+    checks: [],
+    ...over[p.key],
+  }))
 
 const ev = (over: Partial<PipelineEvent> = {}): PipelineEvent => ({
   id: 'x',
@@ -23,9 +41,8 @@ const ev = (over: Partial<PipelineEvent> = {}): PipelineEvent => ({
   format: 'DJs',
   spaceName: 'Main',
   concluded: false,
-  stage: 3,
+  booking: 'confirmed',
   daysToDoor: 20,
-  daysInStage: 2,
   riskNote: null,
   riskKind: 'warn',
   ownerInitials: 'MT',
@@ -38,6 +55,7 @@ const ev = (over: Partial<PipelineEvent> = {}): PipelineEvent => ({
   hours: 0,
   taskHours: [],
   onSiteHours: 0,
+  parts: parts(),
   ...over,
 })
 
@@ -53,45 +71,22 @@ describe('daysBetween', () => {
   })
 })
 
-describe('stage targets', () => {
-  it('flags an event that has outstayed its stage', () => {
-    // Design has a 5-day target.
-    expect(STAGE_TARGET[3]).toBe(5)
-    expect(isPastStageTarget(3, 6)).toBe(true)
-    expect(isPastStageTarget(3, 5)).toBe(false)
-  })
-
-  it('never flags the stages with no target', () => {
-    // On sale and Show week run as long as the calendar says.
-    expect(isPastStageTarget(4, 40)).toBe(false)
-    expect(isPastStageTarget(6, 40)).toBe(false)
-  })
-
-  it('matches the seed events the prototype hand-flagged', () => {
-    // Every seed event carrying a risk note, and the two nearest that do not.
-    expect(isPastStageTarget(5, 6)).toBe(true) // Basement Sessions vol. 4
-    expect(isPastStageTarget(3, 6)).toBe(true) // Static Bloom
-    expect(isPastStageTarget(2, 9)).toBe(true) // Dust to Mountains
-    expect(isPastStageTarget(3, 2)).toBe(false) // Ōtautahi Bass Co-op
-    expect(isPastStageTarget(1, 3)).toBe(false) // Wax Lyrical #12
-  })
-})
-
 describe('projection', () => {
-  it('says modelling before terms are agreed', () => {
-    expect(projection(ev({ stage: 1, surplus: 9999 })).text).toBe('modelling')
+  it('says modelling before the booking is confirmed', () => {
+    expect(projection(ev({ booking: 'enquiry', surplus: 9999 })).text).toBe('modelling')
+    expect(projection(ev({ booking: 'negotiating', surplus: 9999 })).text).toBe('modelling')
   })
 
-  it('shows the projected surplus once past terms', () => {
-    expect(projection(ev({ stage: 2, surplus: 1200 }))).toEqual({
+  it('shows the projected surplus once the booking is confirmed', () => {
+    expect(projection(ev({ surplus: 1200 }))).toEqual({
       text: 'proj. $1,200',
       tone: 'good',
     })
   })
 
   it('does not call a thin surplus good', () => {
-    expect(projection(ev({ stage: 2, surplus: 500 })).tone).toBe('muted')
-    expect(projection(ev({ stage: 2, surplus: 501 })).tone).toBe('good')
+    expect(projection(ev({ surplus: 500 })).tone).toBe('muted')
+    expect(projection(ev({ surplus: 501 })).tone).toBe('good')
   })
 
   it('shows what a concluded event actually took', () => {
@@ -102,7 +97,7 @@ describe('projection', () => {
   })
 
   it('formats a loss with the sign outside the dollar', () => {
-    expect(projection(ev({ stage: 2, surplus: -320 })).text).toBe('proj. -$320')
+    expect(projection(ev({ surplus: -320 })).text).toBe('proj. -$320')
   })
 })
 
@@ -118,29 +113,105 @@ describe('metaLine', () => {
   })
 })
 
-describe('stageCells', () => {
-  it('ticks what is done, counts the current stage, leaves the rest blank', () => {
-    const cells = stageCells(2, 9, false)
-    expect(cells).toHaveLength(8)
-    expect(cells[0]).toMatchObject({ text: '✓', state: 'done' })
-    expect(cells[2]).toMatchObject({ text: '9d', state: 'current' })
-    expect(cells[3]).toMatchObject({ text: '', state: 'ahead' })
+describe('partTitle', () => {
+  it('says where the part stands and what holds it up', () => {
+    const p = parts({
+      design: {
+        status: '2 of 6',
+        detail: 'in review',
+        checks: [
+          { label: 'Design lead assigned', ok: true, why: '', screen: 'event' },
+          { label: 'Event cover signed off', ok: false, why: '', screen: 'design' },
+          { label: 'Listing copy signed off', ok: false, why: '', screen: 'design' },
+        ],
+      },
+    }).find((x) => x.key === 'design')!
+    expect(partTitle(p)).toBe(
+      'Design: 2 of 6, in review. 1 of 3 clear — held up by event cover signed off, listing copy signed off',
+    )
   })
 
-  it('colours only the current cell with the risk', () => {
-    const cells = stageCells(2, 9, true)
-    expect(cells[2].risky).toBe(true)
-    expect(cells.filter((c) => c.risky)).toHaveLength(1)
+  it('stops at the count when everything is clear', () => {
+    const p = parts({
+      roster: {
+        status: 'filled',
+        checks: [{ label: 'Every shift filled', ok: true, why: '', screen: 'roster' }],
+      },
+    }).find((x) => x.key === 'roster')!
+    expect(partTitle(p)).toBe('Roster: filled. 1 of 1 clear')
+  })
+
+  it('leaves the count off a part with no gates', () => {
+    const p = parts({ booking: { status: 'confirmed' } }).find((x) => x.key === 'booking')!
+    expect(partTitle(p)).toBe('Booking: confirmed')
+  })
+
+  it('leaves the gates off a part that is nothing to do yet', () => {
+    // A settlement before the night fails "Actuals in" by definition. Saying
+    // so on hover reads as something to chase when there is nothing to chase.
+    const p = parts({
+      settlement: {
+        status: 'not yet',
+        applies: false,
+        done: false,
+        checks: [{ label: 'Actuals in', ok: false, why: '', screen: 'event' }],
+      },
+    }).find((x) => x.key === 'settlement')!
+    expect(partTitle(p)).toBe('Settlement: not yet')
+  })
+
+  it('keeps a name a gate carries, lowering only the first letter', () => {
+    const p = parts({
+      tickets: {
+        status: 'priced',
+        checks: [{ label: 'Tickets live on Gather.rsvp', ok: false, why: '', screen: 'promo' }],
+      },
+    }).find((x) => x.key === 'tickets')!
+    expect(partTitle(p)).toBe(
+      'Tickets: priced. 0 of 1 clear — held up by tickets live on Gather.rsvp',
+    )
+  })
+})
+
+describe('attentionOf', () => {
+  it('counts a warning once and a blocked part twice', () => {
+    const e = ev({
+      parts: parts({
+        promo: { tone: 'warn' },
+        licence: { tone: 'stop' },
+        design: { tone: 'plain' },
+      }),
+    })
+    expect(attentionOf(e)).toBe(3)
+  })
+
+  it('adds the coordinator’s own flag, weighted the same way', () => {
+    expect(attentionOf(ev({ riskNote: 'stuck', riskKind: 'warn' }))).toBe(1)
+    expect(attentionOf(ev({ riskNote: 'stuck', riskKind: 'stop' }))).toBe(2)
+  })
+
+  it('is zero for an event nothing is wrong with', () => {
+    expect(attentionOf(ev())).toBe(0)
   })
 })
 
 describe('pipelineRows', () => {
   const all = [
-    ev({ id: 'near', daysToDoor: 3, daysInStage: 1, ownerInitials: 'AK' }),
-    ev({ id: 'far', daysToDoor: 60, daysInStage: 9, ownerInitials: 'MT' }),
-    ev({ id: 'risky', daysToDoor: 20, daysInStage: 6, riskNote: 'stuck', ownerInitials: 'MT' }),
-    ev({ id: 'mid', daysToDoor: 8, daysInStage: 2, ownerInitials: 'AK' }),
-    ev({ id: 'done', daysToDoor: -8, daysInStage: 2, concluded: true }),
+    ev({ id: 'near', daysToDoor: 3, ownerInitials: 'AK' }),
+    ev({
+      id: 'far',
+      daysToDoor: 60,
+      ownerInitials: 'MT',
+      parts: parts({ licence: { tone: 'stop' } }),
+    }),
+    ev({ id: 'risky', daysToDoor: 20, riskNote: 'stuck', ownerInitials: 'MT' }),
+    ev({
+      id: 'mid',
+      daysToDoor: 8,
+      ownerInitials: 'AK',
+      parts: parts({ promo: { tone: 'warn' } }),
+    }),
+    ev({ id: 'done', daysToDoor: -8, concluded: true }),
   ]
   const base = { status: 'all', sort: 'door', meInitials: 'MT' } as const
 
@@ -152,9 +223,9 @@ describe('pipelineRows', () => {
     expect(pipelineRows(all, base).map((r) => r.id)).toEqual(['near', 'mid', 'risky', 'far'])
   })
 
-  it('sorts by time stuck when asked', () => {
-    const rows = pipelineRows(all, { ...base, sort: 'stuck' })
-    expect(rows.map((r) => r.daysInStage)).toEqual([9, 6, 2, 1])
+  it('sorts by what needs attention, soonest door first among equals', () => {
+    const rows = pipelineRows(all, { ...base, sort: 'attention' })
+    expect(rows.map((r) => r.id)).toEqual(['far', 'mid', 'risky', 'near'])
   })
 
   it('filters to mine by owner', () => {
@@ -189,23 +260,33 @@ describe('pipelineRows', () => {
 
   it('does not mutate the array it is given', () => {
     const before = all.map((e) => e.id)
-    pipelineRows(all, { ...base, sort: 'stuck' })
+    pipelineRows(all, { ...base, sort: 'attention' })
     expect(all.map((e) => e.id)).toEqual(before)
   })
 })
 
-describe('stageCounts', () => {
-  it('counts live events per stage and ignores concluded ones', () => {
-    const counts = stageCounts([
-      ev({ stage: 0 }),
-      ev({ stage: 0 }),
-      ev({ stage: 4 }),
-      ev({ stage: 7, concluded: true }),
+describe('partHeads', () => {
+  it('counts, per part, the live events still to finish it', () => {
+    const heads = partHeads([
+      ev({ parts: parts({ design: { done: false }, tickets: { done: false } }) }),
+      ev({ parts: parts({ design: { done: false } }) }),
+      ev({ parts: parts({ design: { done: false } }), concluded: true }),
     ])
-    expect(counts).toHaveLength(8)
-    expect(counts[0]).toEqual({ label: 'Enquiry', count: 2 })
-    expect(counts[4]).toEqual({ label: 'On sale', count: 1 })
-    expect(counts[7]).toEqual({ label: 'Payout', count: 0 })
+    expect(heads).toHaveLength(8)
+    expect(heads.map((h) => h.label)).toEqual(PARTS.map((p) => p.label))
+    expect(heads.find((h) => h.key === 'design')!.toGo).toBe(2)
+    expect(heads.find((h) => h.key === 'tickets')!.toGo).toBe(1)
+    expect(heads.find((h) => h.key === 'roster')!.toGo).toBe(0)
+  })
+
+  it('does not count a part that is nothing to do on that event', () => {
+    // A licence the bar close does not need is not a licence still to get.
+    const heads = partHeads([ev({ parts: parts({ licence: { done: false, applies: false } }) })])
+    expect(heads.find((h) => h.key === 'licence')!.toGo).toBe(0)
+  })
+
+  it('carries the stage nickname a part inherited, for the column head', () => {
+    expect(partHeads([]).find((h) => h.key === 'design')!.nick).toBe('Labelling')
   })
 })
 
@@ -254,8 +335,12 @@ describe('labourSplit', () => {
 })
 
 describe('pipelineMetrics', () => {
-  it('counts anything past terms-agreed towards the cost base', () => {
-    const m = pipelineMetrics([ev({ stage: 2 }), ev({ stage: 5 }), ev({ stage: 1 })])
+  it('counts confirmed bookings towards the cost base, whatever else is unfinished', () => {
+    const m = pipelineMetrics([
+      ev({ booking: 'confirmed', parts: parts({ design: { done: false } }) }),
+      ev({ booking: 'confirmed' }),
+      ev({ booking: 'negotiating' }),
+    ])
     expect(m[3].value).toBe('2 of 18')
     expect(m[3].sub).toBe('covers 11% of the base')
   })

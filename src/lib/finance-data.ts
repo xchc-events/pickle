@@ -56,7 +56,7 @@ export interface FinanceEvent {
   id: string
   name: string
   date: string
-  stage: number
+  concluded: boolean
   payables: PayableRow[]
 }
 
@@ -130,11 +130,11 @@ export async function loadFinance(
   wantedId: string | undefined,
   reveal: { allowed: boolean; why: string | null },
 ): Promise<FinanceLoad> {
-  // Confirmed onwards, and concluded events too — a show is not finished for
+  // Confirmed bookings, and concluded events too — a show is not finished for
   // Finance until it has been paid for, which happens after everyone else has
   // stopped looking at it.
   const events = await db.event.findMany({
-    where: { AND: [{ stage: { gte: 2 } }, eventScope(user)] },
+    where: { AND: [{ bookingStatus: 'CONFIRMED' }, eventScope(user)] },
     orderBy: { date: 'desc' },
     select: {
       id: true,
@@ -205,7 +205,7 @@ export async function loadFinance(
       id: row.id,
       name: row.name,
       date: dateLabel(row.date),
-      stage: row.stage,
+      concluded: row.concluded,
       payables,
     },
   }

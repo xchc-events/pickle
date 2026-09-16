@@ -82,7 +82,7 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
       ...FINANCE_SELECT,
       id: true,
       actual: true,
-      stage: true,
+      bookingStatus: true,
       model: true,
       depositRaisedAt: true,
       invoiceRaisedAt: true,
@@ -154,7 +154,7 @@ export async function settlementFor(eventId: string): Promise<Settlement | null>
       retained: vals.ours,
     },
     milestones: milestonesFor(model, {
-      stage: row.stage,
+      confirmed: row.bookingStatus === 'CONFIRMED',
       depositRaised: row.depositRaisedAt !== null,
       invoiceRaised: row.invoiceRaisedAt !== null,
       review: state,

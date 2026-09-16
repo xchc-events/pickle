@@ -63,6 +63,15 @@ a subscription to Prism:
 Keep these. They are the differentiator, and none of what follows should be
 built in a way that weakens them.
 
+**Updated 16 September 2026.** The stage gates are now held by eight parts of
+an event rather than eight stages it moves through in order — see the note
+under Pipeline in `design-handoff/README.md`. Every named, deep-linked condition
+survives, and moving a booking on or putting a night to bed still refuses while
+one fails; what the venue decided to drop is the order between departments,
+because tickets go on sale before the artwork is finished and promoters send
+artwork with the enquiry. The one cross-part rule kept is that tickets wait for
+a confirmed booking.
+
 ---
 
 ## P0 — The pipeline cannot currently finish
@@ -468,7 +477,10 @@ the copy, or filter to the month.
 [pipeline.ts:194-209](../src/lib/pipeline.ts:194) — "11 days" and "9 days",
 honestly marked `placeholder: true`. They need stage-transition history. Since
 `stageEnteredAt` already exists, recording transitions to an append-only table
-would make both real and cost little. **Note the interaction with PG-4:** a
+would make both real and cost little. **Updated 16 September 2026:** `stageEnteredAt` is
+superseded by `bookingStatusSince`, and a show goes on sale when Gather.rsvp
+does — whose `ChannelPush.at` is already recorded — so both intervals now have
+a start and an end on the record; what is still missing is the history of each. **Note the interaction with PG-4:** a
 holds ladder gives you the enquiry→confirm interval for free.
 
 ### PG-18 — External promoters see our cost-base coverage

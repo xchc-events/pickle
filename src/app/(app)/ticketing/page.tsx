@@ -52,8 +52,8 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
 
       {event === null ? (
         <p className={styles.empty}>
-          Nothing to price. Events appear here once terms are agreed — setting a ticket price for a
-          show that has not been confirmed is pricing something that may not happen.
+          Nothing to price. Events appear here from the enquiry on — a price can be modelled while
+          the terms are, but tickets do not go on sale until the booking is confirmed.
         </p>
       ) : (
         <div className={styles.body}>
@@ -61,7 +61,8 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
             <div>
               <h2 className={styles.eventName}>{event.name}</h2>
               <span className={styles.eventMeta}>
-                {event.date} · {event.spaceName} · {event.format} · {event.stageLabel}
+                {event.date} · {event.spaceName} · {event.format} · booking{' '}
+                {event.bookingLabel.toLowerCase()}
               </span>
             </div>
             <span className={event.onSale ? styles.live : styles.notLive}>
@@ -69,7 +70,11 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
                 className={`ph ${event.onSale ? 'ph-check-circle' : 'ph-clock'}`}
                 aria-hidden="true"
               />
-              {event.onSale ? 'live on Gather.rsvp' : 'not pushed to Gather yet'}
+              {event.onSale
+                ? 'live on Gather.rsvp'
+                : event.confirmed
+                  ? 'not pushed to Gather yet'
+                  : 'cannot go on sale until the booking is confirmed'}
             </span>
           </div>
 

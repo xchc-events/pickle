@@ -68,7 +68,7 @@ describe('holdsMilestones', () => {
 
 describe('milestonesFor', () => {
   const base = {
-    stage: 4,
+    confirmed: true,
     depositRaised: false,
     invoiceRaised: false,
     review: 'approved' as ReviewState,
@@ -88,12 +88,16 @@ describe('milestonesFor', () => {
     expect(enq.action).toBeNull()
   })
 
-  it('completes booking-confirmed at stage 2, and says who signs it off before then', () => {
-    const before = milestonesFor('curator', { ...base, stage: 1 }).find((m) => m.key === 'conf')!
+  it('completes booking-confirmed with the booking, and says who signs it off before then', () => {
+    const before = milestonesFor('curator', { ...base, confirmed: false }).find(
+      (m) => m.key === 'conf',
+    )!
     expect(before.done).toBe(false)
     expect(before.note).toBe('not yet — finance signs off here')
 
-    const after = milestonesFor('curator', { ...base, stage: 2 }).find((m) => m.key === 'conf')!
+    const after = milestonesFor('curator', { ...base, confirmed: true }).find(
+      (m) => m.key === 'conf',
+    )!
     expect(after.done).toBe(true)
   })
 
