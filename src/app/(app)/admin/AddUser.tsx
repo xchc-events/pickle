@@ -10,10 +10,10 @@ import styles from './admin.module.css'
 /**
  * Adding somebody.
  *
- * The address is the identifying field, because it is what the provider will
- * hand back when they sign in — a mismatch of one character means they are
- * refused with no way for them to tell why. Everything else can be corrected
- * afterwards from the list above.
+ * The address is the identifying field, because it is what they sign in with
+ * and where their invitation goes — a mismatch of one character means the
+ * invitation reaches nobody. Everything else can be corrected afterwards from
+ * the list above.
  */
 export function AddUser({
   roles,
@@ -125,6 +125,13 @@ export function AddUser({
           </select>
         </label>
       )}
+
+      {/* On by default: an account nobody has been told about is an account
+          nobody uses. Off for somebody who will be told in person first. */}
+      <label className={styles.check}>
+        <input type="checkbox" name="invite" defaultChecked />
+        Email an invitation
+      </label>
 
       <button type="submit" className={styles.addButton} disabled={pending}>
         <i className="ph ph-user-plus" aria-hidden="true" />

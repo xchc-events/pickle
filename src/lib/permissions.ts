@@ -29,6 +29,19 @@ export async function canSee(user: SessionUser, moduleKey: ModuleKey): Promise<b
 }
 
 /**
+ * Gate a page or a server function on being signed in at all.
+ *
+ * For the few things that belong to every account rather than to a module —
+ * a person's own password and sessions. Everything else goes through
+ * `requireModule`.
+ */
+export async function requireUser(): Promise<SessionUser> {
+  const user = await currentUser()
+  if (!user) redirect('/sign-in')
+  return user
+}
+
+/**
  * Gate a page or a server function on a module.
  *
  * Denial is a 404, not a 403: whether a module exists is itself something an
