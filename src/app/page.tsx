@@ -12,7 +12,7 @@ import styles from './landing.module.css'
  * Not every role can see Pipeline — Bar & duty manager cannot — so this picks
  * the first module their role actually reaches rather than sending everybody
  * to one URL and 404ing half of them. Sign-in redirects here for that reason;
- * see `SignInByEmail` in src/app/sign-in/Providers.tsx.
+ * see src/app/sign-in/actions.ts.
  */
 /**
  * Never prerendered.

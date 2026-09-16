@@ -37,11 +37,12 @@ export type Verdict = { ok: true } | { ok: false; why: string }
  *  2. Nobody outside the venue, whatever their module rows say. A promoter
  *     enters their own details and never reads them back — not their own,
  *     and certainly not an artist's.
- *  3. A real session. This is the one that is not about the user: until
- *     Auth.js replaces the cookie stub, anybody who can set a cookie can be
- *     the finance lead, so in production the answer is no regardless of who
- *     the cookie claims to be. Development is exempt so the module can be
- *     built and demonstrated against seed data.
+ *  3. A real session. This is the one that is not about the user: the
+ *     development role picker is a cookie anybody could set, so without a
+ *     session opened by a password or an emailed link the answer in
+ *     production is no, regardless of who the cookie claims to be.
+ *     Development is exempt so the module can be built and demonstrated
+ *     against seed data.
  */
 export function canReveal(ctx: RevealContext): Verdict {
   if (!ctx.modules.includes('finance')) {

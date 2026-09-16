@@ -5,7 +5,7 @@ import { dateLabel, money } from './format'
 import { financeVals, type Scenario } from './finance'
 import { financeInputFor, orgShareFor, scenarioOf } from './finance-input'
 import { capacityOf, mixProblem, normaliseMix, paceOf, sellThrough, tierTable } from './ticketing'
-import { STAGES } from './constants'
+import { bookingStep, type BookingStatus } from './parts'
 import type { SessionUser } from './session'
 
 /**
@@ -45,8 +45,9 @@ export interface TicketEvent {
   date: string
   spaceName: string
   format: string
-  stage: number
-  stageLabel: string
+  /** "Negotiating", "Confirmed". Tickets wait for the second. */
+  bookingLabel: string
+  confirmed: boolean
   onSale: boolean
 
   std: number
@@ -98,10 +99,13 @@ export async function loadTicketing(
   user: SessionUser,
   wantedId: string | undefined,
 ): Promise<TicketingLoad> {
-  // Confirmed onwards. Pricing an event that has not been agreed is pricing
-  // a show that may not happen.
+  // Every live event, from the enquiry on. This used to start at Confirmed so
+  // nobody priced a show that may not happen, but the terms a booking is
+  // confirmed on are worked out from its ticket price — so the price has to
+  // be settable while they are. What waits for confirmation is going on sale,
+  // and that is refused where Gather.rsvp is pushed rather than hidden here.
   const rows = await db.event.findMany({
-    where: { AND: [{ stage: { gte: 2 }, concluded: false }, eventScope(user)] },
+    where: { AND: [{ concluded: false }, eventScope(user)] },
     orderBy: { date: 'asc' },
     include: EVENT_INCLUDE,
     take: 30,
@@ -110,7 +114,9 @@ export async function loadTicketing(
   const queue: TicketQueueRow[] = rows.map((e) => {
     const capacity = capacityOf(e.space, e.format)
     const pct = sellThrough(e.sold, capacity)
-    const onSale = e.stage >= 4
+    // Gather.rsvp is the source of truth; EVENT_INCLUDE reads only its row.
+    const onSale = e.channels.some((c) => c.live)
+    const confirmed = e.bookingStatus === 'CONFIRMED'
 
     return {
       id: e.id,
@@ -120,8 +126,16 @@ export async function loadTicketing(
       capacity,
       pct,
       onSale,
-      note: onSale ? `${e.sold} of ${capacity}` : 'not on sale yet',
-      tone: !onSale ? 'warn' : pct >= 70 ? 'good' : pct > 0 ? 'plain' : 'stop',
+      note: onSale ? `${e.sold} of ${capacity}` : confirmed ? 'not on sale yet' : 'unconfirmed',
+      tone: onSale
+        ? pct >= 70
+          ? 'good'
+          : pct > 0
+            ? 'plain'
+            : 'stop'
+        : confirmed
+          ? 'warn'
+          : 'plain',
     }
   })
 
@@ -150,8 +164,8 @@ export async function loadTicketing(
       date: dateLabel(row.date),
       spaceName: row.space.name,
       format: row.format,
-      stage: row.stage,
-      stageLabel: STAGES[row.stage] ?? '—',
+      bookingLabel: bookingStep(row.bookingStatus.toLowerCase() as BookingStatus).label,
+      confirmed: row.bookingStatus === 'CONFIRMED',
       onSale: row.channels.some((c) => c.live),
 
       std: row.std,

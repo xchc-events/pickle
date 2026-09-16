@@ -93,10 +93,11 @@ export async function loadTech(
   wantedId: string | undefined,
   storageReady: boolean,
 ): Promise<TechLoad> {
-  // Confirmed onwards. Rigging an event that has not been agreed is work done
-  // on a show that may not happen.
+  // Every live event, confirmed or not. Tech used to start at Confirmed; each
+  // part of an event now moves on its own, and riders and stage plots arrive
+  // when they arrive — often with the enquiry.
   const events = await db.event.findMany({
-    where: { AND: [{ stage: { gte: 2 }, concluded: false }, eventScope(user)] },
+    where: { AND: [{ concluded: false }, eventScope(user)] },
     orderBy: { date: 'asc' },
     select: { id: true, name: true, date: true },
     take: 30,

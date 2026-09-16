@@ -99,8 +99,19 @@ type SeedEvent = {
   name: string
   dow: string
   days: number
-  stage: number
-  stageDays: number
+  /// Where the booking stands. Every other part of the event is worked out
+  /// from the rows below, as the product works it out — see src/lib/parts.ts.
+  booking: 'enquiry' | 'negotiating' | 'confirmed'
+  /// Days since this event last moved on. Listings, the review and the first
+  /// activity line are dated off it.
+  sinceDays: number
+  /// Design has been briefed: a piece of the set is up for sign-off, design
+  /// and tech have leads, and four acts are confirmed rather than two.
+  briefed?: boolean
+  /// Tickets are live on Gather.rsvp, with what goes with going on sale: the
+  /// hand-posted listings ticked off, the first two beats worked, a promo
+  /// lead, a finance review signed and a locked bar budget.
+  onSale?: boolean
   format: string
   kind: string
   space?: string
@@ -120,6 +131,9 @@ type SeedEvent = {
   /// How many pieces of the design set are signed off. The next one along is
   /// the one up for sign-off; everything after it is still a draft.
   approved?: number
+  /// Pieces of the set already in, whatever the booking says — a promoter's
+  /// tour artwork arrives with the enquiry. Applied over `approved`.
+  pieces?: Record<string, 'REVIEW' | 'APPROVED'>
   /// The creative one-liner, where the coordinator has written one.
   brief?: string
   att?: [number, number, number]
@@ -161,8 +175,10 @@ const EVENTS: SeedEvent[] = [
     owner: 'AK',
     dow: 'Sun',
     days: 3,
-    stage: 6,
-    stageDays: 1,
+    booking: 'confirmed',
+    sinceDays: 1,
+    briefed: true,
+    onSale: true,
     format: 'Cabaret',
     std: 25,
     door: 35,
@@ -183,8 +199,10 @@ const EVENTS: SeedEvent[] = [
     owner: 'MT',
     dow: 'Fri',
     days: 8,
-    stage: 5,
-    stageDays: 6,
+    booking: 'confirmed',
+    sinceDays: 6,
+    briefed: true,
+    onSale: true,
     format: 'DJs',
     sold: 96,
     kind: 'djs',
@@ -202,8 +220,10 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Kōura Records',
     dow: 'Sat',
     days: 16,
-    stage: 4,
-    stageDays: 4,
+    booking: 'confirmed',
+    sinceDays: 4,
+    briefed: true,
+    onSale: true,
     format: 'Live music',
     owner: 'MT',
     kind: 'live',
@@ -235,8 +255,10 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Hex Collective',
     dow: 'Sat',
     days: 23,
-    stage: 3,
-    stageDays: 6,
+    booking: 'confirmed',
+    sinceDays: 6,
+    briefed: true,
+    onSale: true,
     format: 'DJs + live',
     owner: 'JR',
     sold: 12,
@@ -253,8 +275,10 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Puha Sound',
     dow: 'Fri',
     days: 29,
-    stage: 3,
-    stageDays: 2,
+    booking: 'confirmed',
+    sinceDays: 2,
+    briefed: true,
+    onSale: true,
     format: 'DJs',
     owner: 'SP',
     sold: 31,
@@ -270,8 +294,8 @@ const EVENTS: SeedEvent[] = [
     owner: 'JR',
     dow: 'Thu',
     days: 35,
-    stage: 2,
-    stageDays: 9,
+    booking: 'confirmed',
+    sinceDays: 9,
     format: 'Live music',
     kind: 'live',
     risk: 'Confirmed 9d, no creative brief yet',
@@ -284,8 +308,8 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Puha Sound',
     dow: 'Sat',
     days: 37,
-    stage: 1,
-    stageDays: 3,
+    booking: 'negotiating',
+    sinceDays: 3,
     format: 'DJs',
     owner: 'SP',
     kind: 'djs',
@@ -299,8 +323,8 @@ const EVENTS: SeedEvent[] = [
     owner: 'AK',
     dow: 'Wed',
     days: 41,
-    stage: 1,
-    stageDays: 1,
+    booking: 'negotiating',
+    sinceDays: 1,
     format: 'Cabaret',
     std: 20,
     door: 25,
@@ -317,8 +341,8 @@ const EVENTS: SeedEvent[] = [
     owner: null,
     dow: 'Tue',
     days: 12,
-    stage: 0,
-    stageDays: 2,
+    booking: 'enquiry',
+    sinceDays: 2,
     format: 'Cabaret',
     std: 0,
     door: 0,
@@ -331,10 +355,14 @@ const EVENTS: SeedEvent[] = [
     name: 'Nightshade (Halloween)',
     approved: 0,
     promoter: 'Hex Collective',
+    // Hex sent the cover and the story cut for their whole Halloween run
+    // with the enquiry. They are up for sign-off before any terms are
+    // agreed — design no longer waits on the booking.
+    pieces: { cover: 'REVIEW', story: 'REVIEW' },
     dow: 'Fri',
     days: 71,
-    stage: 0,
-    stageDays: 1,
+    booking: 'enquiry',
+    sinceDays: 1,
     format: 'DJs + live',
     owner: null,
     kind: 'live-djs',
@@ -346,8 +374,10 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Kōura Records',
     dow: 'Fri',
     days: 8,
-    stage: 4,
-    stageDays: 3,
+    booking: 'confirmed',
+    sinceDays: 3,
+    briefed: true,
+    onSale: true,
     format: 'Cabaret',
     kind: 'live',
     std: 22,
@@ -370,8 +400,10 @@ const EVENTS: SeedEvent[] = [
     owner: 'AK',
     dow: 'Sun',
     days: -14,
-    stage: 7,
-    stageDays: 4,
+    booking: 'confirmed',
+    sinceDays: 4,
+    briefed: true,
+    onSale: true,
     format: 'Cabaret',
     std: 25,
     door: 30,
@@ -392,8 +424,10 @@ const EVENTS: SeedEvent[] = [
     promoter: 'Puha Sound',
     dow: 'Sat',
     days: -8,
-    stage: 7,
-    stageDays: 2,
+    booking: 'confirmed',
+    sinceDays: 2,
+    briefed: true,
+    onSale: true,
     format: 'DJs',
     sold: 164,
     kind: 'djs',
@@ -588,8 +622,8 @@ async function main() {
         ownerId: e.owner ? (personByInitials.get(e.owner) ?? null) : null,
         promoter: e.promoter,
         internal: e.internal ?? false,
-        stage: e.stage,
-        stageEnteredAt: addDays(today, -e.stageDays),
+        bookingStatus: e.booking.toUpperCase() as never,
+        bookingStatusSince: addDays(today, -e.sinceDays),
         concluded: e.concluded ?? false,
         // Seed events obc, wl and vs7 are dry hire; everything else curator.
         model: ['obc', 'wl', 'vs7'].includes(e.id) ? 'DRY' : 'CURATOR',
@@ -618,8 +652,8 @@ async function main() {
       },
     })
 
-    // Artists. Status follows the prototype: past Design the first four are
-    // confirmed and the rest pencilled; before it, the first two are confirmed.
+    // Artists. Status follows the prototype: once the creative is briefed the
+    // first four are confirmed and the rest pencilled; before it, the first two.
     const pa = e.pa ?? DEFAULT_PA
     await db.eventArtist.createMany({
       data: pa.map((p, i) => ({
@@ -628,7 +662,7 @@ async function main() {
         low: p.low,
         high: p.high,
         order: i,
-        status: (e.stage >= 3
+        status: (e.briefed
           ? i < 4
             ? 'CONFIRMED'
             : 'PENCILLED'
@@ -689,14 +723,20 @@ async function main() {
       }
     }
 
-    // The bar budget, for every event already on sale — locked as the move to
-    // On sale locks it in the product (src/app/(app)/events/[id]/actions.ts),
-    // off the settlement's own figures. Only `att`, `scen` and `barHead` reach
+    // When tickets went live. Three weeks before the night, but never later
+    // than this event last moved on.
+    const onSaleAt = new Date(
+      Math.min(addDays(today, -e.sinceDays).getTime(), addDays(date, -21).getTime()),
+    )
+
+    // The bar budget, for every event already on sale — locked as tickets
+    // going live locks it in the product (`pushChannel`, in
+    // src/app/(app)/promo/actions.ts), off the settlement's own figures. Only `att`, `scen` and `barHead` reach
     // the two figures a budget takes from `financeVals` — heads and the bar
     // margin line — so the rest of the input is zero rather than assembled for
     // a projection nothing here reads. Nobody's initials, as with the actuals:
     // the seed locked nothing.
-    if (e.stage >= 4) {
+    if (e.onSale) {
       const barHead = e.barHead ?? 20
       const vals = financeVals({
         dow: date.getDay(),
@@ -719,36 +759,30 @@ async function main() {
         orgShareHours: 0,
       })
       const labourHours = plan.filter((s) => isBarRole(s.role)).reduce((n, s) => n + s.hours, 0)
-      // When it went on sale: the day it entered the stage for an event still
-      // there; three weeks before the night for one that has moved on, but
-      // never later than the stage it is in now began.
-      const lockedAt =
-        e.stage === 4
-          ? addDays(today, -e.stageDays)
-          : new Date(Math.min(addDays(today, -e.stageDays).getTime(), addDays(date, -21).getTime()))
 
       await db.barBudget.create({
         data: {
           eventId: created.id,
           ...barBudgetFrom({ vals, barHead, labourHours }),
           basis: 'ON_SALE',
-          lockedAt,
+          lockedAt: onSaleAt,
         },
       })
     }
 
-    // Department leads. The prototype hands them out by stage: ticketing at
-    // confirmation, design and tech when the creative starts, promo when it
-    // goes on sale. Anything earlier than its stage has nobody, which is what
-    // the gates test for.
-    const leads: [string, string, number][] = [
-      ['TICKETING', 'MT', 2],
-      ['DESIGN', 'TW', 3],
-      ['PROMO', 'TW', 4],
-      ['TECH', 'JR', 3],
+    // Department leads, handed out as the prototype hands them out: ticketing
+    // at confirmation, design and tech when the creative is briefed, promo when
+    // tickets go on sale. A part that has not got there has nobody, which is
+    // what its gates test for.
+    const confirmed = e.booking === 'confirmed'
+    const leads: [string, string, boolean][] = [
+      ['TICKETING', 'MT', confirmed],
+      ['DESIGN', 'TW', e.briefed ?? false],
+      ['PROMO', 'TW', e.onSale ?? false],
+      ['TECH', 'JR', e.briefed ?? false],
     ]
-    for (const [role, who, from] of leads) {
-      if (e.stage < from) continue
+    for (const [role, who, has] of leads) {
+      if (!has) continue
       const personId = personByInitials.get(who)
       if (!personId) continue
       await db.eventLead.create({
@@ -757,30 +791,34 @@ async function main() {
     }
 
     // The design set. `approved` pieces are signed off and the next one along
-    // is the one up for sign-off — but only once the event has reached Design.
-    // An event sitting at Confirmed has nothing in front of anyone yet, which
-    // is what "no creative brief yet" on the pipeline is describing.
+    // is the one up for sign-off — but only once the creative is briefed. A
+    // confirmed event with nothing briefed has nothing in front of anyone yet,
+    // which is what "no creative brief yet" on the pipeline is describing.
+    // Pieces a promoter sent early are in whatever the booking says.
     const signedOff = e.approved ?? 0
-    const briefed = e.stage >= 3
     await db.asset.createMany({
       data: ASSET_SET.map((a, i) => ({
         eventId: created.id,
         key: a.key,
-        state: (i < signedOff
-          ? 'APPROVED'
-          : i === signedOff && briefed
-            ? 'REVIEW'
-            : 'DRAFT') as never,
+        state: (e.pieces?.[a.key] ??
+          (i < signedOff
+            ? 'APPROVED'
+            : i === signedOff && e.briefed
+              ? 'REVIEW'
+              : 'DRAFT')) as never,
       })),
     })
 
-    // Channel spread. Everything that syncs itself goes out at confirmation;
-    // the two that need a human are only ticked off once the event is on sale.
+    // Channel spread. Everything that syncs itself goes out at confirmation,
+    // except Gather.rsvp: that is the tickets, and it is live only once the
+    // event is on sale. The two listings that need a human are ticked off then
+    // too.
     const twId = personByInitials.get('TW') ?? null
     await db.channelPush.createMany({
       data: PLATFORMS.map((pl) => {
         const auto = pl.kind === 'api'
-        const live = e.stage >= 2 && (auto || e.stage >= 4)
+        const live =
+          pl.key === 'gather' ? (e.onSale ?? false) : confirmed && (auto || (e.onSale ?? false))
         const byHand = live && !auto
         return {
           eventId: created.id,
@@ -789,7 +827,11 @@ async function main() {
           stale: false,
           note: channelNote(e, pl.key, cap),
           byId: byHand ? twId : null,
-          at: live ? addDays(today, -e.stageDays) : null,
+          at: live
+            ? pl.key === 'gather' || byHand
+              ? onSaleAt
+              : addDays(today, -e.sinceDays)
+            : null,
         }
       }),
     })
@@ -808,7 +850,7 @@ async function main() {
         eventId: created.id,
         key: b.key,
         // Announce and on sale are worked by the time tickets are live.
-        done: e.stage >= 4 && i < 2,
+        done: (e.onSale ?? false) && i < 2,
       })),
     })
 
@@ -832,9 +874,9 @@ async function main() {
     await db.financeReview.create({
       data: {
         eventId: created.id,
-        state: e.stage >= 4 || e.concluded ? 'APPROVED' : 'PENDING',
-        by: e.stage >= 4 || e.concluded ? 'SL' : null,
-        when: e.stage >= 4 || e.concluded ? addDays(today, -e.stageDays) : null,
+        state: e.onSale || e.concluded ? 'APPROVED' : 'PENDING',
+        by: e.onSale || e.concluded ? 'SL' : null,
+        when: e.onSale || e.concluded ? onSaleAt : null,
       },
     })
 
@@ -843,7 +885,7 @@ async function main() {
         eventId: created.id,
         who: '—',
         text: 'Event record created from the seed',
-        at: addDays(today, -e.stageDays),
+        at: addDays(today, -e.sinceDays),
       },
     })
   }

@@ -9,13 +9,22 @@
 .title {
   font-size: 27px;
   letter-spacing: -0.02em;
-  margin: 22px 0 6px;
+  margin: 22px 0 18px;
 }
 
 .blurb {
-  font-size: 13px;
-  color: var(--color-neutral-400);
-  margin: 0 0 18px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-neutral-600);
+  margin: 22px 0 0;
+  text-wrap: pretty;
+}
+
+.note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--st-warn);
+  margin: 14px 0 0;
 }
 
 .list {
@@ -75,73 +84,51 @@
   text-wrap: pretty;
 }
 
-/* --- real sign-in ------------------------------------------------------- */
+/* --- the forms ---------------------------------------------------------- */
 
-.providers {
+.form {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  width: 100%;
-  max-width: 340px;
-  margin-bottom: 28px;
 }
 
-.provider {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  font: inherit;
-  font-size: 14px;
-  font-family: var(--font-heading);
-  color: var(--color-accent-100);
-  background: var(--color-accent-700);
-  border: 1px solid var(--color-accent-600);
-  border-radius: var(--radius-sm);
-  padding: 11px 16px;
-  cursor: pointer;
-}
-
-.provider:hover {
-  background: var(--color-accent-600);
-}
-
-.providerNote {
-  margin: 5px 0 0;
-  font-size: 11px;
-  color: var(--color-neutral-600);
-  text-align: center;
-}
-
-.emailForm {
+.field {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
 
-.emailLabel {
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.label {
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-neutral-600);
 }
 
-.emailRow {
-  display: flex;
-  gap: 6px;
+.aside,
+.asideButton {
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--color-accent-300);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
-.emailRow .provider {
-  width: auto;
-  flex: none;
-  font-size: 12.5px;
-  padding: 9px 13px;
+.aside:hover,
+.asideButton:hover {
+  color: var(--color-accent-100);
 }
 
-.emailInput {
-  flex: 1;
-  min-width: 0;
+.input {
   font: inherit;
   font-size: 13px;
   color: var(--color-neutral-100);
@@ -149,20 +136,72 @@
   border: 1px solid var(--color-neutral-800);
   border-radius: var(--radius-sm);
   padding: 9px 11px;
+  min-width: 0;
 }
 
-.emailInput:focus {
+.input:focus {
   outline: none;
   border-color: var(--color-accent-500);
 }
 
+.inline {
+  display: flex;
+  gap: 6px;
+}
+
+.inline .input {
+  flex: 1;
+}
+
+.primary,
+.secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-family: var(--font-heading);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.primary {
+  font-size: 14px;
+  color: var(--color-accent-100);
+  background: var(--color-accent-700);
+  border: 1px solid var(--color-accent-600);
+  padding: 11px 16px;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--color-accent-600);
+}
+
+.secondary {
+  flex: none;
+  font-size: 12.5px;
+  color: var(--color-accent-300);
+  background: transparent;
+  border: 1px solid var(--color-accent-700);
+  padding: 9px 13px;
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--color-accent-900);
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .error,
-.sent {
-  max-width: 420px;
-  margin: 0 0 20px;
+.sent,
+.already {
+  margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
-  text-align: center;
   border-radius: var(--radius-sm);
   padding: 10px 14px;
 }
@@ -177,6 +216,45 @@
   background: var(--st-good-dim);
 }
 
+.already {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-bottom: 18px;
+  color: var(--color-neutral-300);
+  background: var(--color-surface);
+}
+
+.alreadyActions {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* --- the link, folded away ---------------------------------------------- */
+
+.alt {
+  margin-top: 18px;
+  border-top: 1px solid var(--color-divider);
+  padding-top: 14px;
+}
+
+.altSummary {
+  font-size: 12px;
+  color: var(--color-neutral-400);
+  cursor: pointer;
+}
+
+.altSummary:hover {
+  color: var(--color-neutral-200);
+}
+
+.altBody {
+  padding-top: 12px;
+}
+
 /* --- the development role picker ---------------------------------------- */
 
 .dev {
@@ -185,7 +263,7 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 28px;
   padding-top: 24px;
   border-top: 1px dashed var(--color-neutral-800);
 }
@@ -210,4 +288,42 @@
 .devNote {
   font-size: 11px;
   color: var(--color-neutral-600);
+}
+
+/* --- pages reached from an emailed link --------------------------------- */
+
+.lede {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--color-neutral-400);
+  margin: 0 0 18px;
+  text-wrap: pretty;
+}
+
+.lede strong {
+  color: var(--color-neutral-100);
+  font-weight: 500;
+}
+
+.hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+.back {
+  margin-top: 22px;
+  font-size: 12px;
+}
+
+/* Present for password managers, which need to know whose password this is,
+   and invisible to everybody else. */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

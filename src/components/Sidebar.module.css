@@ -62,6 +62,21 @@
   border-top: 1px solid var(--color-divider);
 }
 
+.me {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  margin: -4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.me:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+}
+
 .who {
   display: flex;
   flex-direction: column;

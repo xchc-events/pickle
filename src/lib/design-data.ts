@@ -75,12 +75,15 @@ const flatten = (assets: { key: string; state: string; promoterSigned: boolean }
   }))
 
 export async function loadDesign(user: SessionUser, wantedId?: string): Promise<DesignView> {
-  // Design starts at Confirmed and stops at the door: before terms are agreed
-  // there is nothing to brief, and briefing an event anyway is how work gets
-  // done on events that never happen. A settled one has nothing left to sign
-  // off, so it drops off the queue rather than sitting at the front of it.
+  // Design takes an event from the enquiry on. It used to start at Confirmed,
+  // on the reasoning that briefing an event before its terms are agreed is
+  // work done on a show that may not happen — but a promoter sends the artwork
+  // for their whole tour with the enquiry, and it has to land somewhere. The
+  // queue row says an unconfirmed booking is unconfirmed rather than chasing
+  // a brief for it; see `designQueueRow`. A settled event has nothing left to
+  // sign off, so it drops off the queue rather than sitting at the front of it.
   const events = await db.event.findMany({
-    where: { AND: [eventScope(user), { stage: { gte: 2 }, concluded: false }] },
+    where: { AND: [eventScope(user), { concluded: false }] },
     include: {
       space: true,
       assets: true,
@@ -105,7 +108,7 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
       id: e.id,
       name: e.name,
       dateLabel: dateLabel(e.date),
-      stage: e.stage,
+      confirmed: e.bookingStatus === 'CONFIRMED',
       assets: flatten(e.assets),
       leadName: designLead(e)?.person.name ?? null,
       riskNote: e.riskNote,

@@ -2,7 +2,11 @@
  * Pipeline derivations.
  *
  * Ported from `pipeVals()` in the design prototype
- * (docs/design-handoff/design/Pickle Prototype.dc.html, near line 3835).
+ * (docs/design-handoff/design/Pickle Prototype.dc.html, near line 3835), and
+ * reworked on 16 September 2026 when each event's single stage became a
+ * status per part — see src/lib/parts.ts. The prototype's eight-cell track
+ * ticked off the stages behind an event and dashed out the ones ahead; the
+ * same eight cells now say where each part stands on its own.
  *
  * Everything here is a pure function over a plain shape so it can be tested
  * without a database. Money never appears in this file: figures arrive
@@ -10,13 +14,14 @@
  * mathematics lives.
  */
 
-import { STAGES, STAGE_TARGET } from './constants'
 import { hrs, money, days as dayLabel } from './format'
 import { CFG } from './finance'
+import { gatesDoneLabel } from './event-record'
+import { PARTS, type BookingStatus, type PartKey, type PartState } from './parts'
 
 export type RiskKind = 'warn' | 'stop'
 export type StatusFilter = 'all' | 'mine' | 'risk' | 'soon' | 'done'
-export type SortKey = 'door' | 'stuck'
+export type SortKey = 'door' | 'attention'
 
 /** One event, flattened for the pipeline. */
 export interface PipelineEvent {
@@ -28,12 +33,9 @@ export interface PipelineEvent {
   format: string
   spaceName: string
   concluded: boolean
-  /** 0 enquiry … 7 payout. */
-  stage: number
+  booking: BookingStatus
   /** Days until doors. Negative once the event is past. */
   daysToDoor: number
-  /** Days the event has sat in its current stage. */
-  daysInStage: number
   /** The coordinator's own words for why this is flagged. Null = not at risk. */
   riskNote: string | null
   riskKind: RiskKind
@@ -53,6 +55,8 @@ export interface PipelineEvent {
   taskHours: { team: string; hours: number }[]
   /** Assigned on-site shift hours. */
   onSiteHours: number
+  /** Where each of the eight parts stands, in pipeline order. */
+  parts: PartState[]
 }
 
 /** Whole days between two instants, by calendar day rather than by 24h. */
@@ -60,16 +64,6 @@ export function daysBetween(from: Date, to: Date): number {
   const a = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())
   const b = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate())
   return Math.round((b - a) / 86_400_000)
-}
-
-/**
- * The rule the stage targets encode: an event past its target has been sitting
- * too long and wants someone's attention. See the note on STAGE_TARGET — the
- * prototype stores the risk copy but this rule picks out exactly the same set.
- */
-export function isPastStageTarget(stage: number, daysInStage: number): boolean {
-  const target = STAGE_TARGET[stage] ?? 99
-  return daysInStage > target
 }
 
 export const isAtRisk = (e: Pick<PipelineEvent, 'riskNote'>): boolean => e.riskNote !== null
@@ -80,27 +74,36 @@ export const riskHue = (kind: RiskKind): string =>
 
 // ------------------------------------------------------------------ rows ---
 
-export interface StageCell {
-  /** '✓' for a stage already passed, 'Nd' for the current one, '' ahead. */
-  text: string
-  state: 'done' | 'current' | 'ahead'
+/**
+ * The hover text on a part's cell: where it stands, and what is in the way.
+ * The cell has room for two words; this is where the rest goes.
+ */
+export function partTitle(p: PartState): string {
+  const head = `${p.label}: ${p.status}${p.detail ? `, ${p.detail}` : ''}`
+  // A part that is nothing to do yet — a settlement before the night — fails
+  // its gates by definition, and listing them would read as a chase.
+  if (p.checks.length === 0 || !p.applies) return head
+
+  // Only the first letter comes down, so "Gather.rsvp" keeps its name.
+  const inline = (label: string) => label.charAt(0).toLowerCase() + label.slice(1)
+  const blocked = p.checks.filter((g) => !g.ok).map((g) => inline(g.label))
+  return `${head}. ${gatesDoneLabel(p.checks)}${blocked.length ? ` — held up by ${blocked.join(', ')}` : ''}`
 }
 
 /**
- * The eight-cell stage track on each row. Passed stages are ticked, the
- * current one carries its day count and picks up the risk colour, stages
- * ahead are dashed outlines.
+ * How much on this event wants somebody. A part that is blocked counts twice
+ * a part that is only asking, and the coordinator's own flag counts the same
+ * way — so a denied licence outranks a stale listing, and a hand-written
+ * "3 shifts unfilled, 8 days out" is never outranked by the arithmetic.
+ *
+ * This is what "time stuck" was for when an event sat in one stage. With
+ * every part moving on its own there is no single clock to be stuck on, but
+ * there is still a question of what to look at first.
  */
-export function stageCells(
-  stage: number,
-  daysInStage: number,
-  atRisk: boolean,
-): (StageCell & { risky: boolean })[] {
-  return STAGES.map((_, i) => {
-    if (i < stage) return { text: '✓', state: 'done' as const, risky: false }
-    if (i === stage) return { text: `${daysInStage}d`, state: 'current' as const, risky: atRisk }
-    return { text: '', state: 'ahead' as const, risky: false }
-  })
+export function attentionOf(e: Pick<PipelineEvent, 'parts' | 'riskNote' | 'riskKind'>): number {
+  const weight = (tone: string) => (tone === 'stop' ? 2 : tone === 'warn' ? 1 : 0)
+  const flag = e.riskNote === null ? 0 : weight(e.riskKind)
+  return e.parts.reduce((n, p) => n + weight(p.tone), flag)
 }
 
 export interface Projection {
@@ -109,15 +112,15 @@ export interface Projection {
 }
 
 /**
- * What the right-hand figure says. Before terms are agreed there is nothing
- * worth projecting, so it says so rather than showing a number built on
- * guesses.
+ * What the right-hand figure says. Before the booking is confirmed there is
+ * nothing worth projecting, so it says so rather than showing a number built
+ * on guesses.
  */
 export function projection(
-  e: Pick<PipelineEvent, 'concluded' | 'stage' | 'surplus' | 'actualTotal'>,
+  e: Pick<PipelineEvent, 'concluded' | 'booking' | 'surplus' | 'actualTotal'>,
 ): Projection {
   if (e.concluded) return { text: `took ${money(e.actualTotal ?? 0)}`, tone: 'good' }
-  if (e.stage < 2) return { text: 'modelling', tone: 'dim' }
+  if (e.booking !== 'confirmed') return { text: 'modelling', tone: 'dim' }
   return {
     text: `proj. ${money(e.surplus)}`,
     tone: e.surplus > 500 ? 'good' : 'muted',
@@ -157,15 +160,39 @@ export function pipelineRows(all: PipelineEvent[], f: RowFilters): PipelineEvent
   if (f.status === 'done') rows = all.filter((e) => e.concluded)
 
   rows.sort((x, y) =>
-    f.sort === 'door' ? x.daysToDoor - y.daysToDoor : y.daysInStage - x.daysInStage,
+    f.sort === 'door'
+      ? x.daysToDoor - y.daysToDoor
+      : attentionOf(y) - attentionOf(x) || x.daysToDoor - y.daysToDoor,
   )
   return rows
 }
 
-/** Per-stage counts across the live pipeline, for the column heads. */
-export function stageCounts(all: PipelineEvent[]): { label: string; count: number }[] {
+export interface PartHead {
+  key: PartKey
+  label: string
+  /** The stage nickname the part inherited, if it did. Hover text on the head. */
+  nick: string | null
+  /** Live events where this part is something to do and is not finished. */
+  toGo: number
+}
+
+/**
+ * The column heads. Where the old heads counted the events sitting in each
+ * stage, these count the events still to finish each part — an event is in
+ * every column now, so a head that counted membership would say the same
+ * number eight times.
+ */
+export function partHeads(all: PipelineEvent[]): PartHead[] {
   const live = all.filter((e) => !e.concluded)
-  return STAGES.map((label, i) => ({ label, count: live.filter((e) => e.stage === i).length }))
+  return PARTS.map((def) => ({
+    key: def.key,
+    label: def.label,
+    nick: def.nick,
+    toGo: live.filter((e) => {
+      const p = e.parts.find((x) => x.key === def.key)
+      return p !== undefined && p.applies && !p.done
+    }).length,
+  }))
 }
 
 // --------------------------------------------------------------- metrics ---
@@ -186,7 +213,7 @@ export const EVENTS_TO_COVER_BASE = 18
 export function pipelineMetrics(all: PipelineEvent[]): Metric[] {
   const live = all.filter((e) => !e.concluded)
   const hours = live.reduce((a, e) => a + e.hours, 0)
-  const confirmed = live.filter((e) => e.stage >= 2).length
+  const confirmed = live.filter((e) => e.booking === 'confirmed').length
 
   return [
     // These two want a median over the last 20 bookings, which needs stage
@@ -217,7 +244,7 @@ export function pipelineMetrics(all: PipelineEvent[]): Metric[] {
     },
     {
       label: 'Events confirmed for the next 60 days',
-      note: `Anything past terms-agreed. We need roughly ${EVENTS_TO_COVER_BASE} to cover the fixed cost base`,
+      note: `Any booking confirmed, however far along the rest is. We need roughly ${EVENTS_TO_COVER_BASE} to cover the fixed cost base`,
       value: `${confirmed} of ${EVENTS_TO_COVER_BASE}`,
       sub: `covers ${Math.round((confirmed / EVENTS_TO_COVER_BASE) * 100)}% of the base`,
       tone: 'good',

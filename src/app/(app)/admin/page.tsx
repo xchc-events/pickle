@@ -1,19 +1,28 @@
 import { requireModule } from '@/lib/permissions'
 import { loadAdmin } from '@/lib/admin-data'
-import { authConfigured, stubAllowed } from '@/lib/session'
+import { stubAllowed } from '@/lib/session'
+import { emailConfigured } from '@/lib/email'
 import { SectionHeading } from '@/components/SectionHeading'
 import { UserRow } from './UserRow'
 import { AddUser } from './AddUser'
-import { addUser, linkPerson, setActive, setOrganisation, setRole } from './actions'
+import {
+  addUser,
+  endSessionsFor,
+  linkPerson,
+  sendInvite,
+  setActive,
+  setOrganisation,
+  setRole,
+} from './actions'
 import styles from './admin.module.css'
 
 /**
  * Admin — who has access.
  *
  * This is where accounts come from. There is no sign-up anywhere in this
- * product: the adapter in auth.ts refuses to create a user, so somebody
- * reaching the sign-in page with a perfectly good email address still gets
- * nothing until they appear on this page.
+ * product: nothing on the sign-in path can create a user (src/lib/auth.ts), so
+ * somebody reaching the sign-in page with a perfectly good email address still
+ * gets nothing until they appear on this page.
  */
 export default async function AdminPage() {
   const { user } = await requireModule('admin')
@@ -31,13 +40,13 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      {!authConfigured ? (
+      {!emailConfigured() ? (
         <p className={styles.banner}>
           <i className="ph ph-warning" aria-hidden="true" />
-          Real sign-in is not configured, so nobody here can actually sign in yet.
+          Email is not configured, so invitations and password links cannot be sent.
           {stubAllowed
-            ? ' The development role picker is standing in. Set AUTH_RESEND_KEY and EMAIL_FROM — see the README.'
-            : ' Set AUTH_RESEND_KEY and EMAIL_FROM — see the README.'}
+            ? ' On this dev server they are written to the server log instead. Set AUTH_RESEND_KEY and EMAIL_FROM to send them — see the README.'
+            : ' Set AUTH_RESEND_KEY and EMAIL_FROM — see the README. People who already have a password can still sign in.'}
         </p>
       ) : null}
 
@@ -61,6 +70,8 @@ export default async function AdminPage() {
               setActive={setActive.bind(null, u.id)}
               linkPerson={linkPerson.bind(null, u.id)}
               setOrganisation={setOrganisation.bind(null, u.id)}
+              sendInvite={sendInvite.bind(null, u.id)}
+              endSessions={endSessionsFor.bind(null, u.id)}
             />
           ))}
         </ul>
@@ -77,9 +88,10 @@ export default async function AdminPage() {
         <AddUser roles={roles} people={people} organisations={organisations} add={addUser} />
 
         <p className={styles.footnote}>
-          Adding an account sends nothing. Give them the address of this site and they ask for a
-          sign-in link by email — staff and outside coordinators alike. The address they type has to
-          match the one above exactly, or they get nothing and no explanation of why.
+          The invitation is a link to choose their own password, and it lasts a week. Nobody here
+          ever sees or sets it. After that they sign in with their address and password, or ask for
+          a link by email — staff and outside coordinators alike. Anybody who forgets their password
+          sets a new one from the sign-in page without needing you.
         </p>
       </div>
     </div>

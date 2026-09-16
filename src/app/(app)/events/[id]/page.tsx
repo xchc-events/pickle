@@ -9,11 +9,12 @@ import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
-import { advanceStage, setLead } from './actions'
+import { advanceBooking, putToBed, setLead } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
 import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
 import { Holds } from './Holds'
+import { Parts } from './Parts'
 import { barRefusal } from '@/lib/bar'
 import styles from './event.module.css'
 import type { LeadRole } from '@/generated/prisma/client'
@@ -22,13 +23,14 @@ import type { LeadRole } from '@/generated/prisma/client'
  * The event record — the hub.
  *
  * Everything the venue knows about one night, in the order the handoff sets
- * out: the enquiry facts and what holds the event at its current stage, then
- * the licence, the bill, the terms, the labour, where it has been listed, and
+ * out: the enquiry facts and where each part of the event stands, then the
+ * licence, the bill, the terms, the labour, where it has been listed, and
  * what has happened to it.
  *
- * The gate panel is the load-bearing part. It is not a checklist for its own
- * sake — an event cannot advance while one fails, so it is the only place a
- * coordinator finds out why a show is stuck.
+ * The parts panel is the load-bearing part. It is not a checklist for its own
+ * sake — every gate is listed under the part it belongs to, the booking cannot
+ * move on and a night cannot be put to bed while one of theirs fails, so it is
+ * the only place a coordinator finds out why a part of a show is stuck.
  *
  * Editing lives where it belongs. Ticket prices are set in Ticketing, shifts
  * in Roster, artwork in Design; this page links to them rather than growing a
@@ -72,7 +74,9 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   // scope is applied in the query, not by leaving something out of the view.
   const holds = canChange ? await holdsForEvent(ev.id) : []
 
-  const blocked = ev.gates.filter((g) => !g.ok)
+  // The one move a person makes by hand next, if there is one.
+  const next = ev.next
+  const blocked = next ? next.gates.filter((g) => !g.ok).length : 0
 
   return (
     <div>
@@ -85,7 +89,9 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
           </Link>
           <div className={styles.titleRow}>
             <h1 className={styles.title}>{ev.name}</h1>
-            <span className="tag tag-outline">{ev.stageLabel}</span>
+            <span className="tag tag-outline" title="Where the booking stands">
+              {ev.bookingLabel}
+            </span>
             <span className={styles.nick}>{ev.nickname}</span>
             <span className={`tag ${ev.model === 'dry' ? 'tag-neutral' : 'tag-outline'}`}>
               {ev.modelLabel}
@@ -98,7 +104,10 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             </span>
             {' · '}
             {ev.spaceName} · {ev.promoter} ·{' '}
-            {ev.concluded ? 'concluded' : `${ev.daysToDoor} to door`} · {ev.daysInStage} in stage
+            {ev.concluded ? 'concluded' : `${ev.daysToDoor} to door`}
+            {ev.booking === 'confirmed'
+              ? ''
+              : ` · ${ev.bookingDays}d at ${ev.bookingLabel.toLowerCase()}`}
           </p>
         </div>
 
@@ -116,19 +125,25 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               <i className="ph ph-sliders" aria-hidden="true" />
               Tech
             </Link>
-            {ev.concluded ? null : (
+            {next ? (
               <ActionButton
-                action={advanceStage.bind(null, ev.id)}
-                className={ev.canAdvance ? 'btn btn-primary' : 'btn btn-secondary'}
+                action={
+                  next.kind === 'booking'
+                    ? // The status this page shows goes with the press, so a
+                      // page that has fallen behind cannot move the booking twice.
+                      advanceBooking.bind(null, ev.id, ev.booking)
+                    : putToBed.bind(null, ev.id)
+                }
+                className={next.clear ? 'btn btn-primary' : 'btn btn-secondary'}
                 title={
-                  ev.canAdvance
-                    ? ev.advanceLabel
-                    : `${blocked.length} gate${blocked.length === 1 ? '' : 's'} still to clear`
+                  next.clear
+                    ? next.label
+                    : `${blocked} gate${blocked === 1 ? '' : 's'} still to clear`
                 }
               >
-                {ev.advanceLabel}
+                {next.label}
               </ActionButton>
-            )}
+            ) : null}
           </div>
         ) : null}
       </header>
@@ -136,7 +151,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
       <div className={styles.body}>
         {/* ---------------------------------------------------- overview --- */}
         <section id="overview">
-          <SectionHeading note="who owns what, and what holds this up">
+          <SectionHeading note="who owns what, and where each part stands">
             Event overview
           </SectionHeading>
 
@@ -204,7 +219,9 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 )}
               </span>
               <span className={styles.factNote}>
-                {ev.dateTbc ? 'still a best guess — Enquiry holds on it' : 'held in the calendar'}
+                {ev.dateTbc
+                  ? 'still a best guess — an enquiry cannot move on until it is held'
+                  : 'held in the calendar'}
               </span>
             </div>
           </div>
@@ -221,45 +238,8 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             <RunTimesReadout doors={ev.doors} barClose={ev.barClose} allOut={ev.allOut} />
           )}
 
-          {/* The gates. */}
-          <div className={styles.gates}>
-            <div className={styles.gatesHead}>
-              <span className={styles.gatesTitle}>{ev.gatesTitle}</span>
-              <div className="rule-fade" />
-              <span className={ev.canAdvance ? styles.good : styles.warn}>{ev.gatesDone}</span>
-            </div>
-
-            {ev.gates.map((g) => (
-              <div key={g.label} className={`${styles.gate} ${g.ok ? styles.gateOk : ''}`}>
-                <i
-                  className={`ph ${g.ok ? 'ph-check-circle' : 'ph-circle-dashed'}`}
-                  aria-hidden="true"
-                />
-                <span className={styles.gateLabel}>{g.label}</span>
-                <span className={styles.gateWhy}>{g.ok ? '' : g.why}</span>
-                {/* A promoter reads what holds their show up. The fix is the
-                    venue's, and every screen it links to is one they cannot
-                    open — a dead link reads as a step they could take. */}
-                {g.ok || !canChange ? (
-                  <span className={styles.gateGap} />
-                ) : (
-                  <Link
-                    // With the event, so the fix opens on this night rather
-                    // than on whichever the module would show first — which
-                    // for Bar is the next night, not the one to close.
-                    href={g.screen === 'event' ? `/events/${ev.id}` : `/${g.screen}?event=${ev.id}`}
-                    className="btn btn-ghost"
-                  >
-                    Fix it
-                  </Link>
-                )}
-              </div>
-            ))}
-
-            <p className={ev.canAdvance ? styles.gatesMsgGood : styles.gatesMsg}>
-              {ev.gatesMessage}
-            </p>
-          </div>
+          {/* The parts, and what holds each one up. */}
+          <Parts eventId={ev.id} parts={ev.parts} next={next} canChange={canChange} />
 
           <div className={styles.tiers}>
             <span className={styles.tiersLabel}>
@@ -431,21 +411,22 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         ) : null}
 
         {/* ----------------------------------------------------- actuals --- */}
-        {/* Only from show week. Before the night there is nothing to count,
-            and a form offering to reconcile an event that has not happened
-            invites somebody to model it twice.
+        {/* Only from the night itself, and only for a booking that was
+            confirmed. Before the night there is nothing to count, and a form
+            offering to reconcile an event that has not happened invites
+            somebody to model it twice.
 
             Never for somebody outside the venue. The section is the form,
             and the till's figures are not among what the handoff shows a
-            promoter; the gate above already tells them whether the night
-            has been counted. */}
-        {canChange && (ev.stage >= 6 || ev.concluded) && (
+            promoter; the Settlement part above already tells them whether
+            the night has been counted. */}
+        {canChange && ((ev.booking === 'confirmed' && ev.nightHasCome) || ev.concluded) && (
           <section id="actuals">
             <SectionHeading
               note={
                 ev.doorHalf && ev.barHalf
                   ? 'the settlement reads off these, not the model'
-                  : 'until both halves are in, the event cannot reach Payout'
+                  : 'until both halves are in, the night cannot be put to bed'
               }
             >
               What the night took

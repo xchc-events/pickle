@@ -15,7 +15,7 @@ you one on `localhost:5432`:
 
 ```bash
 docker compose -f .devcontainer/docker-compose.yml up -d db
-cp .env.example .env      # then fill in AUTH_SECRET: npx auth secret
+cp .env.example .env      # then fill in PAYMENT_KEY: openssl rand -base64 32
 npm ci
 npm run db:migrate
 npm run dev
@@ -72,50 +72,83 @@ Two things gate this in production:
 2. **A real session must back the request.** A session from the development
    role picker carries `authenticated: false`, and `canReveal` refuses every
    decrypt in production without it — anyone who can set that cookie could
-   otherwise be the finance lead. Configuring a provider (see below) is what
-   satisfies this; there is no flag to flip.
+   otherwise be the finance lead. Signing in for real — a password or an emailed
+   link, see below — is what satisfies this; there is no flag to flip.
 
 Without R2 configured, every other part of both modules still works — uploads
 say so rather than failing.
 
 ## Signing in
 
-There is **no sign-up**. `createUser` in `src/lib/auth.ts` throws, so somebody
-arriving with a perfectly good email address gets nothing until an administrator
-has added it in **Admin**. That is deliberate: this is one venue's internal
-tool, and being able to receive mail is not the same as XCHC having decided
-somebody works here.
+There is **no sign-up**. Nothing on the sign-in path can create an account, so
+somebody arriving with a perfectly good email address gets nothing until an
+administrator has added it in **Admin**. That is deliberate: this is one venue's
+internal tool, and being able to receive mail is not the same as XCHC having
+decided somebody works here.
 
-One way in — **a link emailed to the address on the account**, via
-`AUTH_RESEND_KEY` and `EMAIL_FROM`. No passwords and no OAuth, which was a
-decision rather than a default:
+Two ways in, both built in-house in `src/lib/auth.ts` — no OAuth, and no auth
+library:
 
-- **Google** would serve only the half of our users inside the venue. An
-  external promoter signing off a poster is not in XCHC's Workspace.
-- **Passwords** look simpler than they are. Reset needs email anyway, so the
-  dependency does not go away — it just arrives after hashing, reset tokens,
-  strength rules and lockout have been built. Auth.js also refuses database
-  sessions for a credentials-only setup, which would cost us the property
-  below.
+- **Email address and password.** Administrators never see or set a password:
+  adding somebody in Admin emails them an **invitation** (a link, valid 7 days)
+  to choose their own. Anyone who forgets theirs uses **"Forgotten it, or never
+  set one?"** on the sign-in page. That is also how everybody who signed in by
+  link before passwords existed gets their first one.
+- **A link emailed to the address on the account**, folded away under the
+  password form. Still useful for somebody without a password, or whose
+  password is throttled.
 
-Sessions are stored in the database rather than in a JWT, so switching somebody
-off in Admin ends the session they already have open. A token cannot be taken
-back; a row can.
+### What keeps it safe
 
-**Resend setup:** resend.com → add and verify the sending domain → API keys.
-`EMAIL_FROM` must be on that verified domain, e.g. `XCHC <no-reply@send.minim.nz>`.
-Sign-in email deliberately sends from a Minim domain rather than `xchc.co.nz`,
-because XCHC's web presence may move off that domain around launch.
+- **Passwords** are hashed with scrypt from `node:crypto`
+  (`src/lib/password.ts`) — no native dependency — at a cost that meets OWASP's
+  floor, with the parameters stored in the hash so they can be raised later.
+- **The policy** (`src/lib/password-policy.ts`) follows NIST 800-63B rev. 4:
+  15 characters minimum, no composition rules, and a refusal of the guessable —
+  repeats, keyboard runs, the person's own name or address, the venue's name.
+- **Wrong passwords** cost nothing for the first five, then double the wait each
+  time up to an hour, and stop password sign-in after 100 in a row until a reset
+  (`mayAttemptPassword` in `auth-rules.ts`). It never needs an administrator to
+  undo, and the emailed link is never throttled by it — so typing a colleague's
+  address wrongly on purpose cannot lock them out.
+- **Nothing says whether an address has an account.** A wrong password, an
+  unknown address and an account without a password get the same sentence after
+  the same amount of work, and every "email me a link" form answers every
+  address identically — with the real work done after the response.
+- **Sessions are rows in the database**, not JWTs, so switching somebody off in
+  Admin, resetting a password, or "sign out everywhere else" ends sessions that
+  are already open. Only the SHA-256 of each session token and each emailed link
+  is stored. A session lasts 30 days at most, and ends after 14 days unused.
+- **Emailed links survive mail scanners.** Opening one spends nothing; the button
+  on the page it opens does. Links are built from `AUTH_URL`, never from the
+  request, so a reset link cannot be pointed at somebody else's server.
+- **Every sign-in, failure, password change and ended session** is written to the
+  append-only `AuthEvent` table.
 
-Links live one hour, and an address can only be sent one a minute
-(`LINK_COOLDOWN_SECONDS` in `auth-rules.ts`) — every link is a real email
-against a finite quota, and an unthrottled form is how somebody exhausts the
-venue's allowance and locks out the people who need to get in.
+Everybody can see and end their own sessions, and change their password, from
+**Your account** (their name at the foot of the sidebar). Changing it needs the
+current one, even from inside a session.
 
-Until the provider is configured, the development role picker on `/sign-in`
-stands in. It is unavailable in production (`stubAllowed` in `session.ts`) and
-the sessions it grants are marked `authenticated: false`, so it can drive every
-module but can never open a payment detail — see `canReveal` in `payments.ts`.
+**Email setup:** resend.com → add and verify the sending domain → API keys, then
+set `AUTH_RESEND_KEY` and `EMAIL_FROM`. `EMAIL_FROM` must be on that verified
+domain, e.g. `XCHC <no-reply@send.minim.nz>`. Sign-in email deliberately sends
+from a Minim domain rather than `xchc.co.nz`, because XCHC's web presence may
+move off that domain around launch. `AUTH_URL` must be the site's public
+address — in production, links are not sent without it.
+
+Without email configured, password sign-in still works for anyone who has a
+password. In development, invitations and links are **written to the dev
+server's log** instead of being sent, so the whole flow can be followed locally.
+In production they are refused.
+
+Every link is a real email against a finite quota, so an account can only be sent
+one a minute (`LINK_COOLDOWN_SECONDS` in `auth-rules.ts`).
+
+The development role picker on `/sign-in` is still there for switching roles
+quickly. It is unavailable in production (`stubAllowed` in `session.ts`) and the
+sessions it grants are marked `authenticated: false`, so it can drive every module
+but can never open a payment detail — see `canReveal` in `payments.ts` — or
+change a password.
 
 ## The bar, Epos Now and Xero
 

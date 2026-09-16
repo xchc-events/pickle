@@ -84,6 +84,7 @@ const call = (name: string) => actions[name]!(EVENT, ...(ARGS[name] ?? []))
 
 const awhina = {
   id: 'user_awhina',
+  email: 'awhina@koura.test',
   name: 'Awhina Reid',
   role: 'PROMOTER',
   roleKey: 'promoter',
@@ -93,10 +94,12 @@ const awhina = {
   personId: null,
   initials: 'AR',
   authenticated: true,
+  sessionId: 'session_awhina',
 } satisfies SessionUser
 
 const ana = {
   id: 'user_ana',
+  email: 'ana@xchc.test',
   name: 'Ana Kelliher',
   role: 'BAR',
   roleKey: 'bar',
@@ -106,6 +109,7 @@ const ana = {
   personId: 'person_ana',
   initials: 'AK',
   authenticated: true,
+  sessionId: 'session_ana',
 } satisfies SessionUser
 
 const WHY = barRefusal(awhina)

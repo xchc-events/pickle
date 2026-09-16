@@ -6,7 +6,6 @@ import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { ASSET_SET, allApproved, assetSpec, type EventAsset } from '@/lib/design'
 import * as files from '@/lib/files-data'
-import { PLATFORMS } from '@/lib/promo'
 import { said, type Said } from '@/lib/toast'
 
 /**
@@ -33,9 +32,14 @@ async function assetsOf(eventId: string): Promise<EventAsset[]> {
  * Sign a piece off.
  *
  * Approving pulls the next piece in house order up for sign-off, so exactly
- * one thing is ever waiting on somebody. Approving the last one moves the
- * event to On sale on its own — the gate is satisfied, so holding the event
- * behind a second button press would only be ceremony.
+ * one thing is ever waiting on somebody.
+ *
+ * Approving the last one finishes the Design part and nothing else. It used
+ * to move the event to On sale and push every self-syncing listing, Gather.rsvp
+ * among them — but each part of an event moves on its own now, tickets can be
+ * on sale long before the artwork is done, and a push from here would walk
+ * past the rule that tickets wait for a confirmed booking. Listings go out
+ * from Promotion. See src/lib/parts.ts.
  */
 export async function approveAsset(eventId: string, key: string): Promise<Said> {
   const { user } = await requireModule('design')
@@ -68,42 +72,13 @@ export async function approveAsset(eventId: string, key: string): Promise<Said> 
     return said(`${spec.name} approved.`)
   }
 
-  const event = await db.event.findUniqueOrThrow({
-    where: { id },
-    select: { stage: true },
-  })
-
   // Nothing is outstanding on the creative any more, so whatever the
   // coordinator flagged about it no longer describes the event.
   await db.event.update({ where: { id }, data: { riskNote: null } })
 
-  if (event.stage !== 3) {
-    refresh()
-    return said(`${spec.name} approved. That was the last piece.`)
-  }
-
-  await db.event.update({
-    where: { id },
-    data: { stage: 4, stageEnteredAt: new Date() },
-  })
-
-  // The channels that sync themselves go out. The two that need a human do
-  // not: the prototype marks every channel live here, which would put a name
-  // and a time against nobody and quietly pass the "every channel listed or
-  // ticked off" gate on the next transition.
-  for (const p of PLATFORMS.filter((x) => x.kind === 'api')) {
-    await db.channelPush.upsert({
-      where: { eventId_channel: { eventId: id, channel: p.key } },
-      create: { eventId: id, channel: p.key, live: true, note: 'created just now', at: new Date() },
-      update: { live: true, stale: false, note: 'created just now', at: new Date() },
-    })
-  }
-
-  await record(id, user, 'All artwork approved — moved to On sale, auto-sync listings pushed')
-
   refresh()
   return said(
-    `${spec.name} approved — that was the last piece, so the event moved to On sale on its own.`,
+    `${spec.name} approved — that was the last piece, so the design is signed off. The listings go out from Promotion.`,
   )
 }
 
@@ -128,8 +103,8 @@ export async function requestChange(eventId: string, key: string): Promise<Said>
 /**
  * Name who owns the creative.
  *
- * An empty personId clears the lead, which is not a neutral act: the
- * Confirmed → Design gate holds the event there until somebody owns it.
+ * An empty personId clears the lead, which is not a neutral act: the Design
+ * part cannot be finished until somebody owns it.
  */
 export async function setDesignLead(eventId: string, personId: string): Promise<Said> {
   const { user } = await requireModule('design')

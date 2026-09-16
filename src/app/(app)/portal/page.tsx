@@ -1,6 +1,5 @@
 import { requireModule } from '@/lib/permissions'
 import { loadPortal } from '@/lib/portal-data'
-import { STAGES } from '@/lib/constants'
 import { SectionHeading } from '@/components/SectionHeading'
 import { PaymentDetailsForm } from '@/components/PaymentDetailsForm'
 import { saveOwnDetails } from './actions'
@@ -78,7 +77,7 @@ export default async function PortalPage() {
                   <span className={styles.eventName}>{e.name}</span>
                   <span className={styles.eventDate}>{e.date}</span>
                 </div>
-                <span className={styles.eventStage}>{STAGES[e.stage] ?? '—'}</span>
+                <span className={styles.eventStage}>{e.bookingLabel}</span>
                 <span className={e.awaitingSignOff ? styles.warn : styles.quiet}>
                   {e.awaitingSignOff
                     ? `${e.awaitingSignOff} waiting on you`
