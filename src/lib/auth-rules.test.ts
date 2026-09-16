@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   LINK_COOLDOWN_SECONDS,
+  linkBase,
   mayAdmit,
   mayChangeRole,
   mayDeactivate,
@@ -216,5 +217,26 @@ describe('mayRequestLink', () => {
 
   it('is short enough not to annoy a real person', () => {
     expect(LINK_COOLDOWN_SECONDS).toBeLessThanOrEqual(120)
+  })
+})
+
+describe('linkBase', () => {
+  /**
+   * Links in emails are built from configuration and never from the request.
+   * A reset link built from the Host header can be pointed at somebody
+   * else's server by whoever sends the request — "password reset poisoning"
+   * — and the victim's own click hands their token over.
+   */
+  it('uses the configured address, without a trailing slash', () => {
+    expect(linkBase('https://pickle.minim.nz/', 'production')).toBe('https://pickle.minim.nz')
+  })
+
+  it('falls back to the dev server outside production', () => {
+    expect(linkBase(undefined, 'development')).toBe('http://localhost:3000')
+  })
+
+  it('refuses to guess in production — a link to localhost is a link to nowhere', () => {
+    expect(linkBase(undefined, 'production')).toBeNull()
+    expect(linkBase('', 'production')).toBeNull()
   })
 })

@@ -210,3 +210,21 @@ export function mayRequestLink(lastSentAt: Date | null, now: Date): LinkVerdict 
     why: `A link was already sent to that address. Check the inbox, or try again in ${seconds} seconds.`,
   }
 }
+
+/**
+ * The address emailed links point at, or null if there is no safe one.
+ *
+ * Taken from configuration, never from the request. A link built from the Host
+ * header can be pointed anywhere by whoever sends the request, and then the
+ * victim's own click delivers their reset token to that server — "password
+ * reset poisoning". In production an unset address is a refusal rather than a
+ * guess, because a link to localhost is a link to nowhere.
+ */
+export function linkBase(
+  configured: string | undefined,
+  nodeEnv: string | undefined,
+): string | null {
+  const url = configured?.trim()
+  if (url) return url.replace(/\/+$/, '')
+  return nodeEnv === 'production' ? null : 'http://localhost:3000'
+}

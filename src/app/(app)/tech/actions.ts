@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import * as files from '@/lib/files-data'
-import { issueGrant } from '@/lib/grants-data'
+import { NO_LINK_ADDRESS, issueGrant } from '@/lib/grants-data'
 import type { FileKindKey } from '@/lib/files'
 import { said, type Said } from '@/lib/toast'
 
@@ -129,6 +129,10 @@ export interface IssuedLink {
  * shows it to the coordinator, who sends it — this deliberately does not send
  * anything itself, because a link that emails on its own is a link nobody
  * checked the address on.
+ *
+ * With no safe address to build it on — AUTH_URL unset in production — there
+ * is no link, and the coordinator is told why rather than handed one to
+ * localhost. Nothing is recorded, because nothing was sent.
  */
 export async function issueArtistLink(eventId: string, artistId: string): Promise<IssuedLink> {
   const { user } = await requireModule('tech')
@@ -144,6 +148,8 @@ export async function issueArtistLink(eventId: string, artistId: string): Promis
   }
 
   const grant = await issueGrant(artist.payeeId, 'BOTH', id, user.personId)
+  if (!grant) return { ok: false, why: NO_LINK_ADDRESS }
+
   await record(id, user, `sent ${artist.name} a link for their details and rider`)
 
   refresh()
