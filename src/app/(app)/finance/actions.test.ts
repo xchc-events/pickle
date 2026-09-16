@@ -55,6 +55,7 @@ const PAYEE = 'payee_slow_fold'
 
 const mere = {
   id: 'user_mere',
+  email: 'mere@xchc.test',
   name: 'Mere Tapu',
   role: 'COORDINATOR',
   roleKey: 'coordinator',
@@ -64,6 +65,7 @@ const mere = {
   personId: 'person_mere',
   initials: 'MT',
   authenticated: true,
+  sessionId: 'session_mere',
 } satisfies SessionUser
 
 const chase = () => chaseDetails(EVENT, PAYEE)
