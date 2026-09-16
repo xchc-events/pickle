@@ -119,7 +119,7 @@ function EventDetail({ event: e, eposConnected }: { event: BarDetail; eposConnec
         <div>
           <h2 className={styles.eventName}>{e.name}</h2>
           <span className={styles.eventMeta}>
-            {e.date} · {e.spaceName} · {e.stageLabel}
+            {e.date} · {e.spaceName} · {e.saleLabel}
           </span>
         </div>
         <span className={styles.windowTag}>

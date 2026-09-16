@@ -85,10 +85,13 @@ export async function loadRoster(
   user: SessionUser,
   wantedId: string | undefined,
 ): Promise<RosterLoad> {
-  // Confirmed onwards. Rostering an event that has not been agreed asks
-  // people to hold a night for a show that may not happen.
+  // Every live event, confirmed or not. This used to start at Confirmed, so
+  // nobody was asked to hold a night for a show that may not happen; since
+  // each part of an event moves on its own, the venue decided (16 Sep 2026)
+  // that crew need not wait for the booking. The Pipeline shows which
+  // bookings are still unconfirmed.
   const events = await db.event.findMany({
-    where: { AND: [{ stage: { gte: 2 }, concluded: false }, eventScope(user)] },
+    where: { AND: [{ concluded: false }, eventScope(user)] },
     orderBy: { date: 'asc' },
     select: { id: true, name: true, date: true, shifts: { select: { state: true } } },
     take: 30,

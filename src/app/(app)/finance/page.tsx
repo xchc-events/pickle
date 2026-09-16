@@ -3,7 +3,6 @@ import { requireModule, modulesFor } from '@/lib/permissions'
 import { loadFinance } from '@/lib/finance-data'
 import { settlementFor } from '@/lib/settlement-data'
 import { canReveal } from '@/lib/payments'
-import { STAGES } from '@/lib/constants'
 import { money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ActionButton } from '@/components/ActionButton'
@@ -100,7 +99,7 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
           <div className={styles.eventHead}>
             <h2 className={styles.eventName}>{event.name}</h2>
             <span className={styles.eventMeta}>
-              {event.date} · {STAGES[event.stage] ?? '—'}
+              {event.date} · {event.concluded ? 'put to bed' : 'still open'}
             </span>
           </div>
 

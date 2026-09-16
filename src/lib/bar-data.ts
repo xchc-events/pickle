@@ -3,7 +3,6 @@ import type { Prisma } from '@/generated/prisma/client'
 import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, money } from './format'
-import { STAGES } from './constants'
 import { financeVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, scenarioOf } from './finance-input'
 import { halvesOf } from './actuals'
@@ -52,7 +51,7 @@ const BAR_SELECT = {
   ...FINANCE_SELECT,
   id: true,
   name: true,
-  stage: true,
+  bookingStatus: true,
   concluded: true,
   doors: true,
   barClose: true,
@@ -77,6 +76,9 @@ const BAR_SELECT = {
     },
   },
   barBudget: true,
+  // Gather.rsvp's row alone. A night is on sale when it is live — the moment
+  // its bar budget locks. See `pushChannel` in the Promotion actions.
+  channels: { where: { channel: 'gather' }, select: { live: true } },
   barSales: {
     orderBy: { revenue: 'desc' },
     select: {
@@ -93,6 +95,9 @@ const BAR_SELECT = {
 } as const
 
 type BarRow = Prisma.EventGetPayload<{ select: typeof BAR_SELECT }>
+
+/** Tickets are live on Gather.rsvp. */
+const onSale = (row: BarRow): boolean => row.channels.some((c) => c.live)
 
 /**
  * The bar hours planned for the night.
@@ -159,10 +164,10 @@ function summaryOf(row: BarRow): BarEventSummary {
 const startOfToday = (now: Date) => new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
 async function barRows(user: SessionUser, from: Date): Promise<BarRow[]> {
-  // Confirmed onwards. An enquiry is not yet a night anybody should budget a
+  // Confirmed bookings. An enquiry is not yet a night anybody should budget a
   // bar for.
   return db.event.findMany({
-    where: { AND: [{ stage: { gte: 2 } }, { date: { gte: from } }, eventScope(user)] },
+    where: { AND: [{ bookingStatus: 'CONFIRMED' }, { date: { gte: from } }, eventScope(user)] },
     orderBy: { date: 'asc' },
     select: BAR_SELECT,
     take: 150,
@@ -184,7 +189,8 @@ export interface BarDetail {
   id: string
   name: string
   date: string
-  stageLabel: string
+  /** Where the night stands for the bar: on sale, not yet, or put to bed. */
+  saleLabel: string
   spaceName: string
   window: ServiceWindow
   allOut: string | null
@@ -244,7 +250,9 @@ function railItem(row: BarRow, now: Date): BarRailItem {
     }
   }
 
-  if (row.date < startOfToday(now) && row.stage >= 6) {
+  // Every row is a confirmed booking, so a night behind us is one that
+  // happened — and one with no bar half is a bar nobody has closed.
+  if (row.date < startOfToday(now)) {
     return { ...base, figure: money(s.projection.take), note: 'bar not closed', tone: 'warn' }
   }
 
@@ -281,7 +289,7 @@ export async function loadBarEvents(
     ? b.basis === 'LATE'
       ? `locked late, ${dateLabel(b.lockedAt)}${b.lockedBy ? ` by ${b.lockedBy}` : ''} — this was on sale before bar budgets existed`
       : `locked when it went on sale, ${dateLabel(b.lockedAt)}${b.lockedBy ? ` by ${b.lockedBy}` : ''}`
-    : chosen.stage >= 4
+    : onSale(chosen)
       ? 'no budget — this went on sale before bar budgets existed'
       : 'locks when this goes on sale'
 
@@ -295,7 +303,7 @@ export async function loadBarEvents(
       id: chosen.id,
       name: chosen.name,
       date: dateLabel(chosen.date),
-      stageLabel: STAGES[chosen.stage] ?? '—',
+      saleLabel: chosen.concluded ? 'put to bed' : onSale(chosen) ? 'on sale' : 'not on sale yet',
       spaceName: chosen.space.name,
       window,
       allOut: chosen.allOut,
@@ -303,7 +311,7 @@ export async function loadBarEvents(
 
       budget: s.budget,
       budgetNote,
-      canLockLate: !b && chosen.stage >= 4,
+      canLockLate: !b && onSale(chosen),
 
       projection: s.projection,
       actual: s.actual,
@@ -364,8 +372,9 @@ export async function loadBarMonths(user: SessionUser): Promise<BarMonthsLoad> {
 /**
  * The budget as it would be locked right now, off the current projection.
  *
- * Called inside the move to On sale, and by the late lock for an event already
- * past it. Never used to change a budget that exists — nothing does.
+ * Called when tickets first go live on Gather.rsvp, and by the late lock for
+ * an event already on sale. Never used to change a budget that exists —
+ * nothing does.
  */
 export async function budgetToLock(eventId: string): Promise<BarBudgetFigures | null> {
   const row = await db.event.findUnique({ where: { id: eventId }, select: BAR_SELECT })

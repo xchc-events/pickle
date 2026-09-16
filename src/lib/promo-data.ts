@@ -53,11 +53,13 @@ const doorLine = (daysOut: number): string =>
   daysOut > 0 ? `${dayLabel(daysOut)} out` : daysOut === 0 ? 'tonight' : 'past'
 
 export async function loadPromo(user: SessionUser, wantedId?: string): Promise<PromoView> {
-  // Promotion starts once an event is being negotiated rather than at
-  // confirmation: an announce beat can be drafted before terms land, and a
-  // concluded event has nothing left to push.
+  // Promotion takes an event from the enquiry on: a tour can be announced
+  // before this date's terms land, and each part of an event now moves on its
+  // own. The one thing that waits is Gather.rsvp — tickets do not go on sale
+  // until the booking is confirmed, which `pushChannel` refuses rather than
+  // this list hiding. A concluded event has nothing left to push.
   const events = await db.event.findMany({
-    where: { AND: [eventScope(user), { stage: { gte: 1 }, concluded: false }] },
+    where: { AND: [eventScope(user), { concluded: false }] },
     include: {
       space: true,
       channels: { include: { by: true } },

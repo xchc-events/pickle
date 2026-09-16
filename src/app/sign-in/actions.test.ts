@@ -1,37 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { AccessDenied } from '@auth/core/errors'
 
 /**
- * `next-auth`'s entrypoint imports `next/server`, which will not resolve in a
- * plain node test. Its `AuthError` is a straight re-export of `@auth/core`'s
- * (next-auth/index.d.ts:76), and next-auth pins that package to an exact
- * version, so standing the real class in here is the same object the action
- * will meet at runtime — not a stub of it.
- */
-vi.mock('next-auth', async () => ({ ...(await vi.importActual('@auth/core/errors')) }))
-import { LINK_COOLDOWN_SECONDS } from '@/lib/auth-rules'
-
-/**
- * The wiring between the sign-in form and Auth.js.
+ * The sign-in page's two forms: a password, or a link by email.
  *
- * `mayRequestLink` and `mayAdmit` are already covered as pure rules in
- * auth-rules.test.ts. Nothing covered the wiring, and the wiring is where the
- * bug was: `signIn()` rethrows an `AuthError` out of a server action rather
- * than redirecting to `pages.error`, so a refused request reached the browser
- * as "An unexpected response was received from the server" instead of the
- * explanation the sign-in page already had copy for.
- *
- * These tests are therefore about what the *caller* does with a refusal, not
- * about whether the refusal is correct.
+ * Whether a password is right, and whether an address is throttled, are
+ * decided and tested in auth-data.ts and auth-rules.ts. These tests are about
+ * what the page does with the answer — above all, that it says nothing a
+ * stranger could use to learn which addresses have accounts.
  */
 
-const signIn = vi.fn()
-const lastLinkSentAt = vi.fn()
+const authData = { attemptPassword: vi.fn() }
+vi.mock('@/lib/auth-data', () => authData)
 
-vi.mock('@/lib/auth', () => ({
-  signIn: (...args: unknown[]) => signIn(...args),
-  lastLinkSentAt: (...args: unknown[]) => lastLinkSentAt(...args),
-}))
+const auth = { startSession: vi.fn() }
+vi.mock('@/lib/auth', () => auth)
+
+const links = { emailLinkQuietly: vi.fn() }
+vi.mock('@/lib/auth-links', () => links)
+
+const afterQueue: (() => unknown)[] = []
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => void afterQueue.push(fn) }))
 
 /** Stands in for Next's redirect, which signals by throwing. */
 class RedirectSignal extends Error {
@@ -39,111 +27,143 @@ class RedirectSignal extends Error {
     super(`NEXT_REDIRECT ${url}`)
   }
 }
-
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new RedirectSignal(url)
   },
 }))
 
-const { requestSignInLink } = await import('./actions')
+const { signInWithPassword, requestSignInLink, requestPasswordLink } = await import('./actions')
 
-function form(email: string): FormData {
+function form(fields: Record<string, string>): FormData {
   const fd = new FormData()
-  fd.set('email', email)
+  for (const [k, v] of Object.entries(fields)) fd.set(k, v)
   return fd
 }
 
-/** Run the action and report where it sent the browser. */
-async function redirectFor(email: string): Promise<string> {
-  try {
-    await requestSignInLink(form(email))
-  } catch (err) {
-    if (err instanceof RedirectSignal) return err.url
-    throw err
-  }
-  throw new Error('expected the action to redirect, but it returned')
-}
-
-const ago = (seconds: number) => new Date(Date.now() - seconds * 1000)
-
 beforeEach(() => {
-  signIn.mockReset().mockResolvedValue(undefined)
-  lastLinkSentAt.mockReset().mockResolvedValue(null)
+  for (const fn of [...Object.values(authData), ...Object.values(auth), ...Object.values(links)]) {
+    fn.mockReset()
+  }
+  afterQueue.length = 0
 })
 
-describe('requestSignInLink', () => {
-  it('asks Auth.js to send when no link has gone out recently', async () => {
-    await requestSignInLink(form('awhina@koura.test'))
+describe('signInWithPassword', () => {
+  const submit = (email: string, password: string) =>
+    signInWithPassword(null, form({ email, password }))
 
-    expect(signIn).toHaveBeenCalledWith('resend', {
-      email: 'awhina@koura.test',
-      redirectTo: '/',
+  it('opens a password session and sends them to the index when the password is right', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: true, userId: 'u_mere' })
+
+    await expect(submit('mere.tapu@xchc.co.nz', 'kettle harbour mitten')).rejects.toMatchObject({
+      url: '/',
     })
+    expect(auth.startSession).toHaveBeenCalledWith('u_mere', 'PASSWORD')
   })
 
-  it('refuses a second request inside the cooldown and says how long is left', async () => {
-    lastLinkSentAt.mockResolvedValue(ago(20))
+  /**
+   * The data layer already answers `wrong` for an unknown address, an
+   * account with no password and a wrong password alike. This is the other
+   * half: one sentence for all three.
+   */
+  it('gives one answer for a wrong password, whoever the address belongs to', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'wrong' })
 
-    const url = await redirectFor('awhina@koura.test')
+    const state = await submit('stranger@example.test', 'kettle harbour mitten')
 
-    expect(url).toBe(`/sign-in?wait=${LINK_COOLDOWN_SECONDS - 20}`)
+    expect(state?.error).toMatch(/do not match/i)
+    expect(auth.startSession).not.toHaveBeenCalled()
   })
 
-  it('sends no email at all when it refuses — the point is the unspent quota', async () => {
-    lastLinkSentAt.mockResolvedValue(ago(1))
-
-    await redirectFor('awhina@koura.test')
-
-    expect(signIn).not.toHaveBeenCalled()
+  it('points somebody who has never set a password at the way to get one', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'wrong' })
+    expect((await submit('mere.tapu@xchc.co.nz', 'guess'))?.error).toMatch(/never set|forgotten/i)
   })
 
-  it('allows another link once the cooldown has passed', async () => {
-    lastLinkSentAt.mockResolvedValue(ago(LINK_COOLDOWN_SECONDS + 1))
-
-    await requestSignInLink(form('awhina@koura.test'))
-
-    expect(signIn).toHaveBeenCalled()
+  it('tells somebody whose account is switched off that their access has ended', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'inactive' })
+    expect((await submit('left@xchc.co.nz', 'kettle harbour mitten'))?.error).toMatch(
+      /switched off/i,
+    )
+    expect(auth.startSession).not.toHaveBeenCalled()
   })
 
-  /** The reported bug: this used to escape as a Next.js runtime error. */
-  it('turns a refused sign-in into an explanation, not an unhandled error', async () => {
-    signIn.mockRejectedValue(new AccessDenied())
-
-    const url = await redirectFor('stranger@example.test')
-
-    expect(url).toBe('/sign-in?error=AccessDenied')
+  it('passes the throttle’s own explanation through, wait and all', async () => {
+    authData.attemptPassword.mockResolvedValue({
+      ok: false,
+      reason: 'throttled',
+      verdict: { ok: false, stopped: false, seconds: 240, why: 'Try again in 4 minutes.' },
+    })
+    expect((await submit('mere.tapu@xchc.co.nz', 'guess'))?.error).toBe('Try again in 4 minutes.')
   })
 
-  it("lets Next's own redirect through rather than swallowing it", async () => {
-    const theRedirect = new RedirectSignal('/')
-    signIn.mockRejectedValue(theRedirect)
+  it('hands the address back so it need not be typed again — and never the password', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'wrong' })
 
-    await expect(requestSignInLink(form('awhina@koura.test'))).rejects.toBe(theRedirect)
+    const state = await submit('mere.tapu@xchc.co.nz', 'kettle harbour mitten')
+
+    expect(state?.email).toBe('mere.tapu@xchc.co.nz')
+    expect(JSON.stringify(state)).not.toContain('kettle harbour mitten')
   })
 
-  it('does not disguise an unexpected failure as a sign-in problem', async () => {
+  it('normalises the address, so case cannot decide whether somebody gets in', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'wrong' })
+    await submit('  Mere.Tapu@XCHC.co.nz ', 'kettle harbour mitten')
+    expect(authData.attemptPassword).toHaveBeenCalledWith(
+      'mere.tapu@xchc.co.nz',
+      'kettle harbour mitten',
+    )
+  })
+
+  it('leaves the password exactly as typed — spaces are part of it', async () => {
+    authData.attemptPassword.mockResolvedValue({ ok: false, reason: 'wrong' })
+    await submit('mere.tapu@xchc.co.nz', ' kettle harbour mitten ')
+    expect(authData.attemptPassword.mock.calls[0][1]).toBe(' kettle harbour mitten ')
+  })
+
+  it('asks for both fields without checking anything when one is empty', async () => {
+    expect((await submit('mere.tapu@xchc.co.nz', ''))?.error).toMatch(/password/i)
+    expect((await submit('', 'kettle harbour mitten'))?.error).toMatch(/email/i)
+    expect(authData.attemptPassword).not.toHaveBeenCalled()
+  })
+
+  it('does not disguise a genuine fault as a wrong password', async () => {
     const boom = new Error('the database fell over')
-    signIn.mockRejectedValue(boom)
+    authData.attemptPassword.mockRejectedValue(boom)
+    await expect(submit('mere.tapu@xchc.co.nz', 'kettle harbour mitten')).rejects.toBe(boom)
+  })
+})
 
-    await expect(requestSignInLink(form('awhina@koura.test'))).rejects.toBe(boom)
+describe.each([
+  ['requestSignInLink', requestSignInLink, 'SIGN_IN'],
+  ['requestPasswordLink', requestPasswordLink, 'RESET'],
+] as const)('%s', (_, action, purpose) => {
+  it('answers the same way whether or not the address has an account', async () => {
+    const state = await action(null, form({ email: 'stranger@example.test' }))
+    expect(state).toEqual({ sentTo: 'stranger@example.test' })
   })
 
-  it('normalises the address before looking anything up, so case cannot decide', async () => {
-    await requestSignInLink(form('  Awhina@Koura.Test  '))
+  /**
+   * The lookup, the token and the email all happen after the response. If
+   * they happened before it, an address with an account would take a
+   * noticeably longer to answer than one without.
+   */
+  it('does its work after the response has gone, so the timing cannot tell either', async () => {
+    await action(null, form({ email: 'mere.tapu@xchc.co.nz' }))
+    expect(links.emailLinkQuietly).not.toHaveBeenCalled()
 
-    expect(lastLinkSentAt).toHaveBeenCalledWith('awhina@koura.test')
-    expect(signIn).toHaveBeenCalledWith('resend', {
-      email: 'awhina@koura.test',
-      redirectTo: '/',
-    })
+    await Promise.all(afterQueue.map((fn) => fn()))
+    expect(links.emailLinkQuietly).toHaveBeenCalledWith('mere.tapu@xchc.co.nz', purpose)
   })
 
-  it('refuses an empty address without touching the database', async () => {
-    const url = await redirectFor('   ')
+  it('normalises the address', async () => {
+    const state = await action(null, form({ email: '  Mere.Tapu@XCHC.co.nz ' }))
+    expect(state).toEqual({ sentTo: 'mere.tapu@xchc.co.nz' })
+  })
 
-    expect(url).toBe('/sign-in?error=AccessDenied')
-    expect(lastLinkSentAt).not.toHaveBeenCalled()
-    expect(signIn).not.toHaveBeenCalled()
+  it('refuses something that is not an email address, without doing anything', async () => {
+    const state = await action(null, form({ email: 'mere' }))
+    expect(state?.error).toMatch(/email/i)
+    expect(afterQueue).toHaveLength(0)
   })
 })

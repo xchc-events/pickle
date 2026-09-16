@@ -80,7 +80,8 @@ export interface Milestone {
 }
 
 export interface MilestoneInput {
-  stage: number
+  /** Whether the booking is confirmed — see `bookingStatus` on the event. */
+  confirmed: boolean
   depositRaised: boolean
   invoiceRaised: boolean
   review: ReviewState
@@ -131,9 +132,8 @@ export function milestonesFor(model: BookingModelKey, e: MilestoneInput): Milest
     {
       key: 'conf',
       label: 'Booking confirmed',
-      note:
-        e.stage >= 2 ? 'confirmed and held in the calendar' : 'not yet — finance signs off here',
-      done: e.stage >= 2,
+      note: e.confirmed ? 'confirmed and held in the calendar' : 'not yet — finance signs off here',
+      done: e.confirmed,
       action: null,
       heldByFlag: false,
     },

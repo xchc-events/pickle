@@ -11,7 +11,7 @@ Twelve modules, role-gated:
 | Module | Key | What it is for |
 | --- | --- | --- |
 | Home | `home` | Personal "needs you" queue, next event, my hours |
-| Pipeline | `pipeline` | All events by stage, with stage gates; opens the event record |
+| Pipeline | `pipeline` | All events, with a status for each part of each — see the 16 Sep 2026 note under Pipeline; opens the event record |
 | Ticketing | `ticketing` | Tiers, allocations, sales curve, door list |
 | Design | `design` | Asset checklist by tier (hero/lead/support), artist file collection |
 | Promotion | `promo` | Channel spread, platform push status, content rules |
@@ -103,10 +103,16 @@ Greeting + subline. Four-cell metric strip. Two columns: **"Needs you"** action 
 ### Pipeline
 Header with title/kicker/sub and a primary "New enquiry" button (hidden for roles that can't create). Filter row: stage chips + a divider + space chips. Events grouped by stage with `STAGES` names and playful internal nicknames (`NICK`: Fresh, Brining, Sealed, Labelling, On the Shelf, Crewing, Cracked, Tasting Notes) and per-stage target counts (`STAGE_TARGET`). Each row: name (224px), meta line with icon, stage progress bar, days-out, projection ("proj. $X" / "took $X" / "modelling"), owner avatar. Below: 4-cell metric strip and a **"Where the labour goes"** breakdown.
 
+> **Changed 16 Sep 2026 — each event carries a status per part, not one stage.** The eight stages moved an event through enquiry, negotiation, confirmation, design, on sale, rostering, show week and payout in that order. That is not how a night comes together at XCHC: tickets go on sale while the artwork is still being signed off, and a promoter can send the graphics for their whole tour with the booking enquiry. So the venue decided each event carries a status on each of eight parts — **Booking** (enquiry → negotiating → confirmed), **Design**, **Promo**, **Tickets**, **Licence**, **Tech**, **Roster** and **Settlement** — and the pipeline's eight cells show where each part stands on its own, rather than ticking off the stages behind a single cursor.
+>
+> Only the booking is moved by hand. Every other part's status is worked out from the records its own module keeps — the asset set, the listings, Gather.rsvp, the shifts, the actuals — so it cannot disagree with them and nobody types it twice. The one order between parts that still refuses is that **tickets do not go on sale until the booking is confirmed**. Design, promotion, tech and rostering may all run ahead of the booking. The column heads count the events still to finish each part; "sorted by time stuck" became "sorted by what needs attention", since there is no single stage to be stuck in. The first three nicknames (Fresh, Brining, Sealed) and stage targets (3 and 7 days) now belong to the booking; Labelling, On the Shelf, Crewing and Tasting Notes to the parts that grew out of their stages. See `src/lib/parts.ts`.
+
 ### Event record
 The hub. Back link, title, badges (stage, space, booking model), and tabbed/stacked sections: the enquiry facts (owner, date, space, kind of night), artists with fee floor/ceiling and status (`enquired`/`pencilled`/`confirmed`/`declined`) and file checkboxes (`RIDERS`: promo pics, bio, EPK, hospitality rider, tech rider), **Terms & split** (split slider, deal state `agreed`/`queried`/`sent`), licence state (`LICENCE`: not required/required/applied for/confirmed/denied), bar close time, leads per department, and an **activity feed** (initials, text, when) which everything writes into.
 
 **Stage gates** are the load-bearing interaction: each stage transition lists named conditions with a pass/fail state, a reason, and a deep link to the screen that fixes it. An event cannot advance while a gate fails. Gate sets are defined per transition in `gates(e)` — reproduce the full list from the prototype; examples: *An owner is named*, *Date is locked*, *At least one act confirmed*, *Fee floor and ceiling agreed*, *Terms agreed with the promoter*, *Bar close decided*, *Artist bios and pics in*, *Licence filed if it is needed*.
+
+> **Changed 16 Sep 2026.** The gates are now held by the parts (see the note under Pipeline). Every condition `gates(e)` defines is kept, worded as it was, on the part it belongs to, with its reason and its deep link — `src/lib/parts.test.ts` lists them and fails if one goes missing. One was folded rather than moved: *Door list pulled* tested exactly what *Tickets live on Gather.rsvp* tests. What changed is the ordering: finishing one department no longer holds another up. Two moves are still refused while a gate fails — moving the booking on (enquiry → negotiating → confirmed) and putting a counted night to bed — and the event record shows each part with its failing gates under it in place of a single "Move to …" gate list. Signing off the last piece of artwork no longer moves anything or pushes any listing; the bar budget now locks when tickets first go live on Gather.rsvp.
 
 ### Ticketing
 Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup = round(std × 1.2)`, plus a `door` price. A four-way `mix` (subsidised/standard/supporter/door proportions) produces the average ticket price. Shows allocation, sold count, sales curve, and door list. Source of truth is **Gather.rsvp**.
@@ -174,7 +180,7 @@ The **finance review sits before the deposit.** A red flag holds the invoice and
 
 ### Curator model milestones
 1. **Booking enquiry** — on record; the model runs off the enquiry figures. Always complete.
-2. **Booking confirmed** — confirmed and held in the calendar (complete at `stage >= 2`); if not yet, the sub-line reads *"not yet — finance signs off here."*
+2. **Booking confirmed** — confirmed and held in the calendar (complete at `stage >= 2` — since 16 Sep 2026, once the booking is confirmed); if not yet, the sub-line reads *"not yet — finance signs off here."*
 3. **Settlement invoice** — after the door count is in.
 
 The **finance review sits at booking confirmed, step 2.** The venue carries the downside on this model, so nothing is confirmed on a flagged event until the numbers move.
@@ -189,7 +195,7 @@ Sits above settlement on both paths. State machine: `pending → approved | flag
 finReview = { state: 'pending'|'approved'|'flagged', note: string, by: userInitials, when: string }
 ```
 
-Seeded as `approved` (by `SL`, "at confirmation") for events at `stage >= 4` or concluded; `pending` otherwise.
+Seeded as `approved` (by `SL`, "at confirmation") for events at `stage >= 4` — since 16 Sep 2026, events on sale — or concluded; `pending` otherwise.
 
 Panel contents:
 - **State chip** — icon `ph-seal-check` (approved) / `ph-flag` (flagged) / `ph-hourglass-medium` (pending), coloured `--st-good` / `--st-stop` / `--st-warn`. Panel border picks up the status colour when pending or flagged; background is a 6% tint of it.

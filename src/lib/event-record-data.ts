@@ -7,34 +7,36 @@ import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './fina
 import { marginHealth } from './finance'
 import { capacityOf, tierTable, normaliseMix, sellThrough, paceOf } from './ticketing'
 import { channelCards } from './promo'
-import { assetSpec } from './design'
-import { STAGES, NICK } from './constants'
 import { daysBetween } from './pipeline'
 import { halvesOf, type BarClose, type DoorCount } from './actuals'
 import {
-  advanceLabel,
-  canAdvance,
   gatesDoneLabel,
-  gatesFor,
-  gatesMessage,
   isLate,
   type DealState,
-  type Gate,
-  type GateEvent,
   type LeadKey,
   type LicenceState,
   type TechStatus,
 } from './event-record'
+import {
+  bookingStep,
+  nextMove,
+  partsFor,
+  type BookingStatus,
+  type NextMove,
+  type PartState,
+} from './parts'
+import { partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
 
 /**
  * Loads the event record — the hub the handoff calls it.
  *
  * Every figure on this page resolves back through `financeVals`, and every
- * gate through `gatesFor`. This file assembles and presents; it works nothing
- * out for itself. The one number it is tempted to compute inline is the fee
- * floor, and that comes off `financeVals` too, because the gate that reads it
- * and the Terms panel that shows it must not be able to disagree.
+ * part and its gates through `partsFor`. This file assembles and presents; it
+ * works nothing out for itself. The one number it is tempted to compute
+ * inline is the fee floor, and that comes off `financeVals` too, because the
+ * gate that reads it and the Terms panel that shows it must not be able to
+ * disagree.
  */
 
 export interface RecordLead {
@@ -101,14 +103,19 @@ export interface RecordActivity {
   when: string
 }
 
+/** A part of the event, with the count beside its gates already worded. */
+export type RecordPart = PartState & { gatesDone: string }
+
 export interface EventRecord {
   id: string
   name: string
   date: string
   dateTbc: boolean
-  stage: number
-  stageLabel: string
+  booking: BookingStatus
+  bookingLabel: string
   nickname: string
+  /** Days the booking has sat at its current status. */
+  bookingDays: number
   spaceName: string
   format: string
   kind: string
@@ -118,19 +125,18 @@ export interface EventRecord {
   model: 'dry' | 'curator'
   modelLabel: string
   daysToDoor: string
-  daysInStage: number
+  /** The night is today or behind us. What it took can be counted from here. */
+  nightHasCome: boolean
 
   ownerName: string | null
   ownerInitials: string | null
   leads: RecordLead[]
   facts: RecordFact[]
 
-  gates: Gate[]
-  gatesTitle: string
-  gatesDone: string
-  gatesMessage: string
-  canAdvance: boolean
-  advanceLabel: string
+  /** Where each of the eight parts stands, in pipeline order. */
+  parts: RecordPart[]
+  /** The one thing a person presses next, or null when there is nothing. */
+  next: (NextMove & { gatesDone: string }) | null
 
   deal: DealState
   dealNote: string | null
@@ -221,8 +227,9 @@ export async function loadEventRecord(
       id: true,
       name: true,
       dateTbc: true,
-      stage: true,
-      stageEnteredAt: true,
+      bookingStatus: true,
+      bookingStatusSince: true,
+      ownerId: true,
       concluded: true,
       model: true,
       licence: true,
@@ -255,7 +262,7 @@ export async function loadEventRecord(
           payee: { select: { name: true, files: { select: { kind: true } } } },
         },
       },
-      files: { select: { kind: true } },
+      files: { select: { kind: true, assetId: true, current: true, scan: true } },
       // Overrides FINANCE_SELECT's narrower shifts select, so it has to keep
       // `personId` — that is what `financeInputFor` reads to decide whether a
       // shift carries wage cost.
@@ -287,11 +294,11 @@ export async function loadEventRecord(
   // An external promoter with an account is somebody the venue can chase in a
   // portal rather than by email — several gates word themselves off that.
   //
-  // Matched the way `promUser` does in the prototype and `eventScope` does
-  // here: the org name is a substring of the event's promoter field. That is
-  // a comparison Postgres cannot express against a column, so the candidates
-  // come back and the match happens in memory — the same thing pipeline-data
-  // does at line 94.
+  // Matched the way `promUser` does in the prototype: the org name is a
+  // substring of the event's promoter field. That is a comparison Postgres
+  // cannot express against a column, so the candidates come back and the
+  // match happens in memory — exactly as pipeline-data matches it, so a part
+  // reads the same on both screens.
   const externals = await db.user.findMany({
     where: { role: 'PROMOTER', active: true, promoter: { not: null } },
     select: { promoter: true },
@@ -318,58 +325,6 @@ export async function loadEventRecord(
     }
   })
 
-  const gateInput: GateEvent = {
-    stage: row.stage,
-    hasOwner: row.owner !== null,
-    dateTbc: row.dateTbc,
-    hasSpace: !!row.space?.name,
-    kind: row.kind,
-    promoter: row.promoter,
-    internal: row.internal,
-    hasPortal,
-    split: row.split,
-    dealState: deal,
-    dealNote: row.dealNote,
-    barClose: row.barClose,
-    doors: row.doors,
-    allOut: row.allOut,
-    licence,
-    std: row.std,
-    // Gather.rsvp is the source of truth — tickets are live when its channel is.
-    ticketsLive: row.channels.some((c) => c.channel === 'gather' && c.live),
-    techStatus,
-    leads: {
-      ticketing: leadBy.has('ticketing'),
-      design: leadBy.has('design'),
-      promo: leadBy.has('promo'),
-      tech: leadBy.has('tech'),
-    },
-    artists: artists.map((a) => ({
-      status: a.status as 'enquired' | 'pencilled' | 'confirmed' | 'declined',
-      hasPromo: a.files.find((f) => f.kind === 'PRESS_SHOT')?.have ?? false,
-      hasBio: a.files.find((f) => f.kind === 'BIO')?.have ?? false,
-      hasTechRider: a.files.find((f) => f.kind === 'RIDER_TECH')?.have ?? false,
-    })),
-    assets: row.assets.map((a) => ({
-      key: a.key,
-      tier: (assetSpec(a.key)?.tier ?? 'support') as 'hero' | 'lead' | 'support',
-      state: a.state.toLowerCase() as 'draft' | 'review' | 'approved',
-      promoterSigned: a.promoterSigned,
-    })),
-    channels: row.channels.map((c) => ({ live: c.live, stale: c.stale })),
-    beatsDone: row.beats.filter((b) => b.done).length,
-    shifts: row.shifts.map((s) => ({
-      assigned: s.person !== null,
-      pencilled: s.state === 'ASKED',
-    })),
-    hoursLogged: row.hours.length,
-    tasksWithActual: row.tasks.filter((t) => (t.actual ?? 0) > 0).length,
-    doorCounted: false,
-    barClosed: false,
-    floor: vals.floor,
-    ceil: vals.ceil,
-  }
-
   // Actual is a one-to-one the finance select does not carry, so it needs its
   // own read. The figures come back with it rather than just whether they
   // exist: the forms on this page edit them, and a form that could only create
@@ -379,10 +334,17 @@ export async function loadEventRecord(
     select: { tickets: true, ticketRev: true, barTake: true, barProfit: true },
   })
   const halves = halvesOf(actual)
-  gateInput.doorCounted = halves.door !== null
-  gateInput.barClosed = halves.bar !== null
 
-  const gates = gatesFor(gateInput)
+  const now = new Date()
+  const input = partsInputFor(row, {
+    hasPortal,
+    floor: vals.floor,
+    ceil: vals.ceil,
+    actual,
+    now,
+  })
+  const next = nextMove(input)
+
   const capacity = capacityOf(row.space, row.format)
   const pace = paceOf({ sold: row.sold, breakeven: vals.breakeven })
   const health = marginHealth(vals)
@@ -413,16 +375,17 @@ export async function loadEventRecord(
   const onSiteHours = row.shifts.filter((s) => s.person !== null).reduce((n, s) => n + s.hours, 0)
   const offSiteHours = row.tasks.reduce((n, t) => n + (t.actual ?? t.est), 0)
 
-  const now = new Date()
+  const step = bookingStep(input.booking)
 
   return {
     id: row.id,
     name: row.name,
     date: dateLabel(row.date),
     dateTbc: row.dateTbc,
-    stage: row.stage,
-    stageLabel: STAGES[row.stage] ?? '—',
-    nickname: NICK[row.stage] ?? '',
+    booking: input.booking,
+    bookingLabel: step.label,
+    nickname: step.nick,
+    bookingDays: input.bookingDays,
     spaceName: row.space.name,
     format: row.format,
     kind: row.kind,
@@ -432,7 +395,7 @@ export async function loadEventRecord(
     model: row.model === 'DRY' ? 'dry' : 'curator',
     modelLabel: row.model === 'DRY' ? 'Dry hire' : 'Curator model',
     daysToDoor: days(daysBetween(now, row.date)),
-    daysInStage: daysBetween(row.stageEnteredAt, now),
+    nightHasCome: input.daysToDoor <= 0,
 
     ownerName: row.owner?.name ?? null,
     ownerInitials: row.owner?.initials ?? null,
@@ -459,15 +422,8 @@ export async function loadEventRecord(
       // editable one is two places showing the same field.
     ],
 
-    gates,
-    gatesTitle:
-      row.stage < STAGES.length - 1
-        ? `Before this moves to ${STAGES[row.stage + 1]}`
-        : 'Before this is put to bed',
-    gatesDone: gatesDoneLabel(gates),
-    gatesMessage: gatesMessage(gates, row.stage),
-    canAdvance: canAdvance(gates),
-    advanceLabel: advanceLabel(row.stage),
+    parts: partsFor(input).map((p) => ({ ...p, gatesDone: gatesDoneLabel(p.checks) })),
+    next: next ? { ...next, gatesDone: gatesDoneLabel(next.gates) } : null,
 
     deal,
     dealNote: row.dealNote,

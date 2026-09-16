@@ -3,6 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel } from './format'
 import { maskedPayee, type MaskedPayee } from './payments-data'
+import { bookingStep, type BookingStatus } from './parts'
 import type { SessionUser } from './session'
 
 /**
@@ -38,7 +39,11 @@ export interface PortalEvent {
   id: string
   name: string
   date: string
-  stage: number
+  /**
+   * Where the booking stands — the part a promoter is party to. The rest of
+   * an event's parts are the venue's own work, shown on the Pipeline.
+   */
+  bookingLabel: string
   /** Pieces of the set still waiting on this promoter's sign-off. */
   awaitingSignOff: number
 }
@@ -61,7 +66,7 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
       id: true,
       name: true,
       date: true,
-      stage: true,
+      bookingStatus: true,
       assets: { select: { key: true, state: true, promoterSigned: true } },
     },
     take: 20,
@@ -74,7 +79,7 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
       id: e.id,
       name: e.name,
       date: dateLabel(e.date),
-      stage: e.stage,
+      bookingLabel: bookingStep(e.bookingStatus.toLowerCase() as BookingStatus).label,
       awaitingSignOff: e.assets.filter((a) => a.state === 'REVIEW' && !a.promoterSigned).length,
     })),
   }

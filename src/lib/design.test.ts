@@ -99,27 +99,42 @@ describe('the design queue', () => {
     id: 'sb',
     name: 'Static Bloom',
     dateLabel: 'Sat 6 Sep',
-    stage: 3,
+    confirmed: true,
     leadName: 'Tui Ware',
     riskNote: null,
     riskKind: 'warn' as const,
   }
 
   it('calls out an event confirmed with nothing started', () => {
-    const row = designQueueRow({ ...base, stage: 2, assets: set({}) })
+    const row = designQueueRow({ ...base, assets: set({}) })
     expect(row.note).toBe('no brief yet')
     expect(row.noteTone).toBe('warn')
+  })
+
+  /**
+   * Design takes events from the enquiry on, because a promoter's tour
+   * artwork arrives with it. What it does not do is nag for a brief on a show
+   * that may not happen — the reason the queue used to start at Confirmed.
+   * It says the booking is unconfirmed instead, so nobody mistakes early work
+   * for a sure thing.
+   */
+  it('does not ask for a brief on a booking that is not confirmed', () => {
+    const row = designQueueRow({ ...base, confirmed: false, assets: set({}) })
+    expect(row.note).toBe('6 of 6 left · unconfirmed')
+    expect(row.noteTone).toBe('plain')
   })
 
   it('counts what is left once the set is under way', () => {
     const row = designQueueRow({ ...base, assets: set({ cover: 'approved' }) })
     expect(row.note).toBe('5 of 6 left · Sat 6 Sep')
+    const early = designQueueRow({ ...base, confirmed: false, assets: set({ cover: 'approved' }) })
+    expect(early.note).toBe('5 of 6 left · unconfirmed')
   })
 
   it('takes the stop colour from a stop-flagged event', () => {
     const row = designQueueRow({
       ...base,
-      assets: set({}),
+      assets: set({ cover: 'review' }),
       riskNote: 'Artwork awaiting sign-off 6d',
       riskKind: 'stop',
     })

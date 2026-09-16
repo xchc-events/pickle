@@ -1,10 +1,12 @@
 import 'server-only'
 import { db } from './db'
 import { financeVals, type FinanceEvent, type Scenario } from './finance'
-import { daysBetween, type PipelineEvent } from './pipeline'
+import type { PipelineEvent } from './pipeline'
 import { initialsOf } from './format'
 import { eventScope } from './scope'
 import { halvesOf } from './actuals'
+import { partsFor } from './parts'
+import { partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
 
 /**
@@ -12,7 +14,8 @@ import type { SessionUser } from './session'
  *
  * The scope clause comes from src/lib/permissions.ts and goes into the query,
  * so an external promoter's rows never leave the database. Every figure is
- * computed by src/lib/finance.ts — nothing is recomputed here.
+ * computed by src/lib/finance.ts, and every part's status by
+ * src/lib/parts.ts — nothing is recomputed here.
  */
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`
@@ -23,11 +26,18 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
     include: {
       space: true,
       owner: true,
-      artists: true,
+      // Payee files count towards an act's bios, pics and riders.
+      artists: { include: { payee: { select: { files: { select: { kind: true } } } } } },
       shifts: true,
       tasks: true,
       addons: true,
       actual: true,
+      leads: { select: { role: true } },
+      assets: { select: { key: true, state: true, promoterSigned: true } },
+      channels: { select: { channel: true, live: true, stale: true } },
+      beats: { select: { done: true } },
+      files: { select: { kind: true, assetId: true, current: true, scan: true } },
+      hours: { select: { id: true } },
     },
     orderBy: { date: 'asc' },
   })
@@ -98,6 +108,21 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
     // would be a counted figure plus nothing, read as the take.
     const halves = halvesOf(e.actual)
 
+    // The portal rule the event record words its gates off, kept identical to
+    // it — an outside promoter with an active account can be chased in it —
+    // so a part cannot read differently here from how it reads there.
+    const hasPortal =
+      !e.internal &&
+      externals.some((u) => u.active && u.promoter && (e.promoter ?? '').includes(u.promoter))
+
+    const input = partsInputFor(e, {
+      hasPortal,
+      floor: v.floor,
+      ceil: v.ceil,
+      actual: e.actual,
+      now,
+    })
+
     return {
       id: e.id,
       name: e.name,
@@ -105,9 +130,8 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
       format: e.format,
       spaceName: e.space.name,
       concluded: e.concluded,
-      stage: e.stage,
-      daysToDoor: daysBetween(now, e.date),
-      daysInStage: daysBetween(e.stageEnteredAt, now),
+      booking: input.booking,
+      daysToDoor: input.daysToDoor,
       riskNote: e.riskNote,
       riskKind: e.riskKind === 'STOP' ? 'stop' : 'warn',
       ownerInitials: e.owner?.initials ?? null,
@@ -121,6 +145,7 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
       hours: v.hours,
       taskHours: e.tasks.map((t) => ({ team: t.name, hours: t.actual ?? t.est })),
       onSiteHours: e.shifts.filter((s) => s.personId).reduce((a, s) => a + s.hours, 0),
+      parts: partsFor(input),
     } satisfies PipelineEvent
   })
 }

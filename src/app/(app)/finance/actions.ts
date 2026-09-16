@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { forgetDetails, revealFor, type RevealedDetails } from '@/lib/payments-data'
-import { issueGrant, revokeGrant } from '@/lib/grants-data'
+import { NO_LINK_ADDRESS, issueGrant, revokeGrant } from '@/lib/grants-data'
 import { grantStatus } from '@/lib/grants'
 import { said, type Said } from '@/lib/toast'
 import { record } from '@/lib/activity'
@@ -122,7 +122,12 @@ export async function revokeAllLinks(eventId: string, payeeId: string): Promise<
   )
 }
 
-/** Issue a fresh link, for a payee whose details never arrived. */
+/**
+ * Issue a fresh link, for a payee whose details never arrived.
+ *
+ * Refused, with nothing recorded, when there is no safe address to build the
+ * link on — the same refusal as Tech production's act link.
+ */
 export async function chaseDetails(
   eventId: string,
   payeeId: string,
@@ -138,6 +143,8 @@ export async function chaseDetails(
   if (!payee) return { ok: false, why: 'No such payee.' }
 
   const grant = await issueGrant(payeeId, 'PAYMENT_DETAILS', id, user.personId)
+  if (!grant) return { ok: false, why: NO_LINK_ADDRESS }
+
   await db.activity.create({
     data: {
       eventId: id,

@@ -3,6 +3,8 @@
 import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
+import { endSessions, recordAuthEvent } from '@/lib/auth-data'
+import { emailLink, type LinkOutcome } from '@/lib/auth-links'
 import { mayChangeRole, mayDeactivate, normaliseEmail } from '@/lib/auth-rules'
 import { said, type Said } from '@/lib/toast'
 import type { Role } from '@/generated/prisma/client'
@@ -11,17 +13,19 @@ import type { Role } from '@/generated/prisma/client'
  * Admin's mutations — who has access to this product.
  *
  * Every one of them re-checks the module for itself, like every other action
- * in the app. Two things are specific to this file:
+ * in the app. Three things are specific to this file:
  *
- *  - **Deactivating ends their sessions.** Setting `active: false` stops the
- *    next sign-in, but somebody already signed in would keep working until
- *    their session expired. For a venue, "they left on Friday" has to mean
- *    they are out on Friday, so the session rows go too. This is the reason
- *    auth.ts uses database sessions rather than JWTs — a JWT cannot be taken
- *    back.
+ *  - **Deactivating ends their sessions, and their unused links.** Setting
+ *    `active: false` stops the next sign-in, but somebody already signed in
+ *    would keep working until their session expired. For a venue, "they left
+ *    on Friday" has to mean they are out on Friday, so the session rows go
+ *    too. This is the reason sessions are database rows rather than JWTs —
+ *    see src/lib/auth.ts.
  *  - **The last administrator cannot be removed or demoted.** Neither is
  *    recoverable from inside the product, so both are refused rather than
  *    warned about. See `mayDeactivate` and `mayChangeRole` in auth-rules.ts.
+ *  - **Administrators never see or set anybody's password.** They send an
+ *    invitation, and the person chooses their own.
  */
 
 /** The count the last-admin guard is measured against. */
@@ -66,7 +70,7 @@ export async function addUser(form: FormData): Promise<Said> {
     if (taken) return said('That person already has an account.', 'stop')
   }
 
-  await db.user.create({
+  const created = await db.user.create({
     data: {
       email,
       name: name || [firstName, lastName].filter(Boolean).join(' ') || null,
@@ -80,9 +84,127 @@ export async function addUser(form: FormData): Promise<Said> {
   })
 
   refresh()
-  return said(
-    `${name || email} can sign in now. Nothing was emailed — send them the address of this site and they sign in with ${role === 'PROMOTER' ? 'a link to that address' : 'their XCHC Google account'}.`,
-  )
+  const who = name || email
+
+  if (form.get('invite') !== 'on') {
+    return said(
+      `${who} has an account. Nothing was emailed — send an invitation from their row when they are ready, or they can ask for a link from the sign-in page.`,
+    )
+  }
+
+  // The account exists either way, so a failed invitation is a warning here
+  // rather than a stop: there is something to retry from, not something lost.
+  const sent = await invite(created, user.id)
+  return said(`${who} has an account. ${sent.text}`, sent.kind === 'good' ? 'good' : 'warn')
+}
+
+/** What Admin says after trying to email an invitation. */
+function sayInvite(outcome: LinkOutcome, email: string): Said {
+  switch (outcome) {
+    case 'sent':
+      return said(`An invitation to choose a password is on its way to ${email}. It lasts 7 days.`)
+    case 'logged':
+      return said(
+        'Email is not set up on this install, so the invitation was written to the server log instead.',
+        'warn',
+      )
+    case 'cooling':
+      return said(`An email went to ${email} less than a minute ago. Give it a moment.`, 'warn')
+    case 'unavailable':
+      return said('Invitations cannot be sent from this install until AUTH_URL is set.', 'stop')
+    case 'unconfigured':
+      return said(
+        'Email is not configured on this install, so the invitation was not sent. Set AUTH_RESEND_KEY and EMAIL_FROM.',
+        'stop',
+      )
+  }
+}
+
+async function invite(
+  account: { id: string; email: string; name: string | null },
+  actorId: string,
+): Promise<Said> {
+  try {
+    return sayInvite(await emailLink(account, 'INVITE', actorId), account.email)
+  } catch (err) {
+    console.error('Sending an invitation failed:', err)
+    return said(
+      'The invitation was not sent — the mail service refused it. The server log has its reason.',
+      'stop',
+    )
+  }
+}
+
+/**
+ * Email somebody a week-long link to choose their first password.
+ *
+ * Only to an account with no password. Somebody who has one resets it
+ * themselves from the sign-in page, which proves they hold the inbox; an
+ * administrator mailing out password links for accounts that already have
+ * passwords would be a quiet way to take one over.
+ */
+export async function sendInvite(userId: string): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.role !== 'ADMIN') return said('Only an administrator can send invitations.', 'stop')
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, active: true, passwordHash: true },
+  })
+  if (!target) return said('No such account.', 'stop')
+
+  if (!target.active) {
+    return said(
+      'That account is switched off, so the link would not work. Turn it on first.',
+      'stop',
+    )
+  }
+  if (target.passwordHash) {
+    return said(
+      `${target.name ?? target.email} already has a password. If they have forgotten it, they can set a new one from the sign-in page.`,
+      'warn',
+    )
+  }
+
+  const result = await invite(target, user.id)
+  refresh()
+  return result
+}
+
+/**
+ * Sign somebody out everywhere, without switching them off.
+ *
+ * For a lost phone or a laptop left signed in at the bar. They can sign
+ * straight back in with their password; to stop that, switch the account off.
+ */
+export async function endSessionsFor(userId: string): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.role !== 'ADMIN') return said('Only an administrator can do that.', 'stop')
+
+  if (userId === user.id) {
+    return said('To sign yourself out of other browsers, use your account page.', 'warn')
+  }
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true },
+  })
+  if (!target) return said('No such account.', 'stop')
+
+  const ended = await endSessions(target.id)
+  await recordAuthEvent('SESSIONS_ENDED', {
+    email: target.email,
+    userId: target.id,
+    actorId: user.id,
+  })
+
+  refresh()
+  const who = target.name ?? target.email
+  return ended > 0
+    ? said(
+        `${who} is signed out everywhere — ${ended} ${ended === 1 ? 'session' : 'sessions'} ended. They can sign back in; switch the account off to stop that.`,
+      )
+    : said(`${who} had no open sessions.`, 'warn')
 }
 
 export async function setRole(userId: string, role: Role): Promise<Said> {
@@ -134,10 +256,13 @@ export async function setActive(userId: string, active: boolean): Promise<Said> 
   }
 
   // Their sessions go with the switch. Without this they would keep working
-  // until the session expired, which is not what "switched off" means.
+  // until the session expired, which is not what "switched off" means. So do
+  // links they have not used yet: spending one checks the account is on, but
+  // a pending invitation has no business outliving the account it was for.
   const [, ended] = await db.$transaction([
     db.user.update({ where: { id: userId }, data: { active: false } }),
     db.session.deleteMany({ where: { userId } }),
+    db.authToken.deleteMany({ where: { userId, usedAt: null } }),
   ])
 
   refresh()

@@ -143,7 +143,7 @@ export interface BeatSpec {
   channels: readonly string[]
 }
 
-/** The promo plan, in order. The first two are a stage gate. */
+/** The promo plan, in order. The first two are gated — see `GATED_BEATS`. */
 export const BEATS: readonly BeatSpec[] = [
   {
     key: 'announce',
@@ -180,8 +180,9 @@ export const BEATS: readonly BeatSpec[] = [
 export const BEAT_KEYS: readonly string[] = BEATS.map((b) => b.key)
 
 /**
- * How many beats have to be worked before an event can leave On sale. The
- * first two — announce and on sale — are the ones an event cannot be without.
+ * How many beats have to be worked before an event's promotion is finished.
+ * The first two — announce and on sale — are the ones an event cannot be
+ * without. See the Promo part in src/lib/parts.ts.
  */
 export const GATED_BEATS = 2
 

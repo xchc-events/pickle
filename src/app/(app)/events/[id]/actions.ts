@@ -6,19 +6,22 @@ import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
 import {
-  canAdvance,
   canChangeEventRecord,
   LICENCE_WORD,
+  type Gate,
   type LicenceState,
 } from '@/lib/event-record'
-import { STAGES } from '@/lib/constants'
+import { bookingStep, nextBooking, type BookingStatus } from '@/lib/parts'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
 import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-data'
 import { cleanDoor } from '@/lib/actuals'
-import { budgetToLock } from '@/lib/bar-data'
-import { nightFromBudget } from '@/lib/bar'
-import type { DealState, Licence, LeadRole } from '@/generated/prisma/client'
+import type {
+  BookingStatus as BookingStatusRow,
+  DealState,
+  Licence,
+  LeadRole,
+} from '@/generated/prisma/client'
 
 /**
  * The event record's own mutations.
@@ -57,14 +60,38 @@ const LICENCE_DB: Record<LicenceState, Licence> = {
   denied: 'DENIED',
 }
 
+const BOOKING_ROW: Record<BookingStatus, BookingStatusRow> = {
+  enquiry: 'ENQUIRY',
+  negotiating: 'NEGOTIATING',
+  confirmed: 'CONFIRMED',
+}
+
+/** The refusal for a move whose gates are not clear. Names the first blocker. */
+function heldUp(gates: Gate[]): string {
+  const blocked = gates.filter((g) => !g.ok)
+  return blocked.length === 1
+    ? `Still held up: ${blocked[0]!.label.toLowerCase()}.`
+    : `Still held up by ${blocked.length} things, starting with ${blocked[0]!.label.toLowerCase()}.`
+}
+
 /**
- * Move the event to the next stage.
+ * Move the booking one step on: enquiry to negotiating, negotiating to
+ * confirmed.
  *
- * The gates are re-evaluated here rather than trusted from the page. The
- * button being enabled is a convenience; this is the control, and an event
- * whose gates have failed since the page rendered does not advance.
+ * The booking is the one part of an event a person moves by hand — every
+ * other part's status is worked out from its own records — so this and
+ * `putToBed` are where the gates still refuse. They are re-evaluated here
+ * rather than trusted from the page: the button being enabled is a
+ * convenience, and a booking whose gates have failed since the page rendered
+ * does not move.
+ *
+ * `from` is the status the page showed. Without it, a page opened at Enquiry
+ * would confirm a booking somebody had moved to Negotiating in the meantime —
+ * one press, two steps, and tickets one click away on the strength of a
+ * button that said something else. The write is conditional on it too, so
+ * two presses in the same moment move the booking once.
  */
-export async function advanceStage(eventId: string): Promise<Said> {
+export async function advanceBooking(eventId: string, from: BookingStatus): Promise<Said> {
   const { user } = await requireModule('pipeline')
   const verdict = canChangeEventRecord(user)
   if (!verdict.ok) return said(verdict.why, 'stop')
@@ -73,66 +100,75 @@ export async function advanceStage(eventId: string): Promise<Said> {
   const rec = await loadEventRecord(user, id)
   if (!rec) return said('That event is not one you can move.', 'stop')
 
-  if (!canAdvance(rec.gates)) {
-    const blocked = rec.gates.filter((g) => !g.ok)
+  if (rec.booking !== from) {
     return said(
-      blocked.length === 1
-        ? `Still held up: ${blocked[0]!.label.toLowerCase()}.`
-        : `Still held up by ${blocked.length} things, starting with ${blocked[0]!.label.toLowerCase()}.`,
-      'stop',
+      `Nothing moved — the booking has moved on since this page was opened. It is at ${bookingStep(rec.booking).label} now.`,
+      'warn',
     )
   }
 
-  if (rec.stage >= STAGES.length - 1) {
-    await db.event.update({ where: { id }, data: { concluded: true } })
-    await record(id, user, 'put this event to bed')
-    refresh()
-    return said('Concluded — it moves off the pipeline and into Finance for settlement.')
+  const to = nextBooking(rec.booking)
+  if (!to || rec.next?.kind !== 'booking') {
+    return said('The booking is already confirmed — there is nowhere further for it to go.', 'warn')
   }
+  if (!rec.next.clear) return said(heldUp(rec.next.gates), 'stop')
 
-  const next = rec.stage + 1
-  const move = db.event.update({
-    where: { id },
-    // stageEnteredAt resets so days-in-stage counts from now. It is never
-    // stored as a duration, so it cannot go stale.
-    data: { stage: next, stageEnteredAt: new Date() },
+  const moved = await db.event.updateMany({
+    where: { id, bookingStatus: BOOKING_ROW[from] },
+    // bookingStatusSince restarts, so days-at-status counts from now. It is
+    // never stored as a duration, so it cannot go stale.
+    data: { bookingStatus: BOOKING_ROW[to], bookingStatusSince: new Date() },
   })
-
-  // The bar budget locks in the same transaction as the move to On sale, so
-  // every event that goes on sale has one, frozen at what was believed then.
-  // `update: {}` leaves a budget that already exists exactly as it was — a
-  // budget is never rewritten. See src/lib/bar.ts.
-  const budget = STAGES[next] === 'On sale' ? await budgetToLock(id) : null
-  if (budget) {
-    await db.$transaction([
-      move,
-      db.barBudget.upsert({
-        where: { eventId: id },
-        create: { eventId: id, ...budget, basis: 'ON_SALE', lockedBy: user.initials },
-        update: {},
-      }),
-    ])
-  } else {
-    await move
+  if (moved.count === 0) {
+    return said('Nothing moved — somebody moved this booking in the same moment.', 'warn')
   }
 
-  await record(id, user, `moved this to ${STAGES[next]}`)
-
-  if (budget) {
-    const night = nightFromBudget(budget)
-    await record(
-      id,
-      user,
-      `locked the bar budget — ${budget.heads} heads at ${money(budget.spendPerHead)}, ${money(night.take)} over the bar, ${money(night.margin)} after stock`,
-    )
-    refresh()
-    return said(
-      `Now at On sale — tickets can go live, and the bar budget is locked at ${money(night.margin)} after stock. The bar is measured against that from here.`,
-    )
-  }
+  const label = bookingStep(to).label
+  await record(
+    id,
+    user,
+    to === 'confirmed' ? 'confirmed the booking' : `moved the booking to ${label}`,
+  )
 
   refresh()
-  return said(`Now at ${STAGES[next]} — the next set of gates applies.`)
+  return said(
+    to === 'confirmed'
+      ? 'Booking confirmed — tickets can go on sale now.'
+      : `Now at ${label} — the terms are what hold it up next.`,
+  )
+}
+
+/**
+ * Put a counted night to bed.
+ *
+ * Only a confirmed booking whose night has happened gets here, and only once
+ * the hours are logged and both halves of the night are counted. Refused in
+ * words otherwise, for the same reason as `advanceBooking`: the page that drew
+ * the button is not the control.
+ */
+export async function putToBed(eventId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const rec = await loadEventRecord(user, id)
+  if (!rec) return said('That event is not one you can move.', 'stop')
+
+  if (rec.concluded) return said('This event is already put to bed.', 'warn')
+  if (rec.booking !== 'confirmed') {
+    return said('This booking was never confirmed, so there is no night to put to bed.', 'warn')
+  }
+  if (rec.next?.kind !== 'settle') {
+    return said('Not yet — a night is put to bed once it has happened and been counted.', 'warn')
+  }
+  if (!rec.next.clear) return said(heldUp(rec.next.gates), 'stop')
+
+  await db.event.update({ where: { id }, data: { concluded: true } })
+  await record(id, user, 'put this event to bed')
+
+  refresh()
+  return said('Concluded — it moves off the pipeline and into Finance for settlement.')
 }
 
 /**
@@ -181,8 +217,8 @@ export async function setLead(
  * Set where the special licence stands.
  *
  * Denied is not refused here — the council's answer is a fact, and the event
- * record has to be able to hold it. What it does is fail the stage gate, so
- * the coordinator has to change the bar close or the date.
+ * record has to be able to hold it. What it does is block the Licence part,
+ * red on the Pipeline, until the coordinator changes the bar close or the date.
  */
 export async function setLicence(eventId: string, state: LicenceState): Promise<Said> {
   const { user } = await requireModule('pipeline')
@@ -199,7 +235,7 @@ export async function setLicence(eventId: string, state: LicenceState): Promise<
   refresh()
   return said(
     state === 'denied'
-      ? 'Recorded as denied — the bar close or the date has to change before this can advance.'
+      ? 'Recorded as denied — the licence stays blocked until the bar close or the date changes.'
       : `Licence is ${LICENCE_WORD[state]}.`,
     state === 'denied' ? 'stop' : 'good',
   )
@@ -285,7 +321,7 @@ export async function setDateTbc(eventId: string, tbc: boolean): Promise<Said> {
 
   refresh()
   return said(
-    tbc ? 'Back to TBC — this cannot leave Enquiry until a date is held.' : 'Date locked.',
+    tbc ? 'Back to TBC — an enquiry cannot move on until a date is held.' : 'Date locked.',
     tbc ? 'warn' : 'good',
   )
 }
