@@ -171,7 +171,14 @@ export async function putToBed(eventId: string): Promise<Said> {
   return said('Concluded — it moves off the pipeline and into Finance for settlement.')
 }
 
-/** Assign or clear a department lead. */
+/**
+ * Assign or clear a department lead.
+ *
+ * An empty personId clears it, the same as null: LeadPicker's Unassigned
+ * option sends '', and what counts as nobody is settled here rather than left
+ * to whichever control calls the endpoint. A missing one clears too — Prisma
+ * ignores an undefined filter, so looking it up would find any active person.
+ */
 export async function setLead(
   eventId: string,
   role: LeadRole,
@@ -182,7 +189,7 @@ export async function setLead(
   if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
-  if (personId === null) {
+  if (!personId) {
     await db.eventLead.deleteMany({ where: { eventId: id, role } })
     await record(id, user, `left ${role.toLowerCase()} without a lead`)
     refresh()
