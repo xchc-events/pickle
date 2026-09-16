@@ -1,5 +1,6 @@
 import 'server-only'
 import { db } from './db'
+import { linkBase } from './auth-rules'
 import { expiryFrom, grantStatus, hashToken, mintToken, tokenLooksValid } from './grants'
 import type { GrantScope } from '@/generated/prisma/client'
 
@@ -77,12 +78,26 @@ export interface IssuedGrant {
 }
 
 /**
+ * What the coordinator is told when `issueGrant` refuses.
+ *
+ * One sentence for every screen that issues a link, so Tech and Finance cannot
+ * drift into saying different things about the same missing setting.
+ */
+export const NO_LINK_ADDRESS =
+  'Links cannot be issued from this install until AUTH_URL is set. No link was made — ask whoever looks after the install to set it.'
+
+/**
  * Mint a link for somebody outside the venue.
  *
  * The token is returned here and nowhere else. What goes into the database is
  * its hash, so this is the only moment the link exists in a readable form —
  * which is why the caller's job is to put it in front of the coordinator
  * immediately rather than store it for later.
+ *
+ * Null when there is nowhere safe to point it — see `linkBase` — and the caller
+ * says `NO_LINK_ADDRESS`. That is decided before the token is minted: a link to
+ * localhost looks fine to the coordinator who copies it and is dead to the act
+ * who opens it, and a grant nobody can follow is still a live credential.
  */
 export async function issueGrant(
   payeeId: string,
@@ -90,7 +105,15 @@ export async function issueGrant(
   eventId: string | null,
   createdById: string | null,
   now = new Date(),
-): Promise<IssuedGrant> {
+): Promise<IssuedGrant | null> {
+  const base = linkBase(process.env.AUTH_URL, process.env.NODE_ENV)
+  if (!base) {
+    console.error(
+      `Cannot issue a link (${scope}) for payee ${payeeId}: AUTH_URL is not set, so there is no safe address to point it at.`,
+    )
+    return null
+  }
+
   const token = mintToken()
   const expires = expiryFrom(now)
 
@@ -98,8 +121,7 @@ export async function issueGrant(
     data: { tokenHash: hashToken(token), scope, payeeId, eventId, createdById, expires },
   })
 
-  const base = process.env.AUTH_URL ?? 'http://localhost:3000'
-  return { url: `${base.replace(/\/$/, '')}/g/${token}`, expires }
+  return { url: `${base}/g/${token}`, expires }
 }
 
 /**
