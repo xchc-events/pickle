@@ -51,19 +51,22 @@ export function Sidebar({ user, modules }: { user: SessionUser; modules: ModuleK
       </nav>
 
       <div className={styles.foot}>
-        <Avatar
-          initials={user.initials}
-          title={user.name}
-          accent={user.initials === 'MT'}
-          external={user.external}
-        />
-        <span className={styles.who}>
-          <span className={styles.name}>{user.name}</span>
-          <span className={styles.role}>
-            {ROLE_LABEL[user.roleKey]}
-            {user.organisationName ? ` · ${user.organisationName}` : ''}
+        {/* Every account's own page — password and sessions — whatever the role. */}
+        <Link href="/account" className={styles.me} title="Your password and sessions">
+          <Avatar
+            initials={user.initials}
+            title={user.name}
+            accent={user.initials === 'MT'}
+            external={user.external}
+          />
+          <span className={styles.who}>
+            <span className={styles.name}>{user.name}</span>
+            <span className={styles.role}>
+              {ROLE_LABEL[user.roleKey]}
+              {user.organisationName ? ` · ${user.organisationName}` : ''}
+            </span>
           </span>
-        </span>
+        </Link>
         <form action={signOut}>
           <button type="submit" className={styles.out} title="Sign out">
             <i className="ph ph-sign-out" aria-hidden="true" />

@@ -8,11 +8,14 @@ import type { Role } from '@/generated/prisma/client'
 import styles from './admin.module.css'
 
 /**
- * One account, and the three things that can be changed about it.
+ * One account, and the things that can be changed about it.
  *
  * Everything saves on change rather than behind a Save button. There is no
  * draft state here worth protecting — each control is one field, and a row
  * that looks changed but is not saved is worse than a change that lands.
+ *
+ * A password never appears here in any form. The row says whether one is
+ * set, and an account without one can be sent an invitation to choose it.
  */
 export function UserRow({
   user,
@@ -24,6 +27,8 @@ export function UserRow({
   setActive,
   linkPerson,
   setOrganisation,
+  sendInvite,
+  endSessions,
 }: {
   user: AdminUser
   people: PersonOption[]
@@ -34,6 +39,8 @@ export function UserRow({
   setRole: (role: Role) => Promise<Said>
   setActive: (active: boolean) => Promise<Said>
   linkPerson: (personId: string) => Promise<Said>
+  sendInvite: () => Promise<Said>
+  endSessions: () => Promise<Said>
 }) {
   const say = useToast()
   const [pending, start] = useTransition()
@@ -98,18 +105,47 @@ export function UserRow({
       )}
 
       <span className={styles.signedIn}>
-        {user.everSignedIn ? (
-          <span className={styles.good} title="Has signed in with a real credential">
+        {user.lastSignIn ? (
+          <span className={styles.good} title="Last signed in with a real credential">
             <i className="ph ph-check-circle" aria-hidden="true" />
-            signed in
+            signed in {user.lastSignIn}
           </span>
         ) : (
           <span className={styles.quiet}>never signed in</span>
         )}
+
+        {user.hasPassword ? (
+          <span className={styles.quiet}>password set</span>
+        ) : user.active ? (
+          <button
+            type="button"
+            className={styles.inlineAction}
+            disabled={pending}
+            title="Email them a link to choose a password. It lasts 7 days."
+            onClick={() => run(sendInvite)}
+          >
+            no password · send invitation
+          </button>
+        ) : (
+          <span className={styles.quiet}>no password</span>
+        )}
+
         {user.liveSessions > 0 ? (
-          <span className={styles.sessions}>
-            {user.liveSessions} open {user.liveSessions === 1 ? 'session' : 'sessions'}
-          </span>
+          isSelf ? (
+            <span className={styles.sessions}>
+              {user.liveSessions} open {user.liveSessions === 1 ? 'session' : 'sessions'}
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.inlineAction} ${styles.sessions}`}
+              disabled={pending}
+              title="Sign them out of every browser. They can sign back in."
+              onClick={() => run(endSessions)}
+            >
+              {user.liveSessions} open {user.liveSessions === 1 ? 'session' : 'sessions'} · end
+            </button>
+          )
         ) : null}
       </span>
 

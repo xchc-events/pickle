@@ -2,7 +2,8 @@ import 'server-only'
 import { db } from './db'
 import { ROLE_LABEL, MODULES, type ModuleKey, type RoleKey } from './constants'
 import { roleKeyOf } from './session'
-import { initialsOf } from './format'
+import { ago, initialsOf } from './format'
+import { sessionState } from './auth-rules'
 import { userProblems } from './auth-rules'
 import type { Role } from '@/generated/prisma/client'
 
@@ -34,8 +35,10 @@ export interface AdminUser {
   initials: string
   /** Ways this account is set up wrongly. Not errors, but worth saying. */
   problems: string[]
-  /** Whether they have ever actually signed in with a real credential. */
-  everSignedIn: boolean
+  /** "3 days ago", or null if they have never signed in with a real credential. */
+  lastSignIn: string | null
+  /** Whether a password is set. Never the password, or anything derived from it. */
+  hasPassword: boolean
   liveSessions: number
 }
 
@@ -57,13 +60,16 @@ export interface AdminLoad {
 }
 
 export async function loadAdmin(): Promise<AdminLoad> {
+  const now = new Date()
   const rows = await db.user.findMany({
     orderBy: [{ active: 'desc' }, { role: 'asc' }, { email: 'asc' }],
     include: {
       person: { select: { id: true, name: true, initials: true } },
       organisation: { select: { id: true, name: true } },
-      accounts: { select: { provider: true } },
-      sessions: { where: { expires: { gt: new Date() } }, select: { sessionToken: true } },
+      sessions: {
+        where: { expires: { gt: now } },
+        select: { expires: true, lastSeenAt: true },
+      },
     },
   })
 
@@ -100,8 +106,10 @@ export async function loadAdmin(): Promise<AdminLoad> {
         organisationId: u.organisationId,
         personId: u.personId,
       }),
-      everSignedIn: u.accounts.length > 0 || u.emailVerified !== null,
-      liveSessions: u.sessions.length,
+      lastSignIn: u.lastSignInAt ? ago(u.lastSignInAt, now) : null,
+      hasPassword: u.passwordHash !== null,
+      // Past its idle limit a session is dead even before its row is cleared.
+      liveSessions: u.sessions.filter((x) => sessionState(x, now) === 'live').length,
     }
   })
 

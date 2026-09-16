@@ -1,44 +1,77 @@
 'use server'
 
-import { AuthError } from 'next-auth'
 import { redirect } from 'next/navigation'
-import { lastLinkSentAt, signIn } from '@/lib/auth'
-import { mayRequestLink, normaliseEmail } from '@/lib/auth-rules'
+import { after } from 'next/server'
+import { startSession } from '@/lib/auth'
+import { attemptPassword } from '@/lib/auth-data'
+import { emailLinkQuietly } from '@/lib/auth-links'
+import { normaliseEmail } from '@/lib/auth-rules'
 
 /**
- * Asking for a sign-in link.
+ * The sign-in page's forms.
  *
- * Auth.js's `signIn()` does not behave in a server action the way it does on
- * its own route: it **rethrows** an `AuthError` rather than redirecting to
- * `pages.error`. Nothing caught it, so a refusal — a throttled request, or an
- * address with no account — reached the browser as "An unexpected response
- * was received from the server" instead of the explanation the sign-in page
- * already had copy for. Catching it here is the whole point of this file.
+ * Each returns state for `useActionState` rather than redirecting with a
+ * query string, so a failed attempt keeps the address in the box and the
+ * message beside the form — and nothing about the attempt lands in a URL, a
+ * history entry or a proxy log.
  *
- * The cooldown is checked here as well as inside the provider. Not belt and
- * braces: only this side knows how many seconds are left in a form the page
- * can render, because Auth.js passes on an error *code* and discards the
- * sentence. The provider's own check still guards the /api/auth route.
+ * Where a successful sign-in lands is not decided here. Sending everybody to
+ * `/pipeline` would 404 the promoters, who do not have it, so it goes to `/`
+ * and the index puts each person where their permissions actually reach.
  */
-export async function requestSignInLink(formData: FormData): Promise<void> {
-  const email = normaliseEmail(String(formData.get('email') ?? ''))
 
-  // No address is not a sign-in attempt. Refused without a lookup so that an
-  // empty submit cannot be used to probe the token table.
-  if (!email) redirect('/sign-in?error=AccessDenied')
+export type SignInState = { error?: string; email?: string } | null
+export type LinkState = { error?: string; sentTo?: string } | null
 
-  const verdict = mayRequestLink(await lastLinkSentAt(email), new Date())
-  if (!verdict.ok) redirect(`/sign-in?wait=${verdict.seconds}`)
+const WRONG =
+  'That email address and password do not match. If you have never set a password, or have forgotten it, get a link by email below.'
 
-  try {
-    await signIn('resend', { email, redirectTo: '/' })
-  } catch (err) {
-    // Only Auth.js's own failures become a message. Everything else is
-    // rethrown untouched — including the redirect `signIn` throws when it
-    // succeeds, which is how the browser gets to the "check your email" page
-    // at all, and a genuine fault, which should stay loud rather than being
-    // dressed up as a sign-in problem.
-    if (err instanceof AuthError) redirect(`/sign-in?error=${encodeURIComponent(err.type)}`)
-    throw err
+const SWITCHED_OFF =
+  'That account has been switched off. If that is wrong, ask an administrator at the venue.'
+
+export async function signInWithPassword(_: SignInState, form: FormData): Promise<SignInState> {
+  const email = normaliseEmail(String(form.get('email') ?? ''))
+  // Never trimmed or normalised here: a space somebody typed is part of their
+  // password, and the hashing normalises Unicode itself.
+  const password = String(form.get('password') ?? '')
+
+  if (!email) return { error: 'Enter your email address.', email }
+  if (!password) return { error: 'Enter your password.', email }
+
+  const result = await attemptPassword(email, password)
+
+  if (!result.ok) {
+    if (result.reason === 'throttled') return { error: result.verdict.why, email }
+    if (result.reason === 'inactive') return { error: SWITCHED_OFF, email }
+    return { error: WRONG, email }
   }
+
+  await startSession(result.userId, 'PASSWORD')
+  redirect('/')
+}
+
+/**
+ * The two "email me a link" forms — to sign in, and to set a password.
+ *
+ * Both answer every well-formed address identically and immediately, and do
+ * the real work after the response. An address with an account, one without,
+ * a switched-off one and one that had a link a moment ago all look the same
+ * from the outside, in what the page says and in how long it took to say it.
+ */
+async function requestLink(form: FormData, purpose: 'SIGN_IN' | 'RESET'): Promise<LinkState> {
+  const email = normaliseEmail(String(form.get('email') ?? ''))
+  if (!/^[^\s@]+@[^\s@]+$/.test(email)) {
+    return { error: 'Enter the email address the venue has for you.' }
+  }
+
+  after(() => emailLinkQuietly(email, purpose))
+  return { sentTo: email }
+}
+
+export async function requestSignInLink(_: LinkState, form: FormData): Promise<LinkState> {
+  return requestLink(form, 'SIGN_IN')
+}
+
+export async function requestPasswordLink(_: LinkState, form: FormData): Promise<LinkState> {
+  return requestLink(form, 'RESET')
 }

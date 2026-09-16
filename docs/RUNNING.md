@@ -72,10 +72,18 @@ has been stopped for a day. Everything here assumes you stay out of it.
 
    Wait for `Ready in …`, then open <http://localhost:3000>.
 
-3. **Sign in as whoever you need to be.** No password locally —
-   <http://localhost:3000/sign-in> lists every seeded account, and clicking one
-   makes you them. Switching roles is the only real way to test a permissions
-   change.
+3. **Sign in as whoever you need to be.** No password needed locally —
+   <http://localhost:3000/sign-in> lists every seeded account under the real
+   sign-in form, and clicking one makes you them. Switching roles is the only
+   real way to test a permissions change.
+
+   To try **real** sign-in, ask for a password link on the sign-in page
+   ("Forgotten it, or never set one?") with a seeded address such as
+   `sl@xchc.test` (Sione Latu, the admin). Without Resend keys nothing is
+   emailed: the link appears in the terminal running `npm run dev`, in a box
+   starting `email · not sent`. Open it, choose a password, and you are signed
+   in with a real session — the only kind that can change a password or open a
+   payment detail.
 
 4. **Stop it with Ctrl+C** when you're done. The database keeps running, which
    is what you want.

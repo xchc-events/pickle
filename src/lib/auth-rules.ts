@@ -1,4 +1,4 @@
-import type { Role } from '@/generated/prisma/client'
+import type { AuthTokenPurpose, Role } from '@/generated/prisma/client'
 
 /**
  * Who may sign in, and who may change that.
@@ -166,7 +166,8 @@ export function userProblems(u: UserShape): string[] {
 // ----------------------------------------------------------- sign-in links ---
 
 /**
- * How long an address must wait between sign-in links.
+ * How long an account must wait between emailed links of any kind — sign-in,
+ * invitation or reset.
  *
  * Short enough that a real person who mistyped their address and tried again
  * barely notices, long enough that the form is not a way to send somebody a
@@ -211,6 +212,25 @@ export function mayRequestLink(lastSentAt: Date | null, now: Date): LinkVerdict 
   }
 }
 
+/** How long each kind of emailed link lives. */
+export const TOKEN_TTL_SECONDS: Record<AuthTokenPurpose, number> = {
+  /** A link is a credential, and one left unread overnight is a credential left overnight. */
+  SIGN_IN: 60 * 60,
+  /** The same hour. Somebody who asked for a reset is waiting for it. */
+  RESET: 60 * 60,
+  /** A week, because it is sent to somebody who has not started yet. */
+  INVITE: 7 * 24 * 60 * 60,
+}
+
+export type TokenState = 'open' | 'used' | 'expired'
+
+/** Where an emailed link stands. Spent on first use, unlike an `AccessGrant`. */
+export function tokenState(t: { expires: Date; usedAt: Date | null }, now: Date): TokenState {
+  if (t.usedAt) return 'used'
+  if (t.expires.getTime() <= now.getTime()) return 'expired'
+  return 'open'
+}
+
 /**
  * The address emailed links point at, or null if there is no safe one.
  *
@@ -227,4 +247,136 @@ export function linkBase(
   const url = configured?.trim()
   if (url) return url.replace(/\/+$/, '')
   return nodeEnv === 'production' ? null : 'http://localhost:3000'
+}
+
+// ---------------------------------------------------------------- passwords ---
+
+/** Wrong passwords in a row before anybody has to wait. People mistype. */
+export const FREE_ATTEMPTS = 5
+/** The longest single wait. */
+export const MAX_WAIT_MINUTES = 60
+/**
+ * Wrong passwords in a row after which password sign-in stops until a reset.
+ * NIST 800-63B's ceiling; at an hour apart it takes days to reach.
+ */
+export const STOP_AFTER = 100
+
+export interface Attempt {
+  /** `succeeded` is any sign-in that worked, or a password being set. */
+  outcome: 'failed' | 'succeeded'
+  at: Date
+}
+
+export type AttemptVerdict =
+  { ok: true } | { ok: false; stopped: boolean; seconds: number; why: string }
+
+function spoken(seconds: number): string {
+  if (seconds < 60) return seconds === 1 ? '1 second' : `${seconds} seconds`
+  const minutes = Math.ceil(seconds / 60)
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`
+}
+
+/**
+ * Whether a password may be checked for this address right now.
+ *
+ * `history` is the address's recent attempts, newest first. Only the unbroken
+ * run of failures at its head counts: anything that worked resets it.
+ *
+ * The first five wrong passwords cost nothing. From the fifth, each one
+ * doubles the wait before the next is checked — a minute, two, four — up to
+ * an hour, which holds a guesser to a couple of dozen tries a day. After a
+ * hundred in a row, password sign-in stops until the password is reset.
+ *
+ * Nothing here needs an administrator to undo, and nothing here blocks the
+ * emailed link. That is deliberate: a throttle anybody can trigger by typing a
+ * colleague's address is also a way to lock that colleague out, and the link is
+ * what keeps it from being one.
+ *
+ * Fails closed on a failure stamped in the future, unlike `mayRequestLink`: the
+ * worst case there is one extra email, and here it is extra guesses.
+ */
+export function mayAttemptPassword(history: readonly Attempt[], now: Date): AttemptVerdict {
+  let run = 0
+  for (const a of history) {
+    if (a.outcome !== 'failed') break
+    run++
+  }
+
+  if (run >= STOP_AFTER) {
+    return {
+      ok: false,
+      stopped: true,
+      seconds: 0,
+      why: 'Password sign-in for this address has been stopped after too many wrong passwords in a row. Reset the password by email to get back in.',
+    }
+  }
+
+  if (run < FREE_ATTEMPTS) return { ok: true }
+
+  const wait = Math.min(2 ** (run - FREE_ATTEMPTS), MAX_WAIT_MINUTES) * 60
+  const elapsed = Math.max(0, (now.getTime() - history[0].at.getTime()) / 1000)
+  if (elapsed >= wait) return { ok: true }
+
+  const seconds = Math.ceil(wait - elapsed)
+  return {
+    ok: false,
+    stopped: false,
+    seconds,
+    why: `Too many wrong passwords in a row for this address. Try again in ${spoken(seconds)}, or sign in with a link by email instead.`,
+  }
+}
+
+// ----------------------------------------------------------------- sessions ---
+
+/**
+ * The hard limit on a session: a fresh sign-in at least every thirty days, as
+ * NIST 800-63B asks, however much it is used. Without it a bar laptop that is
+ * never switched off stays signed in as whoever used it last, indefinitely.
+ */
+export const SESSION_MAX_DAYS = 30
+
+/**
+ * The idle limit: a session nobody has used for a fortnight ends early. Long
+ * enough that somebody who only works weekends stays signed in between shifts.
+ */
+export const SESSION_IDLE_DAYS = 14
+
+/** How often use is written back. Hourly is plenty to measure a fortnight by. */
+export const SESSION_TOUCH_MINUTES = 60
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+export type SessionState = 'live' | 'idle' | 'expired'
+
+export function sessionState(s: { expires: Date; lastSeenAt: Date }, now: Date): SessionState {
+  if (now.getTime() >= s.expires.getTime()) return 'expired'
+  if (now.getTime() - s.lastSeenAt.getTime() >= SESSION_IDLE_DAYS * DAY_MS) return 'idle'
+  return 'live'
+}
+
+/** When a session signed in at `at` must end regardless. */
+export function sessionExpiry(at: Date): Date {
+  return new Date(at.getTime() + SESSION_MAX_DAYS * DAY_MS)
+}
+
+export function shouldTouchSession(lastSeenAt: Date, now: Date): boolean {
+  return now.getTime() - lastSeenAt.getTime() >= SESSION_TOUCH_MINUTES * 60 * 1000
+}
+
+/**
+ * The session cookie's name and whether it is Secure.
+ *
+ * Over https it is `__Host-` prefixed, which makes the browser insist on
+ * Secure, the whole site as its path, and this exact host — no subdomain can
+ * plant or read it. Browsers refuse that over plain http, so the dev server
+ * gets a plain name. The configured address decides, since that is what the
+ * site is actually served on; production with none configured assumes https.
+ */
+export function sessionCookie(
+  configured: string | undefined,
+  nodeEnv: string | undefined,
+): { name: string; secure: boolean } {
+  const url = configured?.trim()
+  const secure = url ? url.startsWith('https://') : nodeEnv === 'production'
+  return { name: secure ? '__Host-pickle_session' : 'pickle_session', secure }
 }

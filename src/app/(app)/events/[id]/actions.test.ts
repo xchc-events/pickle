@@ -82,6 +82,7 @@ const call = (name: string) => actions[name]!(EVENT, ...(ARGS[name] ?? []))
 
 const awhina = {
   id: 'user_awhina',
+  email: 'awhina@koura.test',
   name: 'Awhina Reid',
   role: 'PROMOTER',
   roleKey: 'promoter',
@@ -91,10 +92,12 @@ const awhina = {
   personId: null,
   initials: 'AR',
   authenticated: true,
+  sessionId: 'session_awhina',
 } satisfies SessionUser
 
 const mere = {
   id: 'user_mere',
+  email: 'mere@xchc.test',
   name: 'Mere Tapu',
   role: 'COORDINATOR',
   roleKey: 'coordinator',
@@ -104,6 +107,7 @@ const mere = {
   personId: 'person_mere',
   initials: 'MT',
   authenticated: true,
+  sessionId: 'session_mere',
 } satisfies SessionUser
 
 const refusal = canChangeEventRecord(awhina)
