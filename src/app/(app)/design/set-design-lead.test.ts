@@ -68,6 +68,7 @@ const EVENT = 'evt_slow_fold'
 
 const coordinator = {
   id: 'user_mere',
+  email: 'mere@xchc.test',
   name: 'Mere Tapu',
   role: 'COORDINATOR',
   roleKey: 'coordinator',
@@ -77,6 +78,7 @@ const coordinator = {
   personId: 'person_mere',
   initials: 'MT',
   authenticated: true,
+  sessionId: 'session_mere',
 } satisfies SessionUser
 
 const CLEARED = {

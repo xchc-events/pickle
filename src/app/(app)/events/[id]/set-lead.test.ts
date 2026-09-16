@@ -68,7 +68,6 @@ vi.mock('next/cache', () => ({ refresh: (...args: unknown[]) => refresh(...args)
 
 // Server-only neighbours of setLead in actions.ts. It reaches none of them.
 vi.mock('@/lib/event-record-data', () => ({ loadEventRecord: vi.fn() }))
-vi.mock('@/lib/bar-data', () => ({ budgetToLock: vi.fn() }))
 vi.mock('@/lib/holds-data', () => ({
   placeHold: vi.fn(),
   confirmHold: vi.fn(),
@@ -82,6 +81,7 @@ const EVENT = 'evt_slow_fold'
 
 const coordinator = {
   id: 'user_mere',
+  email: 'mere@xchc.test',
   name: 'Mere Tapu',
   role: 'COORDINATOR',
   roleKey: 'coordinator',
@@ -91,6 +91,7 @@ const coordinator = {
   personId: 'person_mere',
   initials: 'MT',
   authenticated: true,
+  sessionId: 'session_mere',
 } satisfies SessionUser
 
 const CLEARED = {
