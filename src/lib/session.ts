@@ -1,7 +1,8 @@
 import 'server-only'
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { db } from './db'
-import { auth, authConfigured } from './auth'
+import { currentSession } from './auth'
 import type { Role } from '@/generated/prisma/client'
 import type { RoleKey } from './constants'
 import { initialsOf } from './format'
@@ -12,8 +13,9 @@ import { initialsOf } from './format'
  * Two ways in, and the difference between them is recorded on the result
  * rather than assumed:
  *
- *  - A **real Auth.js session**, backed by a credential the person actually
- *    holds. `authenticated` is true.
+ *  - A **real session** (src/lib/auth.ts), opened with a password or an
+ *    emailed link — a credential the person actually holds. `authenticated`
+ *    is true, and `sessionId` names the session.
  *  - The **development role picker**, a cookie carrying a user id and nothing
  *    else. Anyone who can set it can be anyone, so it is refused outright
  *    outside development, and where it is allowed `authenticated` is false.
@@ -33,6 +35,8 @@ export const SESSION_COOKIE = 'pickle_uid'
 
 export type SessionUser = {
   id: string
+  /** The address on the account — what they sign in with, and where links go. */
+  email: string
   name: string
   role: Role
   roleKey: RoleKey
@@ -49,15 +53,14 @@ export type SessionUser = {
   initials: string
   /** Whether a real credential backs this request. False for the dev stub. */
   authenticated: boolean
+  /** The session behind the request. Null for the dev stub, which has none. */
+  sessionId: string | null
 }
 
 export const roleKeyOf = (role: Role): RoleKey => role.toLowerCase() as RoleKey
 
 /** The dev role picker is only ever available outside production. */
 export const stubAllowed = process.env.NODE_ENV !== 'production'
-
-/** Whether real sign-in is available on this install. */
-export { authConfigured }
 
 const USER_INCLUDE = {
   person: true,
@@ -69,9 +72,10 @@ type Row = NonNullable<Awaited<ReturnType<typeof db.user.findFirst>>> & {
   organisation?: { id: string; name: string } | null
 }
 
-function shape(u: Row, authenticated: boolean): SessionUser {
+function shape(u: Row, sessionId: string | null): SessionUser {
   return {
     id: u.id,
+    email: u.email,
     name: u.name ?? u.person?.name ?? u.email,
     role: u.role,
     roleKey: roleKeyOf(u.role),
@@ -80,24 +84,25 @@ function shape(u: Row, authenticated: boolean): SessionUser {
     external: u.role === 'PROMOTER',
     personId: u.personId,
     initials: u.person?.initials ?? initialsOf(u.name ?? u.email),
-    authenticated,
+    authenticated: sessionId !== null,
+    sessionId,
   }
 }
 
-export async function currentUser(): Promise<SessionUser | null> {
+/** Memoised per request, like the session under it. */
+export const currentUser = cache(async (): Promise<SessionUser | null> => {
   // A real session wins wherever there is one.
-  if (authConfigured) {
-    const session = await auth()
-    const id = session?.user?.id
+  const session = await currentSession()
+  if (session) {
+    const u = await db.user.findFirst({
+      where: { id: session.userId, active: true },
+      include: USER_INCLUDE,
+    })
+    if (u) return shape(u, session.id)
 
-    if (id) {
-      const u = await db.user.findFirst({ where: { id, active: true }, include: USER_INCLUDE })
-      if (u) return shape(u, true)
-
-      // A live session whose account has since been switched off. Falling
-      // through to the stub here would quietly re-admit them, so stop.
-      return null
-    }
+    // A live session whose account has since been switched off. Falling
+    // through to the stub here would quietly re-admit them, so stop.
+    return null
   }
 
   if (!stubAllowed) return null
@@ -109,5 +114,5 @@ export async function currentUser(): Promise<SessionUser | null> {
   const u = await db.user.findFirst({ where: { id, active: true }, include: USER_INCLUDE })
   if (!u) return null
 
-  return shape(u, false)
-}
+  return shape(u, null)
+})

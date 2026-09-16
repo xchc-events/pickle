@@ -53,15 +53,28 @@ enum Role {
   PROMOTER
 }
 
-/// Auth.js account. Permissions are enforced server-side off `role`; the
-/// sidebar hiding a module is a convenience, never the control.
+/// An account. Permissions are enforced server-side off `role`; the sidebar
+/// hiding a module is a convenience, never the control.
+///
+/// Made by an administrator in Admin and nowhere else — nothing on the
+/// sign-in path can create one. See src/lib/auth.ts.
 model User {
   id       String  @id @default(cuid())
   email    String  @unique
   name     String?
-  image    String?
   role     Role    @default(COORDINATOR)
   active   Boolean @default(true)
+
+  // --- credentials ---
+  //
+  /// scrypt, in the PHC format src/lib/password.ts writes. Never the password.
+  /// Null until the person sets one from an invitation or reset link — until
+  /// then an emailed sign-in link is their only way in.
+  passwordHash      String?
+  passwordChangedAt DateTime?
+  /// The last sign-in that succeeded, by either route. Shown in Admin, so an
+  /// account nobody has used in months is visible as one.
+  lastSignInAt      DateTime?
 
   // --- external promoters and curators ---
   //
@@ -91,44 +104,137 @@ model User {
   personId String? @unique
   person   Person? @relation(fields: [personId], references: [id])
 
-  emailVerified DateTime?
-  accounts      Account[]
-  sessions      Session[]
+  sessions   Session[]
+  authTokens AuthToken[]
+  authEvents AuthEvent[] @relation("AuthEventSubject")
+  /// Things this account did to other accounts' access — invitations sent,
+  /// sessions ended. Only ever an administrator.
+  authActs   AuthEvent[] @relation("AuthEventActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model Account {
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+// --------------------------------------------------------------- sign-in ---
 
-  @@id([provider, providerAccountId])
+/// How a session came to exist.
+enum SignInMethod {
+  PASSWORD
+  /// A link emailed to the address on the account — sign-in, invitation or
+  /// reset. Every one of them proves the inbox rather than a secret.
+  EMAIL_LINK
 }
 
+/// A signed-in browser.
+///
+/// Stored in the database rather than in a signed cookie, so that it can be
+/// taken back: switching somebody off in Admin, resetting a password, or
+/// "sign out everywhere else" deletes rows, and the next request from those
+/// browsers finds nothing. A JWT cannot be recalled that way.
+///
+/// Only the SHA-256 of the cookie's value is kept, as with `AccessGrant`. A
+/// copy of this table is a list of who was signed in, not a way to be them.
 model Session {
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String       @id @default(cuid())
+  tokenHash  String       @unique
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method     SignInMethod
+  /// Browser and platform as the browser described itself, so a person can
+  /// recognise "the bar laptop" in their own list. Display only; trivially
+  /// forged, and never used to decide anything.
+  userAgent  String?
+  createdAt  DateTime     @default(now())
+  /// Hard end: sign-in plus SESSION_MAX_DAYS, however much it is used.
+  expires    DateTime
+  /// Pushed forward at most hourly. A session unused for SESSION_IDLE_DAYS
+  /// ends before `expires` does. See `sessionState` in src/lib/auth-rules.ts.
+  lastSeenAt DateTime     @default(now())
+
+  @@index([userId])
 }
 
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
+enum AuthTokenPurpose {
+  /// Signs somebody in. One hour.
+  SIGN_IN
+  /// Sent by an administrator: set a first password. Seven days — it waits in
+  /// an inbox for somebody who has not started yet.
+  INVITE
+  /// Asked for from "forgot your password": set a new one. One hour.
+  RESET
+}
 
-  @@id([identifier, token])
+/// A single-use link emailed to the address on an account.
+///
+/// The token is the credential, so it is handled like `AccessGrant`'s: 32
+/// random bytes, only the SHA-256 stored, spent the first time it is used.
+/// Issuing a new link deletes any unspent one of the same family — there is
+/// only ever one live password link for an account, and it is the latest.
+model AuthToken {
+  id        String           @id @default(cuid())
+  tokenHash String           @unique
+  purpose   AuthTokenPurpose
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires   DateTime
+  usedAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, purpose])
+}
+
+enum AuthEventKind {
+  PASSWORD_SIGN_IN
+  PASSWORD_FAILED
+  LINK_SIGN_IN
+  LINK_SENT
+  INVITE_SENT
+  RESET_SENT
+  /// A first password, set from an invitation.
+  PASSWORD_SET
+  /// Set from a reset link.
+  PASSWORD_RESET
+  /// Changed from the account page, knowing the old one.
+  PASSWORD_CHANGED
+  SIGNED_OUT
+  /// Somebody's sessions ended by something other than signing out: their own
+  /// "sign out everywhere else", or an administrator.
+  SESSIONS_ENDED
+  /// The right credential for an account that has been switched off.
+  REFUSED_INACTIVE
+}
+
+/// The sign-in audit trail.
+///
+/// Append-only, like `Activity`, and separate from it because `Activity`
+/// belongs to an event and a sign-in belongs to nobody's event. Every attempt
+/// that reaches a password check writes a row here, successful or not, and
+/// the wrong-password throttle is counted from these rows rather than kept
+/// anywhere else — so the thing that decides a lockout is also the record of
+/// it.
+///
+/// `email` is the address as typed, normalised, whether or not it has an
+/// account. That is what lets an address with no account be throttled exactly
+/// like one with an account, so the throttle cannot be used to find out which
+/// addresses are on file.
+model AuthEvent {
+  id        String        @id @default(cuid())
+  kind      AuthEventKind
+  email     String
+  userId    String?
+  user      User?         @relation("AuthEventSubject", fields: [userId], references: [id])
+  /// Who did it, when that is not the account itself — an administrator
+  /// sending an invitation or ending somebody's sessions.
+  actorId   String?
+  actor     User?         @relation("AuthEventActor", fields: [actorId], references: [id])
+  /// The client address as reported by the proxy in front of the app.
+  /// Forensics only: behind an unknown proxy it is whatever the client said.
+  ip        String?
+  userAgent String?
+  at        DateTime      @default(now())
+
+  @@index([email, at])
+  @@index([userId, at])
 }
 
 /// Weekly hour cap, volunteer hours, and yes/no day-period preferences
