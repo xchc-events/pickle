@@ -13,6 +13,7 @@ import type { SessionUser } from '@/lib/session'
 
 const ana = {
   id: 'user_ana',
+  email: 'ana@xchc.test',
   name: 'Ana Kelliher',
   role: 'BAR',
   roleKey: 'bar',
@@ -22,6 +23,7 @@ const ana = {
   personId: 'person_ana',
   initials: 'AK',
   authenticated: true,
+  sessionId: 'session_ana',
 } satisfies SessionUser
 
 vi.mock('@/lib/permissions', () => ({

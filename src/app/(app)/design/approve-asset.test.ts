@@ -44,6 +44,7 @@ vi.mock('next/cache', () => ({ refresh: vi.fn() }))
 
 const tui = {
   id: 'user_tui',
+  email: 'tui@xchc.test',
   name: 'Tui Ware',
   role: 'DESIGN',
   roleKey: 'design',
@@ -53,6 +54,7 @@ const tui = {
   personId: 'person_tui',
   initials: 'TW',
   authenticated: true,
+  sessionId: 'session_tui',
 } satisfies SessionUser
 
 const { approveAsset } = await import('./actions')
