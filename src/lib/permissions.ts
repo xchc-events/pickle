@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { db } from './db'
 import type { ModuleKey } from './constants'
 import { currentUser, type SessionUser } from './session'
-import { eventScope } from './scope'
+import { eventScope, modulesOpenTo } from './scope'
 
 /**
  * Server-side access control.
@@ -14,13 +14,22 @@ import { eventScope } from './scope'
  * cannot see is also unreachable by URL and by direct POST.
  */
 
-/** Modules this role may see, read from the database, not from a constant. */
+/**
+ * Modules this user may open, read from the database, not from a constant.
+ *
+ * Less the venue's own for an outside account, whatever its role's rows say
+ * (`modulesOpenTo`). The sidebar and `requireModule` both read this list, so
+ * a module dropped here is gone from the nav and a 404 by URL in one place.
+ */
 export async function modulesFor(user: SessionUser): Promise<ModuleKey[]> {
   const rows = await db.modulePermission.findMany({
     where: { role: user.role },
     select: { module: true },
   })
-  return rows.map((r) => r.module as ModuleKey)
+  return modulesOpenTo(
+    user,
+    rows.map((r) => r.module as ModuleKey),
+  )
 }
 
 export async function canSee(user: SessionUser, moduleKey: ModuleKey): Promise<boolean> {

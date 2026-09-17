@@ -4,9 +4,10 @@ import { BUILT_MODULES, MODULES, type ModuleKey } from './constants'
  * The module nav, as a list.
  *
  * Drawn twice — as the sidebar on a wide screen, and in the menu sheet on a
- * narrow one — and both draw this, built from the role's ModulePermission
- * rows. It is a convenience, not the control: a module left off it is refused
- * by URL too. See src/lib/permissions.ts.
+ * narrow one — and both draw this, built from `modulesFor`: the role's
+ * ModulePermission rows, less the venue's own for an outside account. It is a
+ * convenience, not the control: a module left off it is refused by URL too.
+ * See src/lib/permissions.ts.
  */
 
 export interface NavItem {

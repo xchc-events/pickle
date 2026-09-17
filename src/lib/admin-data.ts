@@ -1,7 +1,8 @@
 import 'server-only'
 import { db } from './db'
-import { ROLE_LABEL, MODULES, type ModuleKey, type RoleKey } from './constants'
+import { ROLE_LABEL, MODULES, type RoleKey } from './constants'
 import { roleKeyOf } from './session'
+import { modulesOpenByRole } from './scope'
 import { ago, initialsOf } from './format'
 import { sessionState } from './auth-rules'
 import { userProblems } from './auth-rules'
@@ -73,13 +74,9 @@ export async function loadAdmin(): Promise<AdminLoad> {
     },
   })
 
-  const perms = await db.modulePermission.findMany()
-  const byRole = new Map<string, ModuleKey[]>()
-  for (const p of perms) {
-    const list = byRole.get(p.role) ?? []
-    list.push(p.module as ModuleKey)
-    byRole.set(p.role, list)
-  }
+  // What each account can actually open, which for an outside account is less
+  // than its role's rows say.
+  const byRole = modulesOpenByRole(await db.modulePermission.findMany())
 
   const users: AdminUser[] = rows.map((u) => {
     const mods = byRole.get(u.role) ?? []
