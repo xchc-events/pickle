@@ -21,6 +21,14 @@ npm run db:migrate
 npm run dev
 ```
 
+## Deploying
+
+There's a `pickle-test` site on Cloudflare that deploys itself: every merge
+to `main` runs the "Deploy test site" workflow, and nobody runs a deploy
+command by hand. See [`docs/deploying.md`](docs/deploying.md) for the
+one-time account setup, day-to-day operations, and putting it on
+`xchc.co.nz`.
+
 ## Before you open a PR
 
 ```bash

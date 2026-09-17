@@ -190,13 +190,14 @@ the same as the page rendering.
 
 ## When something looks broken
 
-| What you see                                                     | What it is                                                                  | Fix                                                                        | Where  |
-| ---------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ |
-| Every page 500s after new work                                   | Server holding a pre-migration Prisma client                                | Ctrl+C, `npm run dev`                                                      | Mac    |
-| `Another next dev server is already running`                     | An old server still holds port 3000                                         | `lsof -ti:3000 \| xargs kill`                                              | Mac    |
-| `ECONNREFUSED` / `Can't reach database server at localhost:5432` | The real container is stopped or was replaced by a bare `docker compose up` | `docker start pickleevents_devcontainer-db-1` — see the compose trap above | Docker |
-| `Unknown field … for select statement`                           | Same cached-client problem                                                  | `npm run db:generate`, restart                                             | Mac    |
-| `.env.example: Operation not permitted`                          | Claude's sandbox refusing to read env files                                 | Ignore — never happens in your terminal                                    | Mac    |
+| What you see                                                                                          | What it is                                                                                                         | Fix                                                                        | Where  |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------ |
+| Every page 500s after new work                                                                        | Server holding a pre-migration Prisma client                                                                       | Ctrl+C, `npm run dev`                                                      | Mac    |
+| `Another next dev server is already running`                                                          | An old server still holds port 3000                                                                                | `lsof -ti:3000 \| xargs kill`                                              | Mac    |
+| `ECONNREFUSED` / `Can't reach database server at localhost:5432`                                      | The real container is stopped or was replaced by a bare `docker compose up`                                        | `docker start pickleevents_devcontainer-db-1` — see the compose trap above | Docker |
+| `Unknown field … for select statement`                                                                | Same cached-client problem                                                                                         | `npm run db:generate`, restart                                             | Mac    |
+| `Cannot find module '@/generated/prisma/client'` after pulling `main`, or Prisma types suddenly wrong | The Prisma generator changed with the Cloudflare work (two clients now) and the old files are still beside the new | `rm -rf src/generated && npm run db:generate`, restart                     | Mac    |
+| `.env.example: Operation not permitted`                                                               | Claude's sandbox refusing to read env files                                                                        | Ignore — never happens in your terminal                                    | Mac    |
 
 ---
 

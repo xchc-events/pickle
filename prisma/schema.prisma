@@ -8,9 +8,26 @@
 // design and promotion modules. The remaining modules — ticketing detail, tech
 // presets — hang off Event and are added as those modules are built.
 
+// Two clients, from one schema, because the app now runs in two runtimes and
+// Prisma 7 compiles queries with a WebAssembly module that each runtime loads
+// differently. On Node the module is decoded from base64 and handed to
+// `new WebAssembly.Module(...)`; workerd forbids compiling Wasm from bytes at
+// runtime ("Wasm code generation disallowed by embedder") and takes it as a
+// module import instead. The generator picks one or the other, so we ask for
+// both and let the build choose — see the alias in next.config.ts.
+//
+// The old `prisma-client-js` generator could only do the Node form, which is
+// why this moved to `prisma-client`; it is also the one Prisma 7 supports.
+// `src/generated/` is gitignored and rebuilt by `npm run db:generate`.
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../src/generated/prisma"
+}
+
+generator workerdClient {
+  provider = "prisma-client"
+  runtime  = "workerd"
+  output   = "../src/generated/prisma-workerd"
 }
 
 datasource db {

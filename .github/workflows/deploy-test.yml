@@ -1,0 +1,263 @@
+# Deploys the test site to Cloudflare Workers.
+#
+# The flow is: merge to main -> migrate the database -> seed it if it is
+# empty -> build the OpenNext bundle -> deploy the Worker -> push the
+# Worker's secrets. Migrate and seed run before the build so a newly
+# deployed Worker never serves against a schema or a database it does not
+# expect.
+#
+# Deploys happen only from here, never from a laptop. OpenNext's build
+# inlines whatever `.env` file is on disk into the bundle, and a laptop has
+# a real one; a GitHub Actions checkout has none. That is the whole reason
+# this is a workflow and not a `wrangler deploy` someone runs locally.
+#
+# Reseeding is deliberately manual: a plain push only seeds an empty
+# database (see the seed step), so a week of test-site clicking-around
+# survives every deploy. Run this workflow by hand with `reseed: true` to
+# wipe the test database and load the seed again. See docs/deploying.md for
+# the full runbook.
+#
+# Nothing here runs until the HYPERDRIVE_ID repository variable exists. The
+# workflow lands before the account-side setup is done, and a red cross on
+# every merge to main in the meantime would only teach people to ignore red
+# crosses; a skipped job says "not set up yet" without crying wolf. Once that
+# one variable is set, a missing secret is a real mistake and fails loudly.
+name: Deploy test site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      reseed:
+        description: 'Wipe the test database and load the seed data again'
+        type: boolean
+        default: false
+
+# Two deploys running at once could both migrate the same database, or one
+# could deploy a Worker while the other is still mid-migration. Queue them
+# instead of cancelling either one - a cancelled migration can leave the
+# database half-upgraded.
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false
+
+# Just enough to check out the repository. No step here calls the GitHub API
+# or writes back to the repo, so nothing more is needed.
+permissions:
+  contents: read
+
+jobs:
+  # Repository variables are the only configuration a job-level `if` can see
+  # (environment secrets and variables only exist once the job has started),
+  # which is why HYPERDRIVE_ID is a repository variable rather than one on the
+  # `test` environment, and why it doubles as the switch for the whole deploy.
+  not-configured:
+    name: Not configured yet
+    if: ${{ vars.HYPERDRIVE_ID == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::warning::The test site is not set up yet, so nothing was deployed. docs/deploying.md has the steps; setting the HYPERDRIVE_ID repository variable is what switches this workflow on."
+          {
+            echo "## Deploy skipped: the test site is not set up yet"
+            echo
+            echo "Nothing was deployed. The \`HYPERDRIVE_ID\` repository variable is not set, and setting it is what switches this workflow on. See \`docs/deploying.md\` for the account-side steps."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy
+    if: ${{ vars.HYPERDRIVE_ID != '' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: test
+      # Before the xchc.co.nz DNS zone moves to Cloudflare, a run can set the
+      # APP_URL environment variable to the Worker's workers.dev address and
+      # the environment URL follows it. vars.APP_URL is an empty string, not
+      # null, when unset, and '' is falsy to `||` in Actions expressions, so
+      # this idiom correctly falls back to the eventual custom domain.
+      url: ${{ vars.APP_URL || 'https://pickle-test.xchc.co.nz' }}
+    steps:
+      - name: Check required configuration is present
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PAYMENT_KEY: ${{ secrets.PAYMENT_KEY }}
+          SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+          HYPERDRIVE_ID: ${{ vars.HYPERDRIVE_ID }}
+          AUTH_RESEND_KEY: ${{ secrets.AUTH_RESEND_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          EPOSNOW_API_KEY: ${{ secrets.EPOSNOW_API_KEY }}
+          EPOSNOW_API_SECRET: ${{ secrets.EPOSNOW_API_SECRET }}
+          EPOSNOW_LOCATION_ID: ${{ secrets.EPOSNOW_LOCATION_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          # Required: later steps cannot do anything useful without these,
+          # so fail here and name exactly what is missing rather than
+          # letting some later step fail on a blank credential.
+          missing=0
+
+          require_secret() {
+            if [ -z "${!1}" ]; then
+              echo "::error::Secret $1 is not set. Add it in Settings → Environments → test."
+              missing=1
+            fi
+          }
+          require_var() {
+            if [ -z "${!1}" ]; then
+              echo "::error::Variable $1 is not set. Add it in Settings → Environments → test."
+              missing=1
+            fi
+          }
+
+          require_secret CLOUDFLARE_API_TOKEN
+          require_secret CLOUDFLARE_ACCOUNT_ID
+          require_secret DATABASE_URL
+          require_secret PAYMENT_KEY
+          require_secret SEED_PASSWORD
+          require_var HYPERDRIVE_ID
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+          # Optional: each of these enables one feature (email, file storage,
+          # the Epos Now sync). The secrets step near the end only pushes
+          # the ones that are set, so a missing one is not an error - but a
+          # notice saves someone guessing later why a feature is quietly
+          # switched off.
+          for name in AUTH_RESEND_KEY R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
+            EPOSNOW_API_KEY EPOSNOW_API_SECRET EPOSNOW_LOCATION_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::notice::Optional secret $name is not set; the feature it enables is skipped."
+            fi
+          done
+          if [ -z "$APP_URL" ]; then
+            echo "::notice::Optional variable APP_URL is not set; the environment URL defaults to https://pickle-test.xchc.co.nz."
+          fi
+
+          echo "Required configuration is present."
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        # postinstall runs `prisma generate`, so the client is ready by the
+        # time the migrate step below needs it.
+        run: npm ci
+
+      - name: Apply database migrations
+        env:
+          # The direct URL to the test Postgres instance. The Worker itself
+          # never uses this - it connects through the Hyperdrive binding
+          # instead (see the deploy step) - but this runner has no
+          # Hyperdrive binding to go through, so migrations and the seed
+          # connect directly.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma migrate deploy
+
+      - name: Seed the database (reseed requested)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.reseed }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+        run: npm run db:seed
+
+      - name: Seed the database (first deploy only)
+        # Runs on every push. SEED_ONLY_IF_EMPTY tells the seed script to
+        # check the User table itself and exit without touching anything
+        # once it is no longer empty, so a redeploy never overwrites a week
+        # of test-site data.
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.reseed) }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SEED_PASSWORD: ${{ secrets.SEED_PASSWORD }}
+          SEED_ONLY_IF_EMPTY: '1'
+        run: npm run db:seed
+
+      - name: Set the Hyperdrive id in wrangler.jsonc
+        env:
+          HYPERDRIVE_ID: ${{ vars.HYPERDRIVE_ID }}
+        run: |
+          sed -i "s/HYPERDRIVE_ID_PLACEHOLDER/$HYPERDRIVE_ID/" wrangler.jsonc
+          if grep -q HYPERDRIVE_ID_PLACEHOLDER wrangler.jsonc; then
+            echo "::error::wrangler.jsonc still contains HYPERDRIVE_ID_PLACEHOLDER after substitution. Check the HYPERDRIVE_ID variable in Settings → Environments → test."
+            exit 1
+          fi
+
+      - name: Build the OpenNext bundle
+        env:
+          # Same dummy value ci.yml's build job uses. The build only needs
+          # this to exist, not to resolve - the real connection at runtime
+          # goes through the Hyperdrive binding instead of DATABASE_URL.
+          DATABASE_URL: postgresql://pickle:pickle@localhost:5432/pickle?schema=public
+        run: npm run cf:build
+
+      # `npx wrangler` rather than the `cloudflare/wrangler-action` third
+      # party action: one fewer action to trust, and this way the version
+      # that runs is whatever package-lock.json pins rather than whatever
+      # the action defaults to. Wrangler reads CLOUDFLARE_API_TOKEN and
+      # CLOUDFLARE_ACCOUNT_ID from the environment natively, so nothing else
+      # is needed to authenticate it.
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          args=(deploy)
+          if [ -n "$APP_URL" ]; then
+            # Lets a workers.dev address exercise the whole app - including
+            # the emailed sign-in link and the session cookie, both built
+            # from AUTH_URL (see src/lib/auth.ts) - before the custom domain
+            # exists.
+            args+=(--var "AUTH_URL:$APP_URL")
+          fi
+
+          npx wrangler "${args[@]}" | tee "$RUNNER_TEMP/wrangler-deploy.log"
+
+          urls=$(grep -oE 'https://[A-Za-z0-9._/-]+' "$RUNNER_TEMP/wrangler-deploy.log" | sort -u)
+          if [ -n "$urls" ]; then
+            while IFS= read -r url; do
+              echo "::notice::Deployed: $url"
+            done <<< "$urls"
+          else
+            echo "::notice::Deploy finished, but no URL was found in wrangler's output - check the log above."
+          fi
+
+      # This has to come after the Worker exists, which is why it is its own
+      # step after the deploy rather than folded into it - so a brand-new
+      # Worker serves for the few seconds between the two steps with none of
+      # these secrets set. Accepted here: this is a test site.
+      #
+      # `wrangler secret bulk` reads a JSON object of key/value pairs from
+      # stdin when it is not given a file
+      # (https://developers.cloudflare.com/workers/wrangler/commands/#secret-bulk).
+      # Building that object with jq straight from the process environment,
+      # and never echoing it, keeps every value out of the log even if one
+      # contains a character the shell would otherwise treat specially.
+      - name: Push Worker secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAYMENT_KEY: ${{ secrets.PAYMENT_KEY }}
+          AUTH_RESEND_KEY: ${{ secrets.AUTH_RESEND_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          EPOSNOW_API_KEY: ${{ secrets.EPOSNOW_API_KEY }}
+          EPOSNOW_API_SECRET: ${{ secrets.EPOSNOW_API_SECRET }}
+          EPOSNOW_LOCATION_ID: ${{ secrets.EPOSNOW_LOCATION_ID }}
+        run: |
+          jq -n -c '
+            env
+            | {PAYMENT_KEY, AUTH_RESEND_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, EPOSNOW_API_KEY, EPOSNOW_API_SECRET, EPOSNOW_LOCATION_ID}
+            | with_entries(select(.value != null and .value != ""))
+          ' | npx wrangler secret bulk

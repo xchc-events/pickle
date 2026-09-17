@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     'coverage/**',
     // The vendor design prototype. Read-only reference, not our code.
     'docs/design-handoff/**',
+    // Build output and local state from the Cloudflare Workers adapter.
+    '.open-next/**',
+    '.wrangler/**',
   ]),
 ])
 
