@@ -18,6 +18,7 @@
       "Bash(npm ci)",
       "Bash(npm ls *)",
       "Bash(npm view *)",
+      "Bash(npm run db:migrate*)",
 
       "Bash(npx tsc *)",
       "Bash(npx vitest *)",
@@ -37,6 +38,8 @@
       "Bash(git checkout *)",
       "Bash(git stash*)",
       "Bash(git worktree list*)",
+      "Bash(git push*)",
+      "Bash(gh pr create*)",
 
       "Bash(gh pr view*)",
       "Bash(gh pr list*)",
@@ -46,29 +49,24 @@
       "Bash(gh run list*)",
       "Bash(gh issue view*)",
       "Bash(gh issue list*)",
+      "Bash(gh pr merge*)",
 
       "Bash(docker compose ps*)",
-      "Bash(docker compose logs*)"
-    ],
+      "Bash(docker compose logs*)",
 
-    "ask": [
-      "Bash(git push*)",
-      "Bash(gh pr create*)",
-      "Bash(gh pr merge*)",
       "Bash(gh release *)",
-      "Bash(npm run db:migrate*)",
       "Bash(npm run db:deploy*)",
       "Bash(npx prisma migrate *)",
       "Bash(npx prisma db push*)",
       "Bash(docker compose down*)",
       "Bash(npm install *)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Read(./.claude/settings.local.json)"
     ],
 
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(./.claude/settings.local.json)",
       "Bash(npm run db:reset*)",
       "Bash(npx prisma migrate reset*)",
       "Bash(git push --force*)",
