@@ -11,8 +11,8 @@ import {
   mayAdmit,
   mayAttemptPassword,
   mayChangeRole,
-  mayDeactivate,
   mayRequestLink,
+  maySetActive,
   normaliseEmail,
   sessionCookie,
   sessionState,
@@ -77,46 +77,82 @@ describe('normaliseEmail', () => {
   })
 })
 
-describe('mayDeactivate', () => {
+describe('maySetActive', () => {
   const actor = { id: 'u1', role: 'ADMIN' as const }
-  const other = { id: 'u2', role: 'COORDINATOR' as const, active: true }
+  const nonAdmins = ['COORDINATOR', 'DESIGN', 'TECH', 'BAR', 'PROMOTER'] as const
 
-  it('lets an admin deactivate somebody else', () => {
-    expect(mayDeactivate(actor, other, 2).ok).toBe(true)
+  describe('switching somebody off', () => {
+    const other = { id: 'u2', role: 'COORDINATOR' as const, active: true }
+
+    it('lets an admin switch off somebody else', () => {
+      expect(maySetActive(actor, other, false, 2).ok).toBe(true)
+    })
+
+    it('refuses to let somebody switch themselves off', () => {
+      const v = maySetActive(actor, { id: 'u1', role: 'ADMIN', active: true }, false, 2)
+      expect(v.ok).toBe(false)
+      expect(v.ok === false && v.why).toMatch(/yourself|your own/i)
+    })
+
+    it('refuses to remove the last remaining admin', () => {
+      const v = maySetActive(
+        { id: 'u9', role: 'ADMIN' },
+        { id: 'u2', role: 'ADMIN', active: true },
+        false,
+        1,
+      )
+      expect(v.ok).toBe(false)
+      expect(v.ok === false && v.why).toMatch(/last|only|locked out/i)
+    })
+
+    it('allows removing an admin while another remains', () => {
+      expect(
+        maySetActive(
+          { id: 'u9', role: 'ADMIN' },
+          { id: 'u2', role: 'ADMIN', active: true },
+          false,
+          2,
+        ).ok,
+      ).toBe(true)
+    })
+
+    it.each(nonAdmins)('refuses a %s, even one whose role can open Admin', (role) => {
+      const v = maySetActive({ id: 'u3', role }, other, false, 2)
+      expect(v.ok).toBe(false)
+      expect(v.ok === false && v.why).toMatch(/admin/i)
+    })
+
+    it('does not count an already-inactive account against the admin floor', () => {
+      // Switching off an account that is already off is a no-op, not a
+      // lockout risk.
+      expect(maySetActive(actor, { id: 'u2', role: 'ADMIN', active: false }, false, 1).ok).toBe(
+        true,
+      )
+    })
   })
 
-  it('refuses to let somebody deactivate themselves', () => {
-    const v = mayDeactivate(actor, { id: 'u1', role: 'ADMIN', active: true }, 2)
-    expect(v.ok).toBe(false)
-    expect(v.ok === false && v.why).toMatch(/yourself|your own/i)
-  })
+  /**
+   * Switching somebody back on hands their access back, which is as much a
+   * decision about who has access as taking it away. The Admin module can be
+   * granted to any role, and without this a coordinator who had been given
+   * it could quietly undo an administrator's switch-off.
+   */
+  describe('switching somebody back on', () => {
+    const off = { id: 'u2', role: 'COORDINATOR' as const, active: false }
 
-  it('refuses to remove the last remaining admin', () => {
-    const v = mayDeactivate(
-      { id: 'u9', role: 'ADMIN' },
-      { id: 'u2', role: 'ADMIN', active: true },
-      1,
-    )
-    expect(v.ok).toBe(false)
-    expect(v.ok === false && v.why).toMatch(/last|only|locked out/i)
-  })
+    it('lets an admin switch somebody back on', () => {
+      expect(maySetActive(actor, off, true, 2).ok).toBe(true)
+    })
 
-  it('allows removing an admin while another remains', () => {
-    expect(
-      mayDeactivate({ id: 'u9', role: 'ADMIN' }, { id: 'u2', role: 'ADMIN', active: true }, 2).ok,
-    ).toBe(true)
-  })
+    it.each(nonAdmins)('refuses a %s, even one whose role can open Admin', (role) => {
+      const v = maySetActive({ id: 'u3', role }, off, true, 2)
+      expect(v.ok).toBe(false)
+      expect(v.ok === false && v.why).toMatch(/admin/i)
+    })
 
-  it('refuses somebody who is not an admin', () => {
-    const v = mayDeactivate({ id: 'u3', role: 'COORDINATOR' }, other, 2)
-    expect(v.ok).toBe(false)
-    expect(v.ok === false && v.why).toMatch(/admin/i)
-  })
-
-  it('does not count an already-inactive account against the admin floor', () => {
-    // Reactivating is never dangerous; deactivating something already off is
-    // a no-op rather than a lockout risk.
-    expect(mayDeactivate(actor, { id: 'u2', role: 'ADMIN', active: false }, 1).ok).toBe(true)
+    it('lets the only admin switch another admin back on — that adds one, it loses none', () => {
+      expect(maySetActive(actor, { id: 'u2', role: 'ADMIN', active: false }, true, 1).ok).toBe(true)
+    })
   })
 })
 

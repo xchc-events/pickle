@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { endSessions, recordAuthEvent } from '@/lib/auth-data'
 import { emailLink, type LinkOutcome } from '@/lib/auth-links'
-import { mayChangeRole, mayDeactivate, normaliseEmail } from '@/lib/auth-rules'
+import { mayChangeRole, maySetActive, normaliseEmail } from '@/lib/auth-rules'
 import { said, type Said } from '@/lib/toast'
 import type { Role } from '@/generated/prisma/client'
 
@@ -23,7 +23,7 @@ import type { Role } from '@/generated/prisma/client'
  *    see src/lib/auth.ts.
  *  - **The last administrator cannot be removed or demoted.** Neither is
  *    recoverable from inside the product, so both are refused rather than
- *    warned about. See `mayDeactivate` and `mayChangeRole` in auth-rules.ts.
+ *    warned about. See `maySetActive` and `mayChangeRole` in auth-rules.ts.
  *  - **Administrators never see or set anybody's password.** They send an
  *    invitation, and the person chooses their own.
  */
@@ -241,11 +241,10 @@ export async function setActive(userId: string, active: boolean): Promise<Said> 
   })
   if (!target) return said('No such account.', 'stop')
 
-  // The guard only has anything to say about switching somebody off.
-  if (!active) {
-    const verdict = mayDeactivate(user, target, await activeAdmins())
-    if (!verdict.ok) return said(verdict.why, 'stop')
-  }
+  // Asked whichever way the switch is going: switching somebody back on is
+  // an administrator's call as much as switching them off.
+  const verdict = maySetActive(user, target, active, await activeAdmins())
+  if (!verdict.ok) return said(verdict.why, 'stop')
 
   const who = target.name ?? target.email
 
