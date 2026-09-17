@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { db } from '@/lib/db'
-import { ROLE_LABEL, MODULES, type ModuleKey } from '@/lib/constants'
+import { ROLE_LABEL, MODULES } from '@/lib/constants'
 import { currentUser, roleKeyOf, stubAllowed } from '@/lib/session'
+import { modulesOpenByRole } from '@/lib/scope'
 import { emailConfigured } from '@/lib/email'
 import { initialsOf } from '@/lib/format'
 import { Brand } from '@/components/Brand'
@@ -99,13 +100,8 @@ async function RolePicker() {
     orderBy: { createdAt: 'asc' },
   })
 
-  const perms = await db.modulePermission.findMany()
-  const modulesByRole = new Map<string, ModuleKey[]>()
-  for (const p of perms) {
-    const list = modulesByRole.get(p.role) ?? []
-    list.push(p.module as ModuleKey)
-    modulesByRole.set(p.role, list)
-  }
+  // What each role can open, as its sidebar will show it — not the raw rows.
+  const modulesByRole = modulesOpenByRole(await db.modulePermission.findMany())
 
   return (
     <section className={styles.dev}>

@@ -13,9 +13,9 @@ import styles from './Sidebar.module.css'
  *
  * Wide, it is the sidebar. Narrow, it is a top bar whose menu button opens
  * the same nav in a sheet — src/lib/shell.ts has the breakpoint. Both are
- * rendered here, on the server, from one list: the same ModulePermission rows
- * the server checks on every request. This is a convenience, not the control
- * — a module missing from it is also unreachable by URL. See
+ * rendered here, on the server, from one list: `modulesFor`, the same list the
+ * server checks on every request. This is a convenience, not the control — a
+ * module missing from it is also unreachable by URL. See
  * src/lib/permissions.ts.
  *
  * The prototype's sidebar also carries a search button and an integrations
