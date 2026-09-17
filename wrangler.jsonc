@@ -1,0 +1,99 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // The test deployment of PicklePicklePickle, built for Cloudflare Workers by
+  // @opennextjs/cloudflare. `npm run cf:build` writes the worker and the static
+  // assets into .open-next/, which is what the two paths below point at; there
+  // is nothing to deploy until that build has run.
+  //
+  // Deploys happen from .github/workflows/deploy-test.yml and never from a
+  // laptop: an OpenNext build reads the .env files sitting next to it, and a
+  // laptop has real ones. A CI checkout has none.
+  "name": "pickle-test",
+  "main": ".open-next/worker.js",
+
+  // nodejs_compat is what lets the Next.js server and node:crypto (scrypt for
+  // passwords, AES-GCM for stored secrets) run at all. From a compatibility
+  // date of 2025-04-01 it also populates process.env from the vars and secrets
+  // below, which is why every existing `process.env.X` read in src/ keeps
+  // working untouched. global_fetch_strictly_public makes fetch() to our own
+  // hostname go out to the internet and come back, rather than being routed
+  // internally, which is how the Resend and R2 calls expect to behave.
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+
+  // OpenNext's on-demand revalidation patch calls the Worker back through this
+  // binding instead of fetching its own public hostname. Every page in this app
+  // is force-dynamic so that path should never run, but the adapter's own
+  // get-started guide still lists the binding as required and it costs nothing
+  // to have. It points at this same Worker on purpose.
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "pickle-test",
+    },
+  ],
+
+  // The database. A Worker cannot hold a Postgres connection open between
+  // requests, so Hyperdrive holds the pool and hands the Worker a connection
+  // string for it; src/lib/db.ts reads that string off this binding rather than
+  // DATABASE_URL, and builds one Prisma client per request from it.
+  //
+  // `id` is committed as a placeholder because the real Hyperdrive id belongs to
+  // the Cloudflare account, not to the repository: the deploy workflow replaces
+  // it with the `HYPERDRIVE_ID` variable of the `test` GitHub environment.
+  // `localConnectionString` is only ever read by `wrangler dev` and
+  // `opennextjs-cloudflare preview`, where it points at the developer's own
+  // Postgres; set CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE to
+  // point a single local run somewhere else, such as a throwaway database.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "HYPERDRIVE_ID_PLACEHOLDER",
+      "localConnectionString": "postgresql://pickle:pickle@localhost:5432/pickle",
+    },
+  ],
+
+  // Configuration that is safe to read in a public repository. Everything with
+  // a secret in it — PAYMENT_KEY, AUTH_RESEND_KEY, the R2 and Epos Now
+  // credentials — is uploaded separately by the deploy workflow with
+  // `wrangler secret bulk` and never appears here.
+  //
+  // AUTH_URL is the origin the app believes it is served from: it decides the
+  // session cookie's name and Secure flag (`sessionCookie` in auth-rules.ts)
+  // and the base of every emailed sign-in link. It is the custom domain here
+  // because that is where the site is meant to live; until the domain exists
+  // the workflow overrides it with `--var AUTH_URL:<APP_URL>` so the
+  // workers.dev hostname is used instead.
+  "vars": {
+    "AUTH_URL": "https://pickle-test.xchc.co.nz",
+    "EMAIL_FROM": "XCHC <no-reply@send.minim.nz>",
+    "R2_BUCKET": "pickle-files",
+  },
+
+  // Until the custom domain is attached, the Worker answers on its
+  // workers.dev hostname, which is how the test site is reached today.
+  "workers_dev": true,
+
+  // Uncomment once the xchc.co.nz zone is served by Cloudflare's nameservers.
+  // A Workers custom domain can only be attached to a zone Cloudflare holds, so
+  // while xchc.co.nz's DNS is still at 1st Domains a deploy with this block
+  // active fails outright rather than degrading to workers.dev.
+  // "routes": [
+  //   {
+  //     "pattern": "pickle-test.xchc.co.nz",
+  //     "custom_domain": true,
+  //   },
+  // ],
+
+  // Worker logs, so a failed sign-in on the test site can be read back out of
+  // the dashboard instead of guessed at.
+  "observability": {
+    "enabled": true,
+  },
+}

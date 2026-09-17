@@ -11,6 +11,23 @@
  * falls on its intended day of week. Day of week is not cosmetic — it picks
  * the event's share of the weekly cost base (COV in src/lib/finance.ts), so
  * moving an event off its day would move its surplus.
+ *
+ * Two environment variables change what a run does, both read once at the
+ * top of `main()` so a bad one can refuse before anything is touched:
+ *
+ *  - `SEED_PASSWORD` — on a local Postgres, seeded users sign in with the
+ *    development role picker and never need a password. A test deployment is
+ *    a production build, where that picker is off and an emailed link cannot
+ *    reach an `@xchc.test` address — so without a password nobody can sign
+ *    in at all. When this is set (and not blank), every seeded user gets it
+ *    as their password, checked against `src/lib/password-policy.ts` for
+ *    each of them first; unset or blank leaves passwords null, as before.
+ *  - `SEED_ONLY_IF_EMPTY` — a redeploy of the test site runs this seed again.
+ *    Wiping and reinstalling is what a developer wants against a local
+ *    database, and the last thing anybody wants against a test database that
+ *    has a week of real clicking-around in it. Set to `1` or `true`, the seed
+ *    counts the User table first and, if it is not empty, logs one line and
+ *    stops without deleting or creating anything.
  */
 
 import 'dotenv/config'
@@ -22,6 +39,8 @@ import { shiftPlan, type RosterEvent } from '../src/lib/roster'
 import { capacityOf } from '../src/lib/ticketing'
 import { financeVals } from '../src/lib/finance'
 import { barBudgetFrom, isBarRole } from '../src/lib/bar'
+import { hashPassword } from '../src/lib/password'
+import { seedOnlyIfEmpty, seedPasswordFrom } from '../src/lib/seed-install'
 
 /**
  * The one bookable room.
@@ -525,6 +544,24 @@ function channelNote(e: SeedEvent, channel: string, cap: number): string | null 
 async function main() {
   const today = startOfToday()
 
+  // Read and validate both seed knobs before anything reaches the database.
+  // A `SEED_PASSWORD` that fails the house policy must refuse here, ahead of
+  // even the `SEED_ONLY_IF_EMPTY` count below — a bad password should never
+  // get the chance to leave a half-cleared database behind.
+  const onlyIfEmpty = seedOnlyIfEmpty(process.env)
+  const seedPassword = seedPasswordFrom(
+    process.env,
+    USERS.map((u) => ({ name: u.n, email: `${u.id}@xchc.test` })),
+  )
+
+  if (onlyIfEmpty) {
+    const existing = await db.user.count()
+    if (existing > 0) {
+      console.log(`seed skipped: ${existing} users already present (SEED_ONLY_IF_EMPTY)`)
+      return
+    }
+  }
+
   console.log('clearing…')
   await db.activity.deleteMany()
   await db.hourEntry.deleteMany()
@@ -578,8 +615,17 @@ async function main() {
         role: u.role.toUpperCase() as Role,
         promoter: u.org ?? null,
         personId: personByInitials.get(u.i) ?? null,
+        // Hashed per user rather than once and reused: password.ts's own
+        // invariant is that even a password shared on purpose still gets a
+        // unique salt per account, and a handful of scrypt hashes costs under
+        // a second next to what a shared salt would give away for free.
+        passwordHash: seedPassword ? await hashPassword(seedPassword) : null,
+        passwordChangedAt: seedPassword ? today : null,
       },
     })
+  }
+  if (seedPassword) {
+    console.log(`passwords set for ${USERS.map((u) => u.id).join(', ')}`)
   }
 
   console.log('spaces…')

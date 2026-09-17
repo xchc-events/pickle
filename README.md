@@ -310,6 +310,16 @@ migrations applied to an empty Postgres 17, a schema drift check
 (`prisma migrate diff`), then format, lint, typecheck and tests, plus a
 separate production build. Both jobs must pass before anything merges.
 
+## Deploying
+
+A `pickle-test` site on Cloudflare Workers deploys itself: every merge to
+`main` runs the "Deploy test site" workflow, which migrates the test
+database, seeds it if it is empty, builds the app with OpenNext and deploys
+it. Nobody runs a deploy command by hand, because the build bakes whatever
+`.env` sits next to it into the bundle. `docs/deploying.md` has the one-time
+account setup, the day-to-day, and what moving `xchc.co.nz` to Cloudflare
+involves.
+
 ## Contributing
 
 Trunk-based. Short-lived branches off `main` named `feat/`, `fix/` or
@@ -335,6 +345,8 @@ Reference them in PRs by their `REQ-nnn` id.
 ## Documentation
 
 - `docs/RUNNING.md`: running the app locally, and what to do when it breaks.
+- `docs/deploying.md`: the Cloudflare test site — account setup, secrets,
+  reseeding, logs, and the custom domain.
 - `docs/design-handoff/README.md`: the specification. Dated change notes are
   appended where the venue has decided something different from the original
   design; where two documents disagree, the most recent wins, and conflicts

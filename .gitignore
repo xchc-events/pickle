@@ -59,3 +59,11 @@ coverage/
 
 # Prisma generated client
 src/generated/
+
+# Cloudflare Workers build output and local state. `.dev.vars` holds the
+# secrets a local `opennextjs-cloudflare preview` needs, so it is as private as
+# a .env file.
+/.open-next/
+/.wrangler/
+.dev.vars
+.dev.vars.*
