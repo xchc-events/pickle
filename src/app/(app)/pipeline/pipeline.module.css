@@ -6,7 +6,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 28px 15px;
+  padding: 20px var(--page-gutter) 15px;
   border-bottom: 1px solid var(--color-divider);
 }
 
@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 12px 28px;
+  padding: 12px var(--page-gutter);
   border-bottom: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
   flex-wrap: wrap;
 }
@@ -82,7 +82,7 @@
 /* --- the matrix ----------------------------------------------------- */
 
 .body {
-  padding: 0 28px 44px;
+  padding: 0 var(--page-gutter) 44px;
 }
 
 .scroller {

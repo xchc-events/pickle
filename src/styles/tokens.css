@@ -91,8 +91,21 @@
 
   /* --- layout ------------------------------------------------------- */
   --sidebar-width: 232px;
-  --header-padding: 26px 28px 20px;
-  --body-padding: 22px 28px 40px;
+  /* How far every page keeps its content from the sides of main — headers,
+     strips and bodies alike. Narrower on a phone; see below. */
+  --page-gutter: 28px;
+  --header-padding: 26px var(--page-gutter) 20px;
+  --body-padding: 22px var(--page-gutter) 40px;
+  /* The smallest thing a thumb should be asked to hit. */
+  --touch-target: 44px;
+}
+
+/* Phone width. A media query cannot read a custom property, so the width is
+   written out here rather than kept as a token. */
+@media (max-width: 599px) {
+  :root {
+    --page-gutter: 16px;
+  }
 }
 
 /* The signature of every section heading: a rule that fades to transparent. */
