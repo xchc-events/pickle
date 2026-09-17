@@ -110,3 +110,16 @@ export const DEFAULT_PERMS: Record<RoleKey, ModuleKey[]> = {
   ],
   promoter: ['pipeline', 'portal'],
 }
+
+/**
+ * The venue's own modules. An outside account never opens these, whatever its
+ * role's rows say: Home is the venue's own to-do list, Bar its own trading,
+ * Admin every account it has. Everything else scopes an outside account to its
+ * own organisation's events, so it can be granted without showing them more.
+ *
+ * Granting is per role, and a grant knows nothing about who is outside, so
+ * this is applied where the rows are read — see `modulesOpenTo` in
+ * src/lib/scope.ts. Decided 17 September 2026, after a promoter granted Home
+ * and Bar was shown sidebar links that could only 404.
+ */
+export const VENUE_ONLY: readonly ModuleKey[] = ['home', 'bar', 'admin']
