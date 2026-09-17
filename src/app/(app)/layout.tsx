@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/session'
 import { modulesFor } from '@/lib/permissions'
-import { Sidebar } from '@/components/Sidebar'
+import { Sidebar, TopBar } from '@/components/Sidebar'
 import { ToastProvider } from '@/components/Toast'
 import styles from './shell.module.css'
 
@@ -26,6 +26,8 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   return (
     <ToastProvider>
       <div className={styles.shell}>
+        {/* One of these shows, by width: see src/lib/shell.ts. */}
+        <TopBar user={user} modules={modules} />
         <Sidebar user={user} modules={modules} />
         <main className={styles.main}>{children}</main>
       </div>

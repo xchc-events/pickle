@@ -112,3 +112,170 @@
 .out:hover {
   color: var(--color-neutral-200);
 }
+
+/* --- narrow screens ------------------------------------------------------
+   The sidebar goes, and a top bar carries the brand and a menu button that
+   opens the same nav in a sheet. The query is COMPACT_SHELL from
+   src/lib/shell.ts, written out. */
+
+/* The top bar, and the head of the sheet that opens over it, are one height,
+   so the brand does not move as the sheet slides in. Content-box, so the rule
+   under each lands at the same height too. */
+.topbar,
+.sheetHead {
+  box-sizing: content-box;
+  min-height: var(--touch-target);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-1) var(--page-gutter);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.topbar {
+  display: none;
+  position: sticky;
+  top: 0;
+  /* Over the page as it scrolls underneath, and under the toast. */
+  z-index: 30;
+  justify-content: space-between;
+  background: var(--color-bg);
+}
+
+@media (max-width: 1023px) {
+  .sidebar {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+  }
+}
+
+/* The menu button, and the close button that takes its place: a thumb-sized
+   target with the glyph at half its size, pulled out so that the glyph, not
+   the target, lines up with the gutter. */
+.menu {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin-inline-end: calc((1em - var(--touch-target)) / 2);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-neutral-300);
+  font-size: calc(var(--touch-target) / 2);
+  cursor: pointer;
+}
+
+.menu:hover {
+  background: color-mix(in srgb, var(--color-neutral-100) 4%, transparent);
+  color: var(--color-neutral-100);
+}
+
+.menu:active {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+/* The sheet. A modal dialog is in the top layer, so it needs no z-index. It
+   covers the screen and is see-through: what shows is the panel — the
+   sidebar again, from the side it lives on — and a close button where the
+   menu button was. Most of this undoes the browser's centred-box defaults. */
+.sheet {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.sheet::backdrop {
+  background: color-mix(in srgb, var(--color-neutral-900) 50%, transparent);
+}
+
+/* The page behind stays where it was. */
+:global(html):has(.sheet[open]) {
+  overflow: hidden;
+}
+
+/* Exactly over the menu button, .menu's pull-out included, so that the one
+   turns into the other and focus stays where it was. */
+.close {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--page-gutter);
+}
+
+.panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--sidebar-width);
+  max-width: calc(100% - var(--touch-target));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  box-shadow: var(--shadow-md);
+}
+
+.sheetHead {
+  flex: none;
+  display: flex;
+}
+
+/* Rows a thumb can hit, with the icons under the brand. */
+.sheet .nav {
+  padding: var(--space-2) calc(var(--page-gutter) - var(--space-3));
+  overscroll-behavior: contain;
+}
+
+.sheet .item {
+  min-height: var(--touch-target);
+  padding-inline: var(--space-3);
+}
+
+.sheet .foot {
+  padding: var(--space-1) var(--page-gutter);
+}
+
+.sheet .me {
+  min-height: var(--touch-target);
+}
+
+.sheet .out {
+  width: var(--touch-target);
+  height: var(--touch-target);
+  margin-inline-end: calc((1em - var(--touch-target)) / 2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sheet[open] .panel {
+    animation: slide-in 0.18s ease-out;
+  }
+
+  .sheet[open] .close,
+  .sheet[open]::backdrop {
+    animation: fade-in 0.18s ease-out;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
