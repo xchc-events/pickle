@@ -73,7 +73,8 @@ same step as `gh pr create`, before CI can finish:
 
 `main` requires a branch to be up to date before it merges. The "Update open PR
 branches" workflow merges `main` into every open PR after each push to `main`,
-which re-runs CI and lets auto-merge fire, so don't update branches by hand. A
+and into a PR the moment it is opened, which re-runs CI and lets auto-merge
+fire, so don't update branches by hand. A
 conflict-free update can still fail CI (a type made required on `main`, a
 fixture added on the branch), which is what the auto-fix wake-up is for. Keep
 the session open until the PR has merged.

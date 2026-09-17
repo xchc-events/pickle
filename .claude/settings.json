@@ -81,6 +81,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
+    "excludedCommands": ["gh"],
     "network": {
       "allowedDomains": [
         "registry.npmjs.org",
