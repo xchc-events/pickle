@@ -3,6 +3,9 @@ name: Update open PR branches
 # main requires a branch to be up to date before it merges, and GitHub's
 # auto-merge does not update the branch for you. After every push to main this
 # merges main into each open PR, which re-runs CI and lets auto-merge fire.
+# A PR that is opened already behind main (its branch came off a stale main)
+# would otherwise wait for an unrelated merge, so opening one updates that PR
+# straight away.
 #
 # It needs a fine-grained personal access token in the PR_UPDATE_TOKEN secret:
 # pushes made with the built-in GITHUB_TOKEN do not trigger workflows, so the
@@ -10,6 +13,9 @@ name: Update open PR branches
 
 on:
   push:
+    branches: [main]
+  pull_request:
+    types: [opened, reopened, ready_for_review]
     branches: [main]
   workflow_dispatch:
 
@@ -26,6 +32,8 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.PR_UPDATE_TOKEN }}
       REPO: ${{ github.repository }}
+      # Set only when a pull request opened this run; empty on a push to main.
+      OPENED_PR: ${{ github.event.pull_request.number }}
     steps:
       - name: Check the token is set
         run: |
@@ -38,8 +46,12 @@ jobs:
         run: |
           set -u
           failed=0
-          numbers=$(gh pr list --repo "$REPO" --base main --state open --json number,isDraft \
-            --jq '.[] | select(.isDraft | not) | .number')
+          if [ -n "$OPENED_PR" ]; then
+            numbers=$OPENED_PR
+          else
+            numbers=$(gh pr list --repo "$REPO" --base main --state open --json number,isDraft \
+              --jq '.[] | select(.isDraft | not) | .number')
+          fi
           if [ -z "$numbers" ]; then
             echo "No open pull requests to update."
             exit 0
