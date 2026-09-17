@@ -51,6 +51,8 @@ beforeEach(() => {
   for (const table of [db.user, db.session, db.authToken]) {
     for (const fn of Object.values(table)) fn.mockReset()
   }
+  // Cleared rather than reset: it keeps running the operations it is given.
+  db.$transaction.mockClear()
   for (const fn of [...Object.values(links), ...Object.values(authData)]) fn.mockReset()
   db.user.findUnique.mockResolvedValue(mere)
   db.session.deleteMany.mockResolvedValue({ count: 0 })
@@ -195,6 +197,58 @@ describe('setActive', () => {
     expect(db.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u_mere' } })
     expect(db.authToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'u_mere', usedAt: null },
+    })
+  })
+
+  it('switches somebody back on when an administrator asks', async () => {
+    db.user.count.mockResolvedValue(1)
+    db.user.findUnique.mockResolvedValue({ ...mere, active: false })
+
+    const said = await actions.setActive('u_mere', true)
+
+    expect(db.user.update).toHaveBeenCalledWith({
+      where: { id: 'u_mere' },
+      data: { active: true },
+    })
+    expect(said.kind).toBe('good')
+  })
+
+  /**
+   * Admin is a module, and any role can be granted it. A coordinator given it
+   * was already refused switching somebody off, but could switch somebody
+   * back on — undoing an administrator's decision from the same page.
+   */
+  describe('from somebody who can open Admin but is not an administrator', () => {
+    beforeEach(() => {
+      permissions.requireModule.mockResolvedValue({
+        user: { ...sione, id: 'u_tui', role: 'COORDINATOR' },
+        modules: ['admin'],
+      })
+      db.user.count.mockResolvedValue(1)
+    })
+
+    it('will not switch an account back on, and writes nothing', async () => {
+      db.user.findUnique.mockResolvedValue({ ...mere, active: false })
+
+      const said = await actions.setActive('u_mere', true)
+
+      expect(said.kind).toBe('stop')
+      expect(said.text).toMatch(/administrator/i)
+      expect(db.user.update).not.toHaveBeenCalled()
+      expect(db.$transaction).not.toHaveBeenCalled()
+    })
+
+    it('will not switch an account off, and ends nothing', async () => {
+      db.user.findUnique.mockResolvedValue({ ...mere, active: true })
+
+      const said = await actions.setActive('u_mere', false)
+
+      expect(said.kind).toBe('stop')
+      expect(said.text).toMatch(/administrator/i)
+      expect(db.user.update).not.toHaveBeenCalled()
+      expect(db.$transaction).not.toHaveBeenCalled()
+      expect(db.session.deleteMany).not.toHaveBeenCalled()
+      expect(db.authToken.deleteMany).not.toHaveBeenCalled()
     })
   })
 })

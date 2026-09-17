@@ -87,8 +87,26 @@ const ADMIN_ONLY = 'Only an administrator can change who has access.'
 const LAST_ADMIN =
   'That is the last administrator. Removing them would lock everybody out of Admin with no way back in from here — promote somebody else first.'
 
-export function mayDeactivate(actor: Actor, target: Target, activeAdmins: number): Verdict {
+/**
+ * Whether `actor` may switch `target` on (`next` true) or off.
+ *
+ * Both directions are an administrator's call. Switching somebody back on
+ * hands their access back, which is as much a decision about who has access
+ * as taking it away — and the Admin module can be granted to any role, so
+ * reaching the page is not the check. Callers ask this whichever way the
+ * switch is going, rather than deciding for themselves when it applies.
+ */
+export function maySetActive(
+  actor: Actor,
+  target: Target,
+  next: boolean,
+  activeAdmins: number,
+): Verdict {
   if (actor.role !== 'ADMIN') return { ok: false, why: ADMIN_ONLY }
+
+  // Everything below guards against a lockout, and switching an account on
+  // never locked anybody out.
+  if (next) return { ok: true }
 
   if (actor.id === target.id && target.active) {
     return {
@@ -97,8 +115,8 @@ export function mayDeactivate(actor: Actor, target: Target, activeAdmins: number
     }
   }
 
-  // Only a *deactivation* can breach the floor. Turning an account back on
-  // never reduces the count.
+  // An account that is already off is not in the count, so switching it off
+  // again cannot breach the floor.
   if (target.active && target.role === 'ADMIN' && activeAdmins <= 1) {
     return { ok: false, why: LAST_ADMIN }
   }
