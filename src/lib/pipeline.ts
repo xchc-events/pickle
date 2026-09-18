@@ -23,6 +23,13 @@ export type RiskKind = 'warn' | 'stop'
 export type StatusFilter = 'all' | 'mine' | 'risk' | 'soon' | 'done'
 export type SortKey = 'door' | 'attention'
 
+/**
+ * How near a night has to be to count as soon: the "Next 30 days" filter, and
+ * the horizon Home asks about unfinished work inside. One number, so the two
+ * screens cannot disagree about what is coming up.
+ */
+export const SOON_DAYS = 30
+
 /** One event, flattened for the pipeline. */
 export interface PipelineEvent {
   id: string
@@ -156,7 +163,7 @@ export function pipelineRows(all: PipelineEvent[], f: RowFilters): PipelineEvent
 
   if (f.status === 'mine') rows = rows.filter((e) => e.ownerInitials === f.meInitials)
   if (f.status === 'risk') rows = rows.filter(isAtRisk)
-  if (f.status === 'soon') rows = rows.filter((e) => e.daysToDoor <= 30)
+  if (f.status === 'soon') rows = rows.filter((e) => e.daysToDoor <= SOON_DAYS)
   if (f.status === 'done') rows = all.filter((e) => e.concluded)
 
   rows.sort((x, y) =>

@@ -4,7 +4,7 @@ import { financeVals, type FinanceEvent, type Scenario } from './finance'
 import type { PipelineEvent } from './pipeline'
 import { initialsOf } from './format'
 import { eventScope } from './scope'
-import { halvesOf } from './actuals'
+import { halvesOf, takenOf } from './actuals'
 import { partsFor } from './parts'
 import { partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
@@ -104,10 +104,6 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
 
     const ext = externals.find((u) => u.promoter && (e.promoter ?? '').includes(u.promoter))
 
-    // "took $X" is only true of a whole night. With one half still out it
-    // would be a counted figure plus nothing, read as the take.
-    const halves = halvesOf(e.actual)
-
     // The portal rule the event record words its gates off, kept identical to
     // it — an outside promoter with an active account can be chased in it —
     // so a part cannot read differently here from how it reads there.
@@ -141,7 +137,8 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
       extCoordInitials: ext ? (ext.person?.initials ?? initialsOf(ext.name ?? ext.email)) : null,
       extCoordName: ext?.name ?? ext?.person?.name ?? null,
       surplus: v.ours,
-      actualTotal: halves.door && halves.bar ? halves.door.ticketRev + halves.bar.barProfit : null,
+      // Only true of a whole night — see takenOf.
+      actualTotal: takenOf(halvesOf(e.actual)),
       hours: v.hours,
       taskHours: e.tasks.map((t) => ({ team: t.name, hours: t.actual ?? t.est })),
       onSiteHours: e.shifts.filter((s) => s.personId).reduce((a, s) => a + s.hours, 0),

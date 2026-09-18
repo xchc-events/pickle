@@ -50,6 +50,7 @@ export const MODULES: readonly ModuleDef[] = [
 
 /** Which modules are actually built. The rest are in the nav but inert. */
 export const BUILT_MODULES: readonly ModuleKey[] = [
+  'home',
   'pipeline',
   'design',
   'promo',

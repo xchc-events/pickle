@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation'
 import { currentUser } from '@/lib/session'
 import { modulesFor } from '@/lib/permissions'
-import { BUILT_MODULES, MODULES, ROLE_LABEL } from '@/lib/constants'
+import { MODULES, ROLE_LABEL } from '@/lib/constants'
+import { landingFor } from '@/lib/home'
 import { Brand } from '@/components/Brand'
 import { signOut } from './actions'
 import styles from './landing.module.css'
@@ -34,9 +35,8 @@ export default async function Index() {
   if (!user) redirect('/sign-in')
 
   const modules = await modulesFor(user)
-  const built = modules.filter((m) => BUILT_MODULES.includes(m))
-  if (built.includes('pipeline')) redirect('/pipeline')
-  if (built.length) redirect(`/${built[0]}`)
+  const landing = landingFor(modules, user.external)
+  if (landing) redirect(landing)
 
   const labels = modules
     .map((k) => MODULES.find((m) => m.key === k)?.label)

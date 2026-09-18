@@ -6,6 +6,7 @@ import {
   countedVals,
   halvesOf,
   isReconciled,
+  takenOf,
   type ActualFigures,
 } from './actuals'
 
@@ -80,6 +81,22 @@ describe('isReconciled', () => {
     expect(isReconciled(halvesOf(row({ barTake: null })))).toBe(false)
     expect(isReconciled(halvesOf(row({ tickets: null })))).toBe(false)
     expect(isReconciled(halvesOf(null))).toBe(false)
+  })
+})
+
+describe('takenOf', () => {
+  it('adds the ticket takings and the bar profit, as the prototype’s post-event total does', () => {
+    expect(takenOf(halvesOf(row()))).toBe(3009 + 1026)
+  })
+
+  it('is nothing until both halves are in — half a night is not what it took', () => {
+    expect(takenOf(halvesOf(row({ barProfit: null })))).toBeNull()
+    expect(takenOf(halvesOf(row({ ticketRev: null })))).toBeNull()
+    expect(takenOf(halvesOf(null))).toBeNull()
+  })
+
+  it('counts a night that took nothing as having taken nothing', () => {
+    expect(takenOf(halvesOf(row({ ticketRev: 0, barTake: 0, barProfit: 0 })))).toBe(0)
   })
 })
 
