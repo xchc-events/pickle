@@ -20,11 +20,14 @@ import styles from './hours.module.css'
  */
 export function LogHours({
   events,
+  startOn,
   months,
   log,
   canLog,
 }: {
   events: { id: string; label: string }[]
+  /** The event the form opens on — see `startingEvent`. */
+  startOn: string
   months: { key: string; label: string; events: number }[]
   log: (form: FormData) => Promise<Said>
   /** False when the account has no person behind it. */
@@ -36,7 +39,7 @@ export function LogHours({
   const [kind, setKind] = useState<'event' | 'org'>('event')
   const [hours, setHours] = useState('')
   const [role, setRole] = useState<string>(TEAMS[0])
-  const [eventId, setEventId] = useState(events[0]?.id ?? '')
+  const [eventId, setEventId] = useState(startOn)
   const [month, setMonth] = useState(months[0]?.key ?? '')
 
   const roles = kind === 'org' ? ORG_ROLES : TEAMS

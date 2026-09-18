@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadHours } from '@/lib/hours-data'
+import { startingEvent } from '@/lib/hours'
 import { SectionHeading } from '@/components/SectionHeading'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
@@ -54,6 +55,7 @@ export default async function HoursPage({ searchParams }: PageProps<'/hours'>) {
         <LogHours
           canLog={user.personId !== null}
           events={data.eventOptions}
+          startOn={startingEvent(data.eventOptions, one(sp.event))}
           months={data.monthOptions}
           log={logHours}
         />

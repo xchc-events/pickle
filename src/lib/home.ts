@@ -40,7 +40,11 @@ import { SOON_DAYS } from './pipeline'
  *    still to settle. Anything else unfinished, once the booking is confirmed,
  *    when the night is inside the Pipeline's "Next 30 days" or a coordinator
  *    has flagged it. Beyond that it is the Pipeline's to show rather than a
- *    to-do — and once a night has passed, settling it is all that is left.
+ *    to-do. Once a night has passed its departments are history, and settling
+ *    it is what is left. A booking that never reached confirmed is still asked
+ *    about after its date: it is not a night that happened, and until the
+ *    product can close an enquiry that came to nothing this is its only
+ *    reminder.
  *  - **Which first?** Anything blocked outright, then whatever is due soonest:
  *    the night for most parts, the booking's own target for the booking.
  *
@@ -81,6 +85,25 @@ export interface Viewer {
  * account, and the modules that account's role opens.
  */
 export type Actors = ReadonlyMap<string, readonly ModuleKey[]>
+
+/**
+ * The actors, from the accounts that could be one and what each role opens.
+ *
+ * Which accounts those are is the loader's query: active, and inside the
+ * venue, since the event record refuses an outside account. An account with
+ * nobody behind it cannot be anybody's lead or owner, so it is left out. A
+ * role with no permission rows opens nothing.
+ */
+export function actorsOf(
+  accounts: readonly { personId: string | null; role: string }[],
+  modulesByRole: ReadonlyMap<string, readonly ModuleKey[]>,
+): Actors {
+  const actors = new Map<string, readonly ModuleKey[]>()
+  for (const a of accounts) {
+    if (a.personId) actors.set(a.personId, modulesByRole.get(a.role) ?? [])
+  }
+  return actors
+}
 
 // ---------------------------------------------------------------- screens ---
 
@@ -228,7 +251,8 @@ function isToday(e: HomeEvent, p: PartState): boolean {
   if (i.concluded || !p.applies) return false
   // A night's settlement only applies once the night has come.
   if (p.key === 'settlement') return !p.done
-  // Bookings move by hand, on their own clock.
+  // Bookings move by hand, on their own clock — and keep asking after the
+  // date has gone, since an unconfirmed booking is not a night that happened.
   if (p.key === 'booking') return !p.done
   // Once the night has passed, its departments are history.
   if (i.daysToDoor < 0) return false
@@ -621,9 +645,12 @@ export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: 
   }
 
   if (can('roster')) {
-    // A night not yet confirmed is not rostered for, and a past one is history.
+    // The nights Roster queues: every live one, confirmed or not, since the
+    // venue decided (16 Sep 2026) that crew need not wait for the booking. The
+    // tile links there, so it counts what that screen shows. A past night is
+    // history.
     const gaps = live
-      .filter((e) => e.input.booking === 'confirmed' && e.input.daysToDoor >= 0)
+      .filter((e) => e.input.daysToDoor >= 0)
       .map((e) => e.input.shifts.filter((s) => !s.assigned).length)
     const open = gaps.reduce((n, g) => n + g, 0)
     const nights = gaps.filter((g) => g > 0).length
@@ -743,7 +770,8 @@ export interface MyHoursInput {
   now: Date
   /** What the person said they can do each week, or null if they have not. */
   availability: { weekly: number; volunteer: number } | null
-  entries: { hours: number; workedOn: Date }[]
+  /** `rostered` is an hour a shift wrote, the only kind that can be still to come. */
+  entries: { hours: number; workedOn: Date; rostered: boolean }[]
 }
 
 export interface MyHours {
@@ -760,16 +788,21 @@ export interface MyHours {
 /**
  * This calendar month's hours, by the day the work happened — an hour typed
  * up a fortnight late is still the month it was worked in, as Hours has it.
- * Rostered shifts are written the moment somebody is put on them, so the month
- * already holds the ones still to come.
+ *
+ * A rostered shift's hours are written the moment somebody is put on it, dated
+ * the night itself (`assignShift`), so the month already holds the ones still
+ * to come. Only those can be: an hour somebody typed is work done, whatever
+ * day it is filed under. Org-wide hours are filed under the 15th of their
+ * month, and would otherwise read as still to come until the 15th.
  */
 export function myHours({ now, availability, entries }: MyHoursInput): MyHours {
   const month = monthKey(now)
   const mine = entries.filter((x) => monthKey(x.workedOn) === month)
   const sum = (rows: typeof mine) => rows.reduce((n, x) => n + x.hours, 0)
 
-  const worked = sum(mine.filter((x) => x.workedOn.getTime() <= now.getTime()))
-  const ahead = sum(mine.filter((x) => x.workedOn.getTime() > now.getTime()))
+  const toCome = (x: (typeof mine)[number]) => x.rostered && x.workedOn.getTime() > now.getTime()
+  const ahead = sum(mine.filter(toCome))
+  const worked = sum(mine.filter((x) => !toCome(x)))
   const total = worked + ahead
 
   // A week's cap spread over this month's days, volunteer hours on top as the

@@ -6,6 +6,7 @@ import { money } from './format'
 import { partsFor, type GateArtist, type PartsEvent } from './parts'
 import { SOON_DAYS } from './pipeline'
 import {
+  actorsOf,
   GATE_ACTION,
   NEEDS_SHOWN,
   greeting,
@@ -446,6 +447,58 @@ describe('Needs you — the moves a person makes by hand', () => {
   })
 })
 
+describe('actorsOf — who could act on something', () => {
+  const byRole = new Map<string, ModuleKey[]>([
+    ['COORDINATOR', ['home', 'pipeline', 'roster']],
+    ['BAR', ['home', 'bar']],
+  ])
+
+  it("is the person behind each account, with what that account's role opens", () => {
+    const found = actorsOf(
+      [
+        { personId: MT, role: 'COORDINATOR' },
+        { personId: AK, role: 'BAR' },
+      ],
+      byRole,
+    )
+    expect([...found]).toEqual([
+      [MT, ['home', 'pipeline', 'roster']],
+      [AK, ['home', 'bar']],
+    ])
+  })
+
+  it('leaves out an account with nobody behind it, and opens nothing for a role with no rows', () => {
+    const found = actorsOf(
+      [
+        { personId: null, role: 'COORDINATOR' },
+        { personId: JR, role: 'TECH' },
+      ],
+      byRole,
+    )
+    expect([...found]).toEqual([[JR, []]])
+  })
+})
+
+describe('Needs you — a booking whose date has gone', () => {
+  it('still asks its owner to move it on, because nothing else will say so', () => {
+    // Departments stop once the night has passed. A booking that never got as
+    // far as confirmed is not a night that happened, though: it sits on the
+    // Pipeline until somebody deals with it, and this is the only reminder.
+    const lapsed = night({}, { booking: 'negotiating', daysToDoor: -5, shifts: [] })
+    const needs = needsFor([lapsed], as(MT), actors)
+    expect(needs.map((n) => n.href)).toEqual(['/events/sb'])
+    expect(needs[0]!.title).toMatch(/Static Bloom/)
+  })
+
+  it('asks nothing of the departments for it', () => {
+    const lapsed = night(
+      {},
+      { booking: 'negotiating', daysToDoor: -5, techStatus: 'draft', assets: inReview(2) },
+    )
+    for (const who of [TW, JR, AK]) expect(needsFor([lapsed], as(who), actors)).toEqual([])
+  })
+})
+
 describe('Needs you — order', () => {
   it('puts anything blocked first, then whatever is due soonest', () => {
     const denied = night(
@@ -619,7 +672,7 @@ describe('the tiles', () => {
     const open = { assigned: false, pencilled: false }
     const nights = [
       night({ id: 'soon' }, { daysToDoor: 8, shifts: [open, open, open] }),
-      // Not confirmed, so not rostered for yet.
+      // Not confirmed, but Roster crews it all the same, so its gaps count.
       night({ id: 'maybe' }, { booking: 'enquiry', daysToDoor: 12, shifts: [open, open] }),
       // Past, so a gap there is history rather than a shift to fill.
       night({ id: 'past' }, { daysToDoor: -4, shifts: [open], barClosed: false }),
@@ -629,9 +682,26 @@ describe('the tiles', () => {
 
     const tiles = homeTiles(nights, counted, as(AK))
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href, t.tone])).toEqual([
-      ['Shifts to fill', '3', 'across 1 night', '/roster', 'warn'],
+      ['Shifts to fill', '5', 'across 2 nights', '/roster', 'warn'],
       ['Bars to close', '2', 'oldest 4 days ago', '/bar?event=past', 'warn'],
     ])
+
+    // Roster crews every live night, confirmed or not (16 Sep 2026), so the
+    // tile that links to it counts the same nights. A past one is history.
+    const pencilled = night(
+      { id: 'pencilled' },
+      { booking: 'negotiating', shifts: [{ assigned: false, pencilled: false }] },
+    )
+    const gone = night(
+      { id: 'gone' },
+      { booking: 'negotiating', daysToDoor: -2, shifts: [{ assigned: false, pencilled: false }] },
+    )
+    expect(homeTiles([pencilled, gone], [], as(AK))[0]).toMatchObject({
+      label: 'Shifts to fill',
+      value: '1',
+      sub: 'across 1 night',
+      tone: 'warn',
+    })
 
     const quiet = homeTiles([night()], [], as(AK))
     expect(quiet.map((t) => [t.value, t.sub, t.tone])).toEqual([
@@ -730,10 +800,10 @@ describe('Your hours this month', () => {
       now,
       availability: null,
       entries: [
-        { hours: 5, workedOn: at(7, 31, 23) },
-        { hours: 2, workedOn: at(8, 1, 0) },
-        { hours: 3.5, workedOn: at(8, 30, 23) },
-        { hours: 7, workedOn: at(9, 1, 0) },
+        { hours: 5, workedOn: at(7, 31, 23), rostered: true },
+        { hours: 2, workedOn: at(8, 1, 0), rostered: true },
+        { hours: 3.5, workedOn: at(8, 30, 23), rostered: true },
+        { hours: 7, workedOn: at(9, 1, 0), rostered: true },
       ],
     })
     expect(mine.total).toBe('5.5h')
@@ -745,16 +815,36 @@ describe('Your hours this month', () => {
       now,
       availability: null,
       entries: [
-        { hours: 6, workedOn: at(8, 3) },
-        { hours: 2, workedOn: at(8, 17, 9) },
-        { hours: 4.5, workedOn: at(8, 25, 19) },
+        { hours: 6, workedOn: at(8, 3), rostered: true },
+        { hours: 2, workedOn: at(8, 17, 9), rostered: false },
+        { hours: 4.5, workedOn: at(8, 25, 19), rostered: true },
       ],
     })
     expect(mine.split).toBe('8h worked · 4.5h still to come')
     expect(myHours({ now, availability: null, entries: [] }).split).toBe('nothing logged yet')
     expect(
-      myHours({ now, availability: null, entries: [{ hours: 3, workedOn: at(8, 29) }] }).split,
+      myHours({
+        now,
+        availability: null,
+        entries: [{ hours: 3, workedOn: at(8, 29), rostered: true }],
+      }).split,
     ).toBe('3h still to come')
+  })
+
+  it('counts typed hours as worked, whatever day they are filed under', () => {
+    // Org-wide hours are filed under the 15th of their month, so that a
+    // timezone cannot roll them into a neighbour. Typed on the 3rd, that is a
+    // day still to come, but only a rostered shift is work not yet done.
+    const early = new Date(2026, 8, 3, 10, 0)
+    const mine = myHours({
+      now: early,
+      availability: null,
+      entries: [
+        { hours: 4, workedOn: at(8, 15, 0), rostered: false },
+        { hours: 6, workedOn: at(8, 20), rostered: true },
+      ],
+    })
+    expect(mine.split).toBe('4h worked · 6h still to come')
   })
 
   it('measures them against what the person said they can do this month', () => {
@@ -762,7 +852,7 @@ describe('Your hours this month', () => {
     const mine = myHours({
       now,
       availability: { weekly: 11, volunteer: 0 },
-      entries: [{ hours: 12, workedOn: at(8, 3) }],
+      entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
     expect(mine.pct).toBe(25)
     expect(mine.capLabel).toBe('of about 47h you can do this month')
@@ -771,7 +861,7 @@ describe('Your hours this month', () => {
     const keen = myHours({
       now,
       availability: { weekly: 11, volunteer: 3.5 },
-      entries: [{ hours: 12, workedOn: at(8, 3) }],
+      entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
     expect(keen.capLabel).toBe('of about 62h you can do this month')
   })
@@ -780,14 +870,18 @@ describe('Your hours this month', () => {
     const over = myHours({
       now,
       availability: { weekly: 2, volunteer: 0 },
-      entries: [{ hours: 40, workedOn: at(8, 3) }],
+      entries: [{ hours: 40, workedOn: at(8, 3), rostered: true }],
     })
     expect(over.pct).toBe(100)
   })
 
   it('draws no bar for someone who has said nothing about their hours', () => {
     for (const availability of [null, { weekly: 0, volunteer: 0 }]) {
-      const mine = myHours({ now, availability, entries: [{ hours: 3, workedOn: at(8, 3) }] })
+      const mine = myHours({
+        now,
+        availability,
+        entries: [{ hours: 3, workedOn: at(8, 3), rostered: true }],
+      })
       expect(mine.pct).toBeNull()
       expect(mine.capLabel).toBeNull()
     }

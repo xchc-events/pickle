@@ -335,15 +335,9 @@ a.tile:hover {
   }
 }
 
-@media (max-width: 560px) {
-  .header {
-    padding: 20px 16px 16px;
-  }
-
-  .body {
-    padding: 18px 16px 32px;
-  }
-
+/* Phone width, as tokens.css has it. The header and body paddings narrow by
+   themselves there, through --page-gutter. */
+@media (max-width: 599px) {
   /* The whole row is the link; the words "Open roster" can go. */
   .need {
     grid-template-columns: 20px minmax(0, 1fr) auto;

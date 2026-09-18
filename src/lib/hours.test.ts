@@ -9,6 +9,7 @@ import {
   monthKey,
   monthLabel,
   splitOf,
+  startingEvent,
 } from './hours'
 import { CFG } from './finance'
 
@@ -209,5 +210,25 @@ describe('effectOf — where the money lands', () => {
     })
     expect(e.tone).toBe('warn')
     expect(e.text).toMatch(/no events|nothing to/i)
+  })
+})
+
+describe('startingEvent — the event the form opens on', () => {
+  const options = [
+    { id: 'oldest', label: 'Oldest · 1 Sep' },
+    { id: 'sb', label: 'Static Bloom · 10 Oct' },
+  ]
+
+  it('opens on the event it was sent to, so hours land on the night in question', () => {
+    expect(startingEvent(options, 'sb')).toBe('sb')
+  })
+
+  it('falls back to the first on the list for an event the reader cannot log against', () => {
+    expect(startingEvent(options, 'somebody-elses')).toBe('oldest')
+    expect(startingEvent(options, undefined)).toBe('oldest')
+  })
+
+  it('is empty with nothing to log against', () => {
+    expect(startingEvent([], 'sb')).toBe('')
   })
 })

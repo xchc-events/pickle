@@ -9,6 +9,7 @@ import type { ModuleKey } from './constants'
 import type { LeadKey } from './event-record'
 import type { SessionUser } from './session'
 import {
+  actorsOf,
   homeTiles,
   myHours,
   needsFor,
@@ -106,11 +107,7 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
     }),
   ])
 
-  const modulesByRole = modulesOpenByRole(permissions)
-  const actors = new Map<string, ModuleKey[]>()
-  for (const a of accounts) {
-    if (a.personId) actors.set(a.personId, modulesByRole.get(a.role) ?? [])
-  }
+  const actors = actorsOf(accounts, modulesOpenByRole(permissions))
 
   const events: HomeEvent[] = rows.map((row) => {
     // The portal rule the event record and the Pipeline word their gates off:
@@ -175,7 +172,7 @@ async function hoursOf(personId: string | null, now: Date): Promise<MyHours | 'u
   const [entries, availability] = await Promise.all([
     db.hourEntry.findMany({
       where: { personId, workedOn: { gte: from, lt: to } },
-      select: { hours: true, workedOn: true },
+      select: { hours: true, workedOn: true, shiftId: true },
     }),
     db.availability.findUnique({
       where: { personId },
@@ -183,5 +180,13 @@ async function hoursOf(personId: string | null, now: Date): Promise<MyHours | 'u
     }),
   ])
 
-  return myHours({ now, availability, entries })
+  return myHours({
+    now,
+    availability,
+    entries: entries.map((e) => ({
+      hours: e.hours,
+      workedOn: e.workedOn,
+      rostered: e.shiftId !== null,
+    })),
+  })
 }
