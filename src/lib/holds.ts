@@ -1,3 +1,5 @@
+import { dateLabel } from './format'
+
 /**
  * Holds on a room for a night.
  *
@@ -169,16 +171,93 @@ export function challengeRefusal(holds: HoldRow[], holdId: string, eventId: stri
  * The re-ranking after a hold at `releasedRank` goes.
  *
  * Returns only the holds that move, so the caller writes the smallest update
- * it can rather than rewriting the whole ladder.
+ * it can rather than rewriting the whole ladder — and whose each one is, so
+ * the events that moved up can be told.
  */
 export function promoteAfterRelease(
   holds: HoldRow[],
   releasedRank: number,
-): { id: string; rank: number }[] {
+): { id: string; eventId: string; rank: number }[] {
   return live(holds)
     .filter((h) => h.rank > releasedRank)
     .sort((a, b) => a.rank - b.rank)
-    .map((h) => ({ id: h.id, rank: h.rank - 1 }))
+    .map((h) => ({ id: h.id, eventId: h.eventId, rank: h.rank - 1 }))
+}
+
+/**
+ * What a write did to a hold that belongs to another event.
+ *
+ * - `released`: the night was confirmed for another event.
+ * - `moved_up`: a hold above it was released.
+ * - `challenged`: it is the 1st hold, and a hold below it challenged.
+ */
+export type HoldChange = 'released' | 'moved_up' | 'challenged'
+
+/**
+ * A hold of another event that a confirmation, release or challenge changed.
+ *
+ * Every mutation writes to the activity table, and these change more than the
+ * acting event's own hold, so the writer reports them and the action writes a
+ * line on each of their events too. It carries no event name, and `affectedLine`
+ * takes none — see there for why.
+ */
+export interface AffectedHold {
+  holdId: string
+  eventId: string
+  change: HoldChange
+  /** The rank it was released from, moved up to, or challenged at. */
+  rank: number
+  spaceName: string
+  date: Date
+}
+
+/**
+ * The holds a write changed that belong to other events, in ladder order.
+ *
+ * The acting event's own holds are left out, because the action writes its own
+ * line about the act. One hold to a night per event means that should not come
+ * up, but nothing in the table forbids a second — and a line saying "another
+ * event" did it would then be wrong about itself.
+ */
+export function affectedHolds(
+  changed: { id: string; eventId: string; rank: number }[],
+  change: HoldChange,
+  night: { spaceName: string; date: Date },
+  actingEventId: string,
+): AffectedHold[] {
+  return changed
+    .filter((h) => h.eventId !== actingEventId)
+    .sort((a, b) => a.rank - b.rank)
+    .map((h) => ({
+      holdId: h.id,
+      eventId: h.eventId,
+      change,
+      rank: h.rank,
+      spaceName: night.spaceName,
+      date: night.date,
+    }))
+}
+
+/**
+ * The activity line on the event whose hold was changed. It follows the
+ * initials of whoever made the write, like every other line.
+ *
+ * It says "another event", never which. A promoter reads the feed of their own
+ * events, and another organisation's event is not theirs to see — the reason
+ * the event page does not load the ladder for them at all. The feed is
+ * append-only, so a name written here could never be taken back.
+ */
+export function affectedLine(hold: AffectedHold): string {
+  const where = `${hold.spaceName} for ${dateLabel(hold.date)}`
+  const label = holdLabel(hold.rank)
+  switch (hold.change) {
+    case 'released':
+      return `confirmed the night for another event — this event's ${label} on ${where} was released`
+    case 'moved_up':
+      return `released a hold above this one — this event is now the ${label} on ${where}`
+    case 'challenged':
+      return `challenged this event's ${label} on ${where} — it has to take the night or give it up`
+  }
 }
 
 /**

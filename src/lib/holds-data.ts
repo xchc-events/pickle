@@ -2,6 +2,7 @@ import 'server-only'
 import { Prisma } from '@/generated/prisma/client'
 import { db } from './db'
 import {
+  affectedHolds,
   ALREADY_CONFIRMED,
   challengeRefusal,
   confirmRefusal,
@@ -14,6 +15,7 @@ import {
   placeRefusal,
   promoteAfterRelease,
   releaseRefusal,
+  type AffectedHold,
   type HoldRow,
 } from './holds'
 
@@ -89,13 +91,22 @@ async function ladderFor(
  * there and its night is never read. The refusals in holds.ts check ownership
  * again against the ladder, so this query is not the only thing standing
  * between a foreign id and a write.
+ *
+ * The room's name comes with it for the lines written on other events whose
+ * holds the write changes.
  */
 function ownSlot(tx: Pick<Prisma.TransactionClient, 'hold'>, holdId: string, eventId: string) {
   return tx.hold.findUnique({
     where: { id: holdId, eventId },
-    select: { spaceId: true, date: true, rank: true },
+    select: { spaceId: true, date: true, rank: true, space: { select: { name: true } } },
   })
 }
+
+/** The night a slot is on, as the lines on other events name it. */
+const nightOf = (slot: { date: Date; space: { name: string } }) => ({
+  spaceName: slot.space.name,
+  date: slot.date,
+})
 
 export interface HoldView {
   id: string
@@ -150,6 +161,16 @@ export async function holdsForEvent(eventId: string): Promise<HoldView[]> {
 
 export type HoldOutcome = { ok: true } | { ok: false; why: string }
 
+/**
+ * How a confirmation, release or challenge went.
+ *
+ * Placing a hold joins the back of the queue and moves nobody. These three
+ * each change holds that belong to other events, so success says which: every
+ * such hold whose row the write changed, from the attempt that committed, for
+ * the action to write a line on each of their events.
+ */
+export type LadderOutcome = { ok: true; affected: AffectedHold[] } | { ok: false; why: string }
+
 export async function placeHold(
   eventId: string,
   spaceId: string,
@@ -176,8 +197,12 @@ export async function placeHold(
  *
  * `eventId` is the event the caller was scoped to; a hold that is not its own
  * is refused as gone.
+ *
+ * The holds released are reported as Postgres returns them from the release
+ * itself, so the events told their hold went are exactly the ones whose hold
+ * did — not a second reading of the ladder that could disagree with the write.
  */
-export async function confirmHold(holdId: string, eventId: string): Promise<HoldOutcome> {
+export async function confirmHold(holdId: string, eventId: string): Promise<LadderOutcome> {
   try {
     return await confirmInside(holdId, eventId)
   } catch (err) {
@@ -189,7 +214,7 @@ export async function confirmHold(holdId: string, eventId: string): Promise<Hold
   }
 }
 
-function confirmInside(holdId: string, eventId: string): Promise<HoldOutcome> {
+function confirmInside(holdId: string, eventId: string): Promise<LadderOutcome> {
   return ladderTransaction(async (tx) => {
     const hold = await ownSlot(tx, holdId, eventId)
     if (!hold) return { ok: false as const, why: NO_LONGER_STANDING }
@@ -202,16 +227,20 @@ function confirmInside(holdId: string, eventId: string): Promise<HoldOutcome> {
       where: { id: holdId },
       data: { state: 'CONFIRMED', challengedByEventId: null, challengedAt: null },
     })
-    await tx.hold.updateMany({
+    const released = await tx.hold.updateManyAndReturn({
       where: { spaceId: hold.spaceId, date: hold.date, state: 'HELD', id: { not: holdId } },
       data: { state: 'RELEASED', releasedAt: new Date() },
+      select: { id: true, eventId: true, rank: true },
     })
-    return { ok: true as const }
+    return {
+      ok: true as const,
+      affected: affectedHolds(released, 'released', nightOf(hold), eventId),
+    }
   })
 }
 
 /** Give up the night, and move everyone below up one. Only the event's own hold. */
-export async function releaseHold(holdId: string, eventId: string): Promise<HoldOutcome> {
+export async function releaseHold(holdId: string, eventId: string): Promise<LadderOutcome> {
   return ladderTransaction(async (tx) => {
     const hold = await ownSlot(tx, holdId, eventId)
     if (!hold) return { ok: false as const, why: NO_LONGER_STANDING }
@@ -225,10 +254,14 @@ export async function releaseHold(holdId: string, eventId: string): Promise<Hold
       data: { state: 'RELEASED', releasedAt: new Date(), challengedByEventId: null },
     })
 
-    for (const move of promoteAfterRelease(ladder, hold.rank)) {
+    const moves = promoteAfterRelease(ladder, hold.rank)
+    for (const move of moves) {
       await tx.hold.update({ where: { id: move.id }, data: { rank: move.rank } })
     }
-    return { ok: true as const }
+    return {
+      ok: true as const,
+      affected: affectedHolds(moves, 'moved_up', nightOf(hold), eventId),
+    }
   })
 }
 
@@ -243,7 +276,7 @@ export async function releaseHold(holdId: string, eventId: string): Promise<Hold
  * waiting, so a challenge only ever goes out in the name of the event queued
  * behind.
  */
-export async function challengeHold(holdId: string, eventId: string): Promise<HoldOutcome> {
+export async function challengeHold(holdId: string, eventId: string): Promise<LadderOutcome> {
   return ladderTransaction(async (tx) => {
     const mine = await ownSlot(tx, holdId, eventId)
     if (!mine) return { ok: false as const, why: NO_LONGER_STANDING }
@@ -253,10 +286,14 @@ export async function challengeHold(holdId: string, eventId: string): Promise<Ho
     if (why) return { ok: false as const, why }
 
     // challengeRefusal has just found a 1st hold standing.
+    const first = firstHold(ladder)!
     await tx.hold.update({
-      where: { id: firstHold(ladder)!.id },
+      where: { id: first.id },
       data: { challengedByEventId: eventId, challengedAt: new Date() },
     })
-    return { ok: true as const }
+    return {
+      ok: true as const,
+      affected: affectedHolds([first], 'challenged', nightOf(mine), eventId),
+    }
   })
 }
