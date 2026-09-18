@@ -15,6 +15,8 @@ import { bookingStep, nextBooking, type BookingStatus } from '@/lib/parts'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
 import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-data'
+import { affectedLine, type AffectedHold } from '@/lib/holds'
+import type { SessionUser } from '@/lib/session'
 import { cleanDoor } from '@/lib/actuals'
 import type {
   BookingStatus as BookingStatusRow,
@@ -389,6 +391,10 @@ export async function countDoor(
  * browser too, and could name any hold on any night. So the writers are handed
  * the scoped event with it, and refuse a hold that is not that event's — which
  * is also what keeps each activity line on the event the hold belongs to.
+ *
+ * Confirming, releasing and challenging also change other events' holds on the
+ * night. Those events get a line too, from the writer's report of what it
+ * changed — see `recordAffected`.
  */
 export async function holdTheRoom(eventId: string): Promise<Said> {
   const { user } = await requireModule('pipeline')
@@ -421,6 +427,7 @@ export async function takeTheNight(eventId: string, holdId: string): Promise<Sai
   if (!out.ok) return said(out.why, 'warn')
 
   await record(id, user, 'confirmed the room — every other hold on that night was released')
+  await recordAffected(user, out.affected)
   refresh()
   return said('Confirmed. The room is yours and the other holds are released.')
 }
@@ -435,6 +442,7 @@ export async function dropTheHold(eventId: string, holdId: string): Promise<Said
   if (!out.ok) return said(out.why, 'warn')
 
   await record(id, user, 'released a hold — anyone behind it moved up')
+  await recordAffected(user, out.affected)
   refresh()
   return said('Released. Whoever was behind it has moved up.')
 }
@@ -449,6 +457,22 @@ export async function challengeTheHold(eventId: string, holdId: string): Promise
   if (!out.ok) return said(out.why, 'warn')
 
   await record(id, user, 'challenged the hold above this one')
+  await recordAffected(user, out.affected)
   refresh()
   return said('Challenged. The first hold now has to take the night or give it up.')
+}
+
+/**
+ * A line on each other event whose hold the write changed, as the person who
+ * made it.
+ *
+ * Their holds moved as surely as this event's did, and the activity table is
+ * where every mutation is written down. The line says "another event" and never
+ * which — see `affectedLine`.
+ *
+ * Not exported, so not an endpoint: it writes whatever report it is handed, and
+ * only a writer's report of its own committed change should reach it.
+ */
+async function recordAffected(user: SessionUser, affected: AffectedHold[]): Promise<void> {
+  for (const hold of affected) await record(hold.eventId, user, affectedLine(hold))
 }

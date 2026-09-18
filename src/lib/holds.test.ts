@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  affectedHolds,
+  affectedLine,
   ALREADY_CONFIRMED,
   challengeRefusal,
   confirmRefusal,
@@ -13,6 +15,7 @@ import {
   placeRefusal,
   promoteAfterRelease,
   releaseRefusal,
+  type AffectedHold,
   type HoldRow,
   type HoldState,
 } from './holds'
@@ -233,38 +236,121 @@ describe('NO_LONGER_STANDING', () => {
 })
 
 describe('promoteAfterRelease', () => {
-  it('moves everyone below the released hold up one', () => {
-    const holds = [
-      hold({ id: 'a', rank: 1 }),
-      hold({ id: 'b', rank: 2 }),
-      hold({ id: 'c', rank: 3 }),
-    ]
-    expect(promoteAfterRelease(holds, 1)).toEqual([
-      { id: 'b', rank: 1 },
-      { id: 'c', rank: 2 },
+  /** Three events queued for one night, as they would be — one hold each. */
+  const queue = () => [
+    hold({ id: 'a', eventId: 'ea', rank: 1 }),
+    hold({ id: 'b', eventId: 'eb', rank: 2 }),
+    hold({ id: 'c', eventId: 'ec', rank: 3 }),
+  ]
+
+  /** Whose hold each move is, so the event that moved up can be told. */
+  it('moves everyone below the released hold up one, and says whose hold each is', () => {
+    expect(promoteAfterRelease(queue(), 1)).toEqual([
+      { id: 'b', eventId: 'eb', rank: 1 },
+      { id: 'c', eventId: 'ec', rank: 2 },
     ])
   })
 
   it('leaves holds above the released one alone', () => {
-    const holds = [
-      hold({ id: 'a', rank: 1 }),
-      hold({ id: 'b', rank: 2 }),
-      hold({ id: 'c', rank: 3 }),
-    ]
-    expect(promoteAfterRelease(holds, 2)).toEqual([{ id: 'c', rank: 2 }])
+    expect(promoteAfterRelease(queue(), 2)).toEqual([{ id: 'c', eventId: 'ec', rank: 2 }])
   })
 
   it('does not promote released holds', () => {
-    const holds = [
-      hold({ id: 'a', rank: 1 }),
-      hold({ id: 'b', rank: 2, state: 'released' }),
-      hold({ id: 'c', rank: 3 }),
-    ]
-    expect(promoteAfterRelease(holds, 1)).toEqual([{ id: 'c', rank: 2 }])
+    const holds = queue().map((h) => (h.id === 'b' ? { ...h, state: 'released' as const } : h))
+    expect(promoteAfterRelease(holds, 1)).toEqual([{ id: 'c', eventId: 'ec', rank: 2 }])
   })
 
   it('has nothing to do when the last hold goes', () => {
     expect(promoteAfterRelease([hold({ rank: 1 })], 1)).toEqual([])
+  })
+})
+
+/**
+ * Confirming, releasing and challenging each change holds that belong to other
+ * events — the rest of the night released, everyone behind moved up, the 1st
+ * hold put on notice. Every mutation writes to the activity table, so each of
+ * those events is owed a line of its own, not only the event that acted.
+ */
+describe('affectedHolds', () => {
+  /** A local date, so the night reads the same in any timezone. */
+  const night = { spaceName: 'Main', date: new Date(2026, 9, 3) }
+
+  it('describes each changed hold by its event, what happened, its rank, and the night', () => {
+    expect(affectedHolds([{ id: 'b', eventId: 'e2', rank: 2 }], 'released', night, 'e1')).toEqual([
+      {
+        holdId: 'b',
+        eventId: 'e2',
+        change: 'released',
+        rank: 2,
+        spaceName: 'Main',
+        date: night.date,
+      },
+    ])
+  })
+
+  /**
+   * The acting event writes its own line about the act. One hold to a night
+   * per event means this should never come up, but nothing in the table
+   * forbids a second, and "another event" would then be a lie about itself.
+   */
+  it("leaves out the acting event's own holds", () => {
+    const changed = [
+      { id: 'a', eventId: 'e1', rank: 2 },
+      { id: 'b', eventId: 'e2', rank: 3 },
+    ]
+    expect(affectedHolds(changed, 'released', night, 'e1').map((h) => h.holdId)).toEqual(['b'])
+  })
+
+  it('lists them in ladder order, whatever order the write returned them in', () => {
+    const changed = [
+      { id: 'c', eventId: 'e3', rank: 3 },
+      { id: 'b', eventId: 'e2', rank: 2 },
+    ]
+    expect(affectedHolds(changed, 'released', night, 'e1').map((h) => h.holdId)).toEqual(['b', 'c'])
+  })
+
+  it('is nobody when the write changed no other hold', () => {
+    expect(affectedHolds([], 'moved_up', night, 'e1')).toEqual([])
+  })
+})
+
+describe('affectedLine', () => {
+  /**
+   * The line on the feed of an event whose hold somebody else's write changed.
+   * It follows the initials of whoever made the write, like every other line.
+   *
+   * It says "another event" and never which. A promoter reads the feed of
+   * their own events, and another organisation's event is not theirs to see —
+   * the same reason the event page does not load the ladder for them at all.
+   * Nothing here takes a name, so there is none to leak.
+   */
+  const affected = (over: Pick<AffectedHold, 'change' | 'rank'>): AffectedHold => ({
+    holdId: 'h2',
+    eventId: 'e2',
+    spaceName: 'Main',
+    date: new Date(2026, 9, 3),
+    ...over,
+  })
+
+  it('says the night was confirmed for another event, and which of its holds that released', () => {
+    expect(affectedLine(affected({ change: 'released', rank: 2 }))).toBe(
+      "confirmed the night for another event — this event's 2nd hold on Main for Sat 3 Oct was released",
+    )
+  })
+
+  it('says a hold above was released, and where this event now stands', () => {
+    expect(affectedLine(affected({ change: 'moved_up', rank: 1 }))).toBe(
+      'released a hold above this one — this event is now the 1st hold on Main for Sat 3 Oct',
+    )
+    expect(affectedLine(affected({ change: 'moved_up', rank: 2 }))).toBe(
+      'released a hold above this one — this event is now the 2nd hold on Main for Sat 3 Oct',
+    )
+  })
+
+  it("says this event's 1st hold was challenged, and what that asks of it", () => {
+    expect(affectedLine(affected({ change: 'challenged', rank: 1 }))).toBe(
+      "challenged this event's 1st hold on Main for Sat 3 Oct — it has to take the night or give it up",
+    )
   })
 })
 

@@ -1,6 +1,7 @@
+import { isDeepStrictEqual } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Prisma } from '@/generated/prisma/client'
-import { NO_LONGER_STANDING } from './holds'
+import { NO_LONGER_STANDING, type HoldChange } from './holds'
 
 /**
  * The hold writers, against a ladder kept in memory.
@@ -13,6 +14,11 @@ import { NO_LONGER_STANDING } from './holds'
  * on that night, release any hold still standing, or challenge with somebody
  * else's lower hold in their own event's name — and each activity line landed
  * on the event the request came from, not the event the hold belonged to.
+ *
+ * A write that succeeds also reports the holds of other events it changed, and
+ * the action writes a line on each of those events from that report. So the
+ * report is tested against the table itself: a hold whose row changed and was
+ * left out gets no line, and one listed that did not change gets a false one.
  *
  * The stand-in database answers only the queries holds-data.ts makes, and logs
  * which client made each one, so a check that slipped outside the Serializable
@@ -87,6 +93,12 @@ function holdClient(client: 'db' | 'tx') {
       for (const row of hit) Object.assign(row, data)
       return { count: hit.length }
     },
+    updateManyAndReturn: async ({ where, data }: { where: Where; data: Partial<Row> }) => {
+      log('updateManyAndReturn')
+      const hit = rows.filter((r) => matches(r, where))
+      for (const row of hit) Object.assign(row, data)
+      return hit.map(copy)
+    },
   }
 }
 
@@ -158,10 +170,43 @@ const states = () => Object.fromEntries(rows.map((r) => [r.id, r.state]))
 const standing = () =>
   Object.fromEntries(rows.filter((r) => r.state === 'HELD').map((r) => [r.id, r.rank]))
 
+/** A hold that belongs to another event, as a writer reports what it did to it. */
+const affected = (holdId: string, eventId: string, change: HoldChange, rank: number) => ({
+  holdId,
+  eventId,
+  change,
+  rank,
+  spaceName: 'Main',
+  date: SATURDAY,
+})
+
+/** A hold given up before now. It keeps its row and its old number. */
+const givenUp = (id: string, eventId: string): Row => ({
+  ...hold({ id, eventId, rank: 1 }),
+  state: 'RELEASED',
+})
+
 describe('confirmHold', () => {
   it("confirms the event's own 1st hold and releases every other hold on the night", async () => {
-    await expect(confirmHold('hold_sf', 'sf')).resolves.toEqual({ ok: true })
+    await expect(confirmHold('hold_sf', 'sf')).resolves.toMatchObject({ ok: true })
     expect(states()).toEqual({ hold_sf: 'CONFIRMED', hold_sb: 'RELEASED', hold_dtm: 'RELEASED' })
+  })
+
+  it('reports every other event whose hold it released, at the rank each held', async () => {
+    await expect(confirmHold('hold_sf', 'sf')).resolves.toEqual({
+      ok: true,
+      affected: [
+        affected('hold_sb', 'sb', 'released', 2),
+        affected('hold_dtm', 'dtm', 'released', 3),
+      ],
+    })
+  })
+
+  it('does not report a hold that was given up before the night was taken', async () => {
+    rows.push(givenUp('hold_gone', 'gone'))
+
+    const out = await confirmHold('hold_sf', 'sf')
+    expect(out.ok && out.affected.map((h) => h.eventId)).toEqual(['sb', 'dtm'])
   })
 
   it("refuses another event's 1st hold, and releases nobody", async () => {
@@ -174,8 +219,23 @@ describe('confirmHold', () => {
 
 describe('releaseHold', () => {
   it("releases the event's own hold and moves everyone behind it up", async () => {
-    await expect(releaseHold('hold_sf', 'sf')).resolves.toEqual({ ok: true })
+    await expect(releaseHold('hold_sf', 'sf')).resolves.toMatchObject({ ok: true })
     expect(standing()).toEqual({ hold_sb: 1, hold_dtm: 2 })
+  })
+
+  it('reports every event it moved up, at the rank each moved to', async () => {
+    await expect(releaseHold('hold_sf', 'sf')).resolves.toEqual({
+      ok: true,
+      affected: [
+        affected('hold_sb', 'sb', 'moved_up', 1),
+        affected('hold_dtm', 'dtm', 'moved_up', 2),
+      ],
+    })
+  })
+
+  it('does not report the holds above it, which stay where they were', async () => {
+    const out = await releaseHold('hold_sb', 'sb')
+    expect(out.ok && out.affected.map((h) => h.eventId)).toEqual(['dtm'])
   })
 
   it("refuses another event's hold, and moves nobody up", async () => {
@@ -188,8 +248,16 @@ describe('releaseHold', () => {
 
 describe('challengeHold', () => {
   it('puts the 1st hold on notice in the name of the event holding the lower one', async () => {
-    await expect(challengeHold('hold_sb', 'sb')).resolves.toEqual({ ok: true })
+    await expect(challengeHold('hold_sb', 'sb')).resolves.toMatchObject({ ok: true })
     expect(rows.find((r) => r.id === 'hold_sf')?.challengedByEventId).toBe('sb')
+  })
+
+  /** Only the incumbent is on notice. A hold queued in between is not changed. */
+  it('reports the 1st hold it put on notice, and nobody queued in between', async () => {
+    await expect(challengeHold('hold_dtm', 'dtm')).resolves.toEqual({
+      ok: true,
+      affected: [affected('hold_sf', 'sf', 'challenged', 1)],
+    })
   })
 
   it("refuses another event's lower hold, so nobody is challenged in the caller's name", async () => {
@@ -223,7 +291,7 @@ describe.each([
   })
 
   it('reads and writes only inside a Serializable transaction', async () => {
-    await expect(write(holdId, owner)).resolves.toEqual({ ok: true })
+    await expect(write(holdId, owner)).resolves.toMatchObject({ ok: true })
 
     expect($transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
@@ -234,8 +302,39 @@ describe.each([
   it('runs again from the top when Postgres aborts it for a conflict', async () => {
     conflicts = 1
 
-    await expect(write(holdId, owner)).resolves.toEqual({ ok: true })
+    await expect(write(holdId, owner)).resolves.toMatchObject({ ok: true })
     expect($transaction).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * The report is what the action writes activity lines from. A changed hold
+   * missing from it gets no line; one listed that did not change gets a false
+   * one. A hold given up earlier sits on the night, unchanged, to be left out.
+   */
+  it("reports exactly the other events' holds whose rows it changed", async () => {
+    rows.push(givenUp('hold_gone', 'gone'))
+    const was = new Map(structuredClone(rows).map((row) => [row.id, row]))
+
+    const out = await write(holdId, owner)
+
+    const changed = rows
+      .filter((row) => row.eventId !== owner && !isDeepStrictEqual(row, was.get(row.id)))
+      .map((row) => row.id)
+    expect(changed).not.toEqual([])
+    expect(out.ok && out.affected.map((h) => h.holdId)).toEqual(changed)
+  })
+
+  /**
+   * An aborted attempt's writes are rolled back, so what it would have
+   * reported never happened. Only the attempt that committed is reported.
+   */
+  it('reports what the attempt that committed changed, and nothing twice', async () => {
+    const start = structuredClone(rows)
+    const clean = await write(holdId, owner)
+
+    rows = start
+    conflicts = 1
+    await expect(write(holdId, owner)).resolves.toEqual(clean)
   })
 })
 
