@@ -194,3 +194,22 @@ export function effectOf(input: EffectInput): Effect {
     text: `${money(cost)} spread across ${n} event${n === 1 ? '' : 's'} in ${input.target} — ${money(cost / n)} each.`,
   }
 }
+
+// ------------------------------------------------------- the form's start ---
+
+/**
+ * The event the log-hours form opens on.
+ *
+ * Another screen can send somebody here to log against one night, as Home's
+ * "Log the hours" does. The form opens on that night, so that pressing the
+ * button without looking cannot put the hours on a different event. The list
+ * is already scoped to the reader, so an event that is not on it is ignored
+ * rather than trusted.
+ */
+export function startingEvent(
+  options: readonly { id: string }[],
+  wanted: string | undefined,
+): string {
+  const asked = wanted ? options.find((o) => o.id === wanted) : undefined
+  return (asked ?? options[0])?.id ?? ''
+}

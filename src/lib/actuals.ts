@@ -64,6 +64,21 @@ export function halvesOf(row: ActualFigures | null): Halves {
 /** Whether the whole night is counted. The last gate waits on this. */
 export const isReconciled = (h: Halves): boolean => h.door !== null && h.bar !== null
 
+/**
+ * What a counted night took: the Pipeline's "took $X", and Home's revenue.
+ *
+ * Ticket takings plus bar profit, as the prototype's post-event total adds
+ * them up, and only once both halves are in — half a night read as its take
+ * would be a counted figure plus nothing. One function so the two screens
+ * cannot disagree about it.
+ *
+ * Note that the two figures are not on one GST basis: the takings include
+ * GST and the profit does not (see `ActualFigures`). That is the prototype's
+ * sum, kept as it is on the screens already showing it.
+ */
+export const takenOf = (h: Halves): number | null =>
+  h.door && h.bar ? h.door.ticketRev + h.bar.barProfit : null
+
 export type Cleaned<T> = { ok: true; value: T } | { ok: false; why: string }
 
 const isNumber = (n: number) => Number.isFinite(n)

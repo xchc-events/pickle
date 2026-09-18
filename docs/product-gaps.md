@@ -436,6 +436,15 @@ exists — failing gates, unassigned shifts, pending reviews, unlogged hours.
 This is the cheapest high-value screen left: it is aggregation over data we
 already hold, with no new schema.
 
+**Updated 17 September 2026.** Built, with no new schema, on the parts of an
+event rather than its stages. "Needs you" puts each part's failing gates in
+front of whoever the part is waiting on: the owner, the department's lead, or
+anyone who can open the module when nobody named could act. See the note
+under Home in `design-handoff/README.md`. Pending finance reviews are not on
+it, because nothing in the product waits on a review yet. Even a red flag
+does not stop a curator booking being confirmed, which the handoff says it
+should.
+
 ### PG-14 — Bar is not built
 
 > As a duty manager, I want to know whether tonight beat the model.
@@ -501,6 +510,19 @@ avatar. It is display-only and cannot leak an event — PR #10 moved access
 scoping onto `promoterId` — but it is the same shape as the bug that was fixed,
 and it is the last reason `User.promoter` still exists. PR #10 said that column
 would be dropped after one release. Drop it and this together.
+
+### PG-20 — "took $X" adds figures on two GST bases
+
+Found 17 September 2026, building Home. The Pipeline's "took $X" and Home's
+"Revenue, last 2 events" are both `takenOf` in
+[actuals.ts](../src/lib/actuals.ts): ticket takings plus bar profit, as the
+prototype's post-event total adds them. But `ticketRev` is stored GST
+inclusive and `barProfit` GST exclusive, so the figure is neither. For Long
+Player Sundays #9 it reads $4,035, where ex-GST income is $3,643 and the
+GST-inclusive equivalent is $4,189. The settlement itself is not affected:
+`countedVals` takes GST off the takings before they reach income. This moves a
+figure on a shipped screen, so it needs a decision on which basis to show, not
+a quiet fix. `takenOf` is the one place to change once that is decided.
 
 ---
 
