@@ -32,7 +32,7 @@ export async function assignShift(
 
   const shift = await db.shift.findFirst({
     where: { id: shiftId, eventId: id },
-    include: { hourEntry: { select: { id: true } } },
+    include: { hourEntry: { select: { id: true } }, event: { select: { date: true } } },
   })
   if (!shift) return said('That shift is not on this event.', 'stop')
 
@@ -67,10 +67,20 @@ export async function assignShift(
     }),
     // Upsert rather than create: reassigning a shift moves the hours to the
     // new person instead of leaving the old person's behind.
+    //
+    // `workedOn` is the night, on both paths. Left to the column's default it
+    // is the moment of assigning, so a shift filled in September for an October
+    // night reads as September's work wherever hours are shown by month. The
+    // update writes it too, which puts right an entry made before this did.
     shift.hourEntry
       ? db.hourEntry.update({
           where: { id: shift.hourEntry.id },
-          data: { personId: person.id, hours: shift.hours, eventId: id },
+          data: {
+            personId: person.id,
+            hours: shift.hours,
+            eventId: id,
+            workedOn: shift.event.date,
+          },
         })
       : db.hourEntry.create({
           data: {
@@ -79,6 +89,7 @@ export async function assignShift(
             shiftId: shift.id,
             hours: shift.hours,
             note: shift.role,
+            workedOn: shift.event.date,
           },
         }),
   ])

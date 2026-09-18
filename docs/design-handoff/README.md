@@ -195,11 +195,15 @@ The **finance review sits before the deposit.** A red flag holds the invoice and
 
 The **finance review sits at booking confirmed, step 2.** The venue carries the downside on this model, so nothing is confirmed on a flagged event until the numbers move.
 
+> **Changed 17 Sep 2026: confirming a booking goes through the advice process.** XCHC decides who may confirm a booking through its advice process, not through one finance sign-off. A booking under $1,000 that passes the autonomous checks is confirmed by its coordinator alone. From $1,000 to $3,000 it needs Fast Advice. Over $3,000, or with an Optics Risk, it needs Full Advice, and the finance view is one of that path's reviews. This applies to both booking models. See `advice-process.md`, which replaces the finance review at this step.
+
 Milestone rows render as: state icon (`ph-check-circle` / `ph-circle-dashed`), label, sub-line, and an action button ("Raise it" / "Reverse") where the step is actionable. Done = `--st-good` border and a 7% good-tint background; not done = divider border, transparent.
 
 ### Finance review panel
 
 Sits above settlement on both paths. State machine: `pending → approved | flagged`, and `flagged → approved` (via "Clear the flag and approve").
+
+> **Changed 17 Sep 2026.** This review no longer decides whether a booking is confirmed. On both models, that is the advice process in `advice-process.md`. The review stays as the check before a dry hire's 25% deposit invoice.
 
 ```
 finReview = { state: 'pending'|'approved'|'flagged', note: string, by: userInitials, when: string }
@@ -320,6 +324,7 @@ No image assets. The brand mark is three inline SVG circles in accent ramp steps
 
 - `design/Pickle Prototype.dc.html` — the full platform prototype (all twelve modules, all roles, all logic). Constants (`CFG`, `COV`, `STAGES`, `MODULES`, `ROLE_LABEL`, `DEFAULT_PERMS`, `USERS`, `PEOPLE`, `PRESETS`, `ASSET_SET`, `PLATFORMS`, …) are in the script block near line 3040; `calc()`, `gates()`, `crewPayout()` and `financeVals()` are the functions to port precisely.
 - `design/Night Sheet (existing).dc.html` — the venue's existing night-sheet artefact, for context on the workflow being replaced.
+- `advice-process.md` — who may confirm a booking, and how (added 17 Sep 2026). Replaces the finance review at confirmation.
 - `design/support.js` — the prototype's runtime. Reference only; do not port.
 - `design/_ds/nocturne-…/styles.css` — the design system's token and component layer. Take colours, type, spacing, radii and shadows from here.
 - `design/_ds/nocturne-…/readme.md` — Nocturne's own usage guide.
