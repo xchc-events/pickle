@@ -1,5 +1,7 @@
+import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadPortal } from '@/lib/portal-data'
+import { mayStartEnquiry } from '@/lib/intake'
 import { SectionHeading } from '@/components/SectionHeading'
 import { PaymentDetailsForm } from '@/components/PaymentDetailsForm'
 import { saveOwnDetails } from './actions'
@@ -65,7 +67,15 @@ export default async function PortalPage() {
           </div>
         )}
 
-        <SectionHeading note="everything your organisation has on">Your shows</SectionHeading>
+        <div className={styles.sectionRow}>
+          <SectionHeading note="everything your organisation has on">Your shows</SectionHeading>
+          {mayStartEnquiry(user).ok ? (
+            <Link href="/events/new" className={styles.bookLink}>
+              <i className="ph ph-plus" aria-hidden="true" />
+              Book a night
+            </Link>
+          ) : null}
+        </div>
 
         {events.length === 0 ? (
           <p className={styles.none}>Nothing on at the moment.</p>

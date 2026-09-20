@@ -353,6 +353,14 @@ core. PR #2 noted that "New enquiry" explains inline that an enquiry starts as
 the public event sheet, and that no public form exists. It still does not.
 Every event in the system begins with a staff member typing.
 
+> **Partly answered, 21 Sep 2026.** Until now nothing began at all: no code
+> could create an event. "New enquiry" now opens `/events/new`, and a promoter
+> who already has an account can send an enquiry from there. It arrives at
+> Enquiry with its date TBC, no owner and no figures, and sits unclaimed on Home
+> until somebody at the venue takes it. That covers the last two criteria below
+> for signed-in promoters. The signed-out front door, with its throttle, is
+> still not built.
+
 **Acceptance criteria**
 
 - An unauthenticated form creates an event at stage 0 with `dateTbc`.

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadPipeline } from '@/lib/pipeline-data'
+import { mayStartEnquiry } from '@/lib/intake'
 import {
   labourSplit,
   metaLine,
@@ -78,8 +79,7 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
             · {pipelineSubline(all, rows.length)}
           </p>
         </div>
-        {/* An external promoter does not start enquiries from in here. */}
-        {user.external ? null : <NewEnquiry />}
+        {mayStartEnquiry(user).ok ? <NewEnquiry /> : null}
       </header>
 
       <div className={styles.filters}>

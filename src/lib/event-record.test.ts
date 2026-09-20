@@ -4,6 +4,7 @@ import {
   canChangeEventRecord,
   gatesDoneLabel,
   gatesMessage,
+  headsLine,
   isLate,
   timeMinutes,
   type Gate,
@@ -100,5 +101,23 @@ describe('who may change the event record', () => {
   it('tells them who can make the change, not only that they cannot', () => {
     const v = canChangeEventRecord({ external: true })
     expect(v.ok === false && v.why).toMatch(/coordinator/i)
+  })
+})
+
+describe('how many through the door', () => {
+  it('says how many pays everybody in full and how many breaks even', () => {
+    expect(headsLine(186, 94)).toBe('Full pay needs 186 through the door. Breakeven is 94.')
+  })
+
+  // finance.ts divides by what a head is worth, which is nothing until the
+  // night has a ticket price or a bar spend. An enquiry sent in from outside
+  // arrives with neither, and "Breakeven is Infinity" is not something to show
+  // a coordinator, let alone a promoter.
+  it('says nothing is priced yet rather than Infinity', () => {
+    const unpriced =
+      'Nothing is priced yet, so no number through the door covers the night. Set a ticket price in Ticketing and these figures appear.'
+    expect(headsLine(Infinity, Infinity)).toBe(unpriced)
+    expect(headsLine(186, Infinity)).toBe(unpriced)
+    expect(headsLine(NaN, 94)).toBe(unpriced)
   })
 })

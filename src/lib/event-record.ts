@@ -161,6 +161,25 @@ export function gatesMessage(gates: Gate[], whenClear: string): string {
     : `${blocked.length} things hold this up, starting with ${blocked[0]!.label.toLowerCase()}.`
 }
 
+// ----------------------------------------------------------------- heads ---
+
+/**
+ * The line under "their people": how many through the door pays everybody in
+ * full, and how many breaks even.
+ *
+ * Both figures come out of `financeVals` as a division by what a head is
+ * worth, and a head is worth nothing until the night has a ticket price or a
+ * bar spend. Every seeded event had both, so this never showed; an enquiry
+ * sent in from outside arrives with neither. finance.ts is the specification
+ * and is left to say Infinity. This is where that is put into words.
+ */
+export function headsLine(fullPayAt: number, breakeven: number): string {
+  if (!Number.isFinite(fullPayAt) || !Number.isFinite(breakeven)) {
+    return 'Nothing is priced yet, so no number through the door covers the night. Set a ticket price in Ticketing and these figures appear.'
+  }
+  return `Full pay needs ${fullPayAt} through the door. Breakeven is ${breakeven}.`
+}
+
 // ------------------------------------------------------------------- who ---
 
 /**

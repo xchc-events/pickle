@@ -3,13 +3,13 @@ import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
-import { canChangeEventRecord } from '@/lib/event-record'
+import { canChangeEventRecord, headsLine } from '@/lib/event-record'
 import { SectionHeading } from '@/components/SectionHeading'
 import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
-import { advanceBooking, putToBed, setLead } from './actions'
+import { advanceBooking, putToBed, setLead, setOwner } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
 import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
@@ -64,6 +64,14 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
       })
     : []
   const leadOptions = people.map((p) => ({ personId: p.id, name: p.name }))
+
+  // The record exposes ownerName/ownerInitials for display, not the id a
+  // picker's value needs, and matching ev.ownerName against `people` would be
+  // wrong — names are not unique. Read only for whoever is allowed to change
+  // it, the same as `people` above.
+  const ownerRow = canChange
+    ? await db.event.findUnique({ where: { id: ev.id }, select: { ownerId: true } })
+    : null
 
   // The room ladder. Loaded here rather than folded into loadEventRecord:
   // holds are about the room and the night, not about the event's own state.
@@ -198,7 +206,14 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             <div className={styles.fact}>
               <span className={styles.factKey}>Owner</span>
               <span className={styles.factValue}>
-                {ev.ownerName ? (
+                {canChange ? (
+                  <LeadPicker
+                    action={setOwner.bind(null, ev.id)}
+                    value={ownerRow?.ownerId ?? ''}
+                    options={leadOptions}
+                    label="Owner"
+                  />
+                ) : ev.ownerName ? (
                   <>
                     <Avatar initials={ev.ownerInitials ?? '–'} title={ev.ownerName} accent />
                     {ev.ownerName}
@@ -368,9 +383,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 <span>Their people, against their ceiling</span>
                 <span className="tabular">{ev.ceiling}</span>
               </div>
-              <p className={styles.factNote}>
-                Full pay needs {ev.fullPayAt} through the door. Breakeven is {ev.breakeven}.
-              </p>
+              <p className={styles.factNote}>{headsLine(ev.fullPayAt, ev.breakeven)}</p>
             </div>
             <div>
               <div className={styles.barHead}>
