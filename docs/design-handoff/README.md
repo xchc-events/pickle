@@ -8,24 +8,24 @@ The platform's central claim: **one record of an event, one record of a person, 
 
 Twelve modules, role-gated:
 
-| Module | Key | What it is for |
-| --- | --- | --- |
-| Home | `home` | Personal "needs you" queue, next event, my hours |
-| Pipeline | `pipeline` | All events, with a status for each part of each — see the 16 Sep 2026 note under Pipeline; opens the event record |
-| Ticketing | `ticketing` | Tiers, allocations, sales curve, door list |
-| Design | `design` | Asset checklist by tier (hero/lead/support), artist file collection |
-| Promotion | `promo` | Channel spread, platform push status, content rules |
-| Tech production | `tech` | Rig presets, gear/labour add-ons, patch and requirements |
-| Roster | `roster` | Shifts per event by role, assignment against availability |
-| Bar | `bar` | Live take, spend/head, margin by product, stock cost |
-| Hours | `hours` | Timesheets: rostered shifts + logged task hours, per person |
-| Finance | `finance` | Settlement P&L, booking-model milestones, **finance review**, wages run, Xero posting |
-| Admin | `admin` | Role/module permission matrix, users, people records, reset |
-| Sign-offs | `portal` | External promoter portal — their events only, deal terms, file requests |
+| Module          | Key         | What it is for                                                                                                    |
+| --------------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| Home            | `home`      | Personal "needs you" queue, next event, my hours                                                                  |
+| Pipeline        | `pipeline`  | All events, with a status for each part of each — see the 16 Sep 2026 note under Pipeline; opens the event record |
+| Ticketing       | `ticketing` | Tiers, allocations, sales curve, door list                                                                        |
+| Design          | `design`    | Asset checklist by tier (hero/lead/support), artist file collection                                               |
+| Promotion       | `promo`     | Channel spread, platform push status, content rules                                                               |
+| Tech production | `tech`      | Rig presets, gear/labour add-ons, patch and requirements                                                          |
+| Roster          | `roster`    | Shifts per event by role, assignment against availability                                                         |
+| Bar             | `bar`       | Live take, spend/head, margin by product, stock cost                                                              |
+| Hours           | `hours`     | Timesheets: rostered shifts + logged task hours, per person                                                       |
+| Finance         | `finance`   | Settlement P&L, booking-model milestones, **finance review**, wages run, Xero posting                             |
+| Admin           | `admin`     | Role/module permission matrix, users, people records, reset                                                       |
+| Sign-offs       | `portal`    | External promoter portal — their events only, deal terms, file requests                                           |
 
 ## About the design files
 
-The files in `design/` are **design references created in HTML** — a working prototype that demonstrates intended look, structure, data model and behaviour. They are **not production code to lift**. `Pickle Prototype.dc.html` is a single-file component written against a bespoke streaming-template runtime (`support.js`); it exists to be *read and reproduced*, not deployed.
+The files in `design/` are **design references created in HTML** — a working prototype that demonstrates intended look, structure, data model and behaviour. They are **not production code to lift**. `Pickle Prototype.dc.html` is a single-file component written against a bespoke streaming-template runtime (`support.js`); it exists to be _read and reproduced_, not deployed.
 
 Your task is to **recreate these designs in the target codebase's own environment** — React/Next, Vue, Rails+Hotwire, whatever is established — using its routing, data layer, component library and auth. If there is no codebase yet, choose the framework that best suits a multi-user, permissioned, data-heavy internal tool (a React or Vue SPA against a real API with a relational database is the obvious fit) and implement the designs there.
 
@@ -50,25 +50,28 @@ The information architecture, the finance mathematics, and the gate logic are **
 
 Core tokens actually used:
 
-| Token | Value | Used for |
-| --- | --- | --- |
-| `--color-bg` | `#161826` | Page ground |
-| `--color-surface` | (from styles.css) | Cards, dialogs, toast, palette |
-| `--color-text` | `#e9e9ed` | Body text |
-| `--color-accent` | `#9184d9` | Section headings, primary outlines, key figures |
-| `--color-neutral-100…900` | OKLCH ramp | Text hierarchy: 100 = brightest, 400–500 = secondary, 600–700 = tertiary/muted, 800–900 = borders/tracks |
-| `--color-accent-100…900` | OKLCH ramp | Accent text on tints (100–300), tints and hovers (700–900) |
-| `--color-divider` | (from styles.css) | 1px rules, card borders |
-| `--radius-md` / `--radius-lg` | 8px scale | Cards, chips, panels |
-| `--shadow-sm/md/lg` | tuned to ground | Elevation — never stack shadows |
-| `--font-heading` / `--font-body` | Inter 500 / Inter 400 | Headings never bolder than 500 |
+| Token                            | Value                 | Used for                                                                                                 |
+| -------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| `--color-bg`                     | `#161826`             | Page ground                                                                                              |
+| `--color-surface`                | (from styles.css)     | Cards, dialogs, toast, palette                                                                           |
+| `--color-text`                   | `#e9e9ed`             | Body text                                                                                                |
+| `--color-accent`                 | `#9184d9`             | Section headings, primary outlines, key figures                                                          |
+| `--color-neutral-100…900`        | OKLCH ramp            | Text hierarchy: 100 = brightest, 400–500 = secondary, 600–700 = tertiary/muted, 800–900 = borders/tracks |
+| `--color-accent-100…900`         | OKLCH ramp            | Accent text on tints (100–300), tints and hovers (700–900)                                               |
+| `--color-divider`                | (from styles.css)     | 1px rules, card borders                                                                                  |
+| `--radius-md` / `--radius-lg`    | 8px scale             | Cards, chips, panels                                                                                     |
+| `--shadow-sm/md/lg`              | tuned to ground       | Elevation — never stack shadows                                                                          |
+| `--font-heading` / `--font-body` | Inter 500 / Inter 400 | Headings never bolder than 500                                                                           |
 
 Three **status colours** are declared inline on the app root and are local to this product (they are not in Nocturne):
 
 ```css
---st-warn:      oklch(0.734 0.125 68);   --st-warn-dim: oklch(0.30 0.055 68);
---st-good:      oklch(0.734 0.115 152);  --st-good-dim: oklch(0.29 0.05 152);
---st-stop:      oklch(0.700 0.140 25);   --st-stop-dim: oklch(0.30 0.07 25);
+--st-warn: oklch(0.734 0.125 68);
+--st-warn-dim: oklch(0.3 0.055 68);
+--st-good: oklch(0.734 0.115 152);
+--st-good-dim: oklch(0.29 0.05 152);
+--st-stop: oklch(0.7 0.14 25);
+--st-stop-dim: oklch(0.3 0.07 25);
 ```
 
 Promote these to real tokens in your theme. `good` = done/healthy/paid, `warn` = pending/thin/attention, `stop` = loss/blocked/red-flagged.
@@ -80,7 +83,7 @@ Nocturne conventions to keep: outlined primary buttons (accent border on transpa
 ### Repeating layout patterns
 
 - **Section heading:** 12px, `letter-spacing: 0.13em`, uppercase, `--color-accent`, followed by a 1px fading rule filling remaining width, optionally a 11.5px `--color-neutral-600` note at the right. Used dozens of times; make it a component.
-- **Metric strip:** `display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-divider)` with `--color-bg` cells — the 1px gap *is* the divider. Label 10.5px neutral-600, value 24px heading font, `font-variant-numeric: tabular-nums`.
+- **Metric strip:** `display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--color-divider)` with `--color-bg` cells — the 1px gap _is_ the divider. Label 10.5px neutral-600, value 24px heading font, `font-variant-numeric: tabular-nums`.
 - **Row list:** full-width `<button>` rows, transparent background, `border-top: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent)`, hover `color-mix(in srgb, var(--color-neutral-100) 4%, transparent)`.
 - **Chip filters:** 11px, `padding: 3px 10px`, `border-radius: 11px`, 1px border; selected state swaps border to accent and background to a 14% accent mix.
 - **Avatar:** 22–24px circle, initials in heading font at 9–9.5px.
@@ -93,11 +96,13 @@ Nocturne conventions to keep: outlined primary buttons (accent border on transpa
 The app is one shell with a module switcher. Layout: **sidebar 232px fixed** (brand, search button, module nav, integrations panel, current-user footer) + **main region, flex 1, scrolling**. Header blocks are `padding: 26px 28px 20px` with a bottom divider; content bodies `padding: 22px 28px 40px`.
 
 ### Login
-Role picker, not a credential form — `max-width: 460px`, centred. Brand lockup (three-circle pickle mark in accent ramp + "PicklePicklePickle" / "XCHC · Ōtautahi Christchurch"), `<h1>` "Sign in" at 27px, then one row per user in `USERS`. Copy: *"Pick a role to explore. What you can see and do changes with it."* Footnote states persistence is browser-local with a reset in Admin.
+
+Role picker, not a credential form — `max-width: 460px`, centred. Brand lockup (three-circle pickle mark in accent ramp + "PicklePicklePickle" / "XCHC · Ōtautahi Christchurch"), `<h1>` "Sign in" at 27px, then one row per user in `USERS`. Copy: _"Pick a role to explore. What you can see and do changes with it."_ Footnote states persistence is browser-local with a reset in Admin.
 
 In production: replace with real auth; keep the idea that role determines the visible module set.
 
 ### Home
+
 Greeting + subline. Four-cell metric strip. Two columns: **"Needs you"** action queue (rows: icon, title, sub, age in a status colour — clicking routes to the thing) and a 296px aside with **"Next through the door"** (event name, when, days-out counter at 27px accent, one-line status, primary button "Open the event") and **"Your hours this month"** (figure, loaded cost, progress bar).
 
 > **Built 17 Sep 2026, on the parts rather than the stages.** "Needs you" is the failing gates of each event's parts (see the note under Pipeline), each put in front of the person it waits on. The event's own business — the booking, the licence, counting the door, putting the night to bed — goes to its owner. A department's part goes to its lead. Shift gaps and closing the bar go to anyone who can open Roster or Bar, as the prototype had it. Where nobody named could act (no owner, an owner who never signs in, a lead whose role cannot open the screen), it goes to everyone who can open the part's module, and for the event's own business that is Finance. A reader only ever sees gates on screens they can open.
@@ -106,11 +111,12 @@ Greeting + subline. Four-cell metric strip. Two columns: **"Needs you"** action 
 >
 > The four tiles are kept for anyone who can open the Pipeline. "At risk" now reads the Pipeline's own flag, since the stage targets it counted went with the stages. A role that cannot open the Pipeline gets shifts to fill and bars to close instead.
 >
-> "Next through the door" is the next *confirmed* night. It shows where the parts stand and the event record's surplus only to someone who can open the event record. "Your hours this month" is the reader's own hour entries, by the day worked (a rostered shift counts on its night, and is "still to come" until then; anything typed is worked), measured against the weekly hours on their availability.
+> "Next through the door" is the next _confirmed_ night. It shows where the parts stand and the event record's surplus only to someone who can open the event record. "Your hours this month" is the reader's own hour entries, by the day worked (a rostered shift counts on its night, and is "still to come" until then; anything typed is worked), measured against the weekly hours on their availability.
 >
 > An outside account is refused Home, as it is Bar; its equivalent is Sign-offs. Home is one of the venue's own modules (`VENUE_ONLY` in `src/lib/constants.ts`), which `modulesOpenTo` in `src/lib/scope.ts` takes off an outside account whatever its role is granted, so `requireModule('home')` has already refused. `homeRefusal` in `src/lib/home.ts` stands behind that.
 
 ### Pipeline
+
 Header with title/kicker/sub and a primary "New enquiry" button (hidden for roles that can't create). Filter row: stage chips + a divider + space chips. Events grouped by stage with `STAGES` names and playful internal nicknames (`NICK`: Fresh, Brining, Sealed, Labelling, On the Shelf, Crewing, Cracked, Tasting Notes) and per-stage target counts (`STAGE_TARGET`). Each row: name (224px), meta line with icon, stage progress bar, days-out, projection ("proj. $X" / "took $X" / "modelling"), owner avatar. Below: 4-cell metric strip and a **"Where the labour goes"** breakdown.
 
 > **Changed 16 Sep 2026 — each event carries a status per part, not one stage.** The eight stages moved an event through enquiry, negotiation, confirmation, design, on sale, rostering, show week and payout in that order. That is not how a night comes together at XCHC: tickets go on sale while the artwork is still being signed off, and a promoter can send the graphics for their whole tour with the booking enquiry. So the venue decided each event carries a status on each of eight parts — **Booking** (enquiry → negotiating → confirmed), **Design**, **Promo**, **Tickets**, **Licence**, **Tech**, **Roster** and **Settlement** — and the pipeline's eight cells show where each part stands on its own, rather than ticking off the stages behind a single cursor.
@@ -126,60 +132,71 @@ Header with title/kicker/sub and a primary "New enquiry" button (hidden for role
 > Still to come: editing a booking's acts, fees, split and figures after it is made (nothing can yet, so an outside enquiry can be claimed and its date locked but not taken past Negotiating), switching the booking model, and turning a name "not on file yet" into an organisation. The public, signed-out sheet the prototype imagined is `PG-9` in `docs/product-gaps.md`.
 
 ### Event record
+
 The hub. Back link, title, badges (stage, space, booking model), and tabbed/stacked sections: the enquiry facts (owner, date, space, kind of night), artists with fee floor/ceiling and status (`enquired`/`pencilled`/`confirmed`/`declined`) and file checkboxes (`RIDERS`: promo pics, bio, EPK, hospitality rider, tech rider), **Terms & split** (split slider, deal state `agreed`/`queried`/`sent`), licence state (`LICENCE`: not required/required/applied for/confirmed/denied), bar close time, leads per department, and an **activity feed** (initials, text, when) which everything writes into.
 
-**Stage gates** are the load-bearing interaction: each stage transition lists named conditions with a pass/fail state, a reason, and a deep link to the screen that fixes it. An event cannot advance while a gate fails. Gate sets are defined per transition in `gates(e)` — reproduce the full list from the prototype; examples: *An owner is named*, *Date is locked*, *At least one act confirmed*, *Fee floor and ceiling agreed*, *Terms agreed with the promoter*, *Bar close decided*, *Artist bios and pics in*, *Licence filed if it is needed*.
+**Stage gates** are the load-bearing interaction: each stage transition lists named conditions with a pass/fail state, a reason, and a deep link to the screen that fixes it. An event cannot advance while a gate fails. Gate sets are defined per transition in `gates(e)` — reproduce the full list from the prototype; examples: _An owner is named_, _Date is locked_, _At least one act confirmed_, _Fee floor and ceiling agreed_, _Terms agreed with the promoter_, _Bar close decided_, _Artist bios and pics in_, _Licence filed if it is needed_.
 
-> **Changed 16 Sep 2026.** The gates are now held by the parts (see the note under Pipeline). Every condition `gates(e)` defines is kept, worded as it was, on the part it belongs to, with its reason and its deep link — `src/lib/parts.test.ts` lists them and fails if one goes missing. One was folded rather than moved: *Door list pulled* tested exactly what *Tickets live on Gather.rsvp* tests. What changed is the ordering: finishing one department no longer holds another up. Two moves are still refused while a gate fails — moving the booking on (enquiry → negotiating → confirmed) and putting a counted night to bed — and the event record shows each part with its failing gates under it in place of a single "Move to …" gate list. Signing off the last piece of artwork no longer moves anything or pushes any listing; the bar budget now locks when tickets first go live on Gather.rsvp.
+> **Changed 16 Sep 2026.** The gates are now held by the parts (see the note under Pipeline). Every condition `gates(e)` defines is kept, worded as it was, on the part it belongs to, with its reason and its deep link — `src/lib/parts.test.ts` lists them and fails if one goes missing. One was folded rather than moved: _Door list pulled_ tested exactly what _Tickets live on Gather.rsvp_ tests. What changed is the ordering: finishing one department no longer holds another up. Two moves are still refused while a gate fails — moving the booking on (enquiry → negotiating → confirmed) and putting a counted night to bed — and the event record shows each part with its failing gates under it in place of a single "Move to …" gate list. Signing off the last piece of artwork no longer moves anything or pushes any listing; the bar budget now locks when tickets first go live on Gather.rsvp.
 
 ### Ticketing
+
 Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup = round(std × 1.2)`, plus a `door` price. A four-way `mix` (subsidised/standard/supporter/door proportions) produces the average ticket price. Shows allocation, sold count, sales curve, and door list. Source of truth is **Gather.rsvp**.
 
 > **Corrected 2 Sep 2026.** This line previously read "supporter/standard/subsidised", which contradicts the prototype it describes: `TIER_KEYS` is `[sub, std, sup, door]` and `avgTicket` pairs `mix[0]` with `tiers().sub`. Read the wrong way round it prices a supporter at 80% of standard rather than 120%, and the mix feeds the average ticket price straight into the P&L. The prototype code is authoritative and is unchanged; only this sentence was wrong.
 
 ### Design
+
 Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each with format spec and a rationale line. Hero = two vertical video cuts (9:16); lead = the 1920×1005 event cover; support = story, A2 poster, listing copy. `CONTENT_RULES` render as a short doctrine panel: vertical video first (twice), video beats a still, almost no words on an image, real over polished, one idea per asset.
 
 ### Promotion
+
 `PLATFORMS` list with per-platform integration mode (`api` vs `manual`) and a note on how each is handled — Gather.rsvp (source of truth), Facebook event (Graph API), Instagram (manual), Eventfinda, Eventbrite (inventory capped so it can't oversell), EventsHub (council, moderated, 2 working days), Linktree, Telegram, Discord. Plus channel spread state per event.
 
 ### Tech production
-`PRESETS` are one-click rig bundles that append gear costs *and* labour hours to the event: in-house projection mapping + VJ, full band backline, livestream & multitrack, extra lighting rig, silent disco headsets. Each item is `{kind: 'gear', cost}` or `{kind: 'labour', hours}` and flows straight into the finance model. Tech roles: `Sound — Lead`, `Sound — 2IC`, `Lighting — Lead`.
+
+`PRESETS` are one-click rig bundles that append gear costs _and_ labour hours to the event: in-house projection mapping + VJ, full band backline, livestream & multitrack, extra lighting rig, silent disco headsets. Each item is `{kind: 'gear', cost}` or `{kind: 'labour', hours}` and flows straight into the finance model. Tech roles: `Sound — Lead`, `Sound — 2IC`, `Lighting — Lead`.
 
 ### Roster
+
 Shifts generated per event from role windows (`ROLE_WIN`, or `ROLE_WIN_EARLY` for early events; apartment and workshop events get reduced hours). Each shift: role, hours, start offset, assigned person, state, "asked" count. Assignment is checked against `AVAIL_SEED` (per-person weekly hour cap, volunteer hours, yes/no day-period preferences keyed `Fri-eve`, `Mon-day` …). **Roster ↔ Hours is two-way**: assigning a shift creates the hours; editing hours reflects back.
 
 Roles: Duty manager, Bar staff, Sound — Lead, Sound — 2IC, Lighting — Lead, Door, Care team, Set-up crew, Clean-up crew.
 
 ### Bar
+
 Live take ticking during show week, spend-per-head against the assumed `barHead`, margin by product modelled from the event's take and the house mix, stock cost at 40.2%, and an "Against the model" comparison panel. Bar labour can be toggled in or out of margin.
 
 ### Hours
+
 Timesheets per person: rostered shift hours + logged task hours (`est` vs `actual`), every line attached to an event. This is the module that makes the profit share arguable — say so in the UI as the prototype does.
 
 ### Finance
+
 The most specified screen. Event chip rail across the top (each chip: name, date, **booking model**, figure, note), then a header row with the model badge, a "Switch to dry hire / curator model" ghost button (hidden for external users), and the event identity line.
 
 **Settlement P&L** (`finLines`) — label / value / note rows, with rules above the income and retained lines:
 
-1. Tickets — *n* at $avg average → ticket revenue ex-GST (projection with quiet/likely/great case, or reconciled from Gather.rsvp once concluded)
+1. Tickets — _n_ at $avg average → ticket revenue ex-GST (projection with quiet/likely/great case, or reconciled from Gather.rsvp once concluded)
 2. Bar margin — $x/head at 59.8% → bar margin (or actual bar profit after stock)
 3. **Income, GST exclusive** (rule above; neutral-100) — with the GST collected and held stated in the note
-4. − Cost base share — *day* carries *n*% (rent, power, insurance, software)
+4. − Cost base share — _day_ carries _n_% (rent, power, insurance, software)
 5. − Gear, hire & promotion (incl. Wheke Sound on the sliding scale where applicable)
 6. − Comps & crew tokens (at stock cost, not till price)
-7. − Crew wages, loaded — *n* hours, *n* people, from rostered shifts and logged tasks
-8. − Org-wide labour, share of *month* — apportioned across the events in that month
-9. − Artist & promoter floors — *n* names on the bill
-10. − Surplus share out — *n*% of the surplus to their people
+7. − Crew wages, loaded — _n_ hours, _n_ people, from rostered shifts and logged tasks
+8. − Org-wide labour, share of _month_ — apportioned across the events in that month
+9. − Artist & promoter floors — _n_ names on the bill
+10. − Surplus share out — _n_% of the surplus to their people
 11. **Retained by PicklePicklePickle** (rule above; accent if positive, `--st-stop` if negative) — "back into the cost base" / "this one costs us money"
 
 Also on Finance: the **milestone pipeline** (below), the **finance review panel** (below), a **wages run** ("pay all" across everyone unpaid on the event, from hours already logged), **artist payments** (per name, reversible), and **post to Xero** (stub, but the account mapping is real: 1 invoice to 200, wage lines to 477, artist bills to 412).
 
 ### Admin
+
 Role × module **permission matrix** as toggle rows — turning a module off removes it from that role's sidebar on next paint, verifiable by signing in as them. Users table (person, role, access, "you" marker). **"Your people"** — every name is an editable field, and changing it changes that person on every shift, timesheet, run sheet and bar view at once, because there is only one record of a person. Plus a state reset.
 
 ### Sign-offs (external promoter portal)
+
 Scoped hard: an external user sees only their own events (`visible()` returns `myEvents()` for external users) and only the `pipeline` + `portal` modules. They see the deal terms with the venue's own model figures, can agree or query (a query records a note the venue sees), and get file requests for the riders. Model-switch and finance-review actions are hidden from them.
 
 ---
@@ -191,14 +208,16 @@ Every event carries `model: 'dry' | 'curator'`. `MODELS = { dry: 'Dry hire', cur
 The badge appears in the Finance header and on every Finance event chip. Dry hire = neutral outline (`--color-neutral-700` border, 5% neutral fill, neutral-300 text). Curator = accent (`--color-accent` border, 14% accent fill, accent-100 text).
 
 ### Dry hire milestones
+
 1. **25% deposit invoice** — the first money milestone; risk sits here because a dry hire settles off the hire fee.
 2. **Balance invoice** — "the rest, once the door count is in".
 
 The **finance review sits before the deposit.** A red flag holds the invoice and goes back to the coordinator.
 
 ### Curator model milestones
+
 1. **Booking enquiry** — on record; the model runs off the enquiry figures. Always complete.
-2. **Booking confirmed** — confirmed and held in the calendar (complete at `stage >= 2` — since 16 Sep 2026, once the booking is confirmed); if not yet, the sub-line reads *"not yet — finance signs off here."*
+2. **Booking confirmed** — confirmed and held in the calendar (complete at `stage >= 2` — since 16 Sep 2026, once the booking is confirmed); if not yet, the sub-line reads _"not yet — finance signs off here."_
 3. **Settlement invoice** — after the door count is in.
 
 The **finance review sits at booking confirmed, step 2.** The venue carries the downside on this model, so nothing is confirmed on a flagged event until the numbers move.
@@ -220,18 +239,19 @@ finReview = { state: 'pending'|'approved'|'flagged', note: string, by: userIniti
 Seeded as `approved` (by `SL`, "at confirmation") for events at `stage >= 4` — since 16 Sep 2026, events on sale — or concluded; `pending` otherwise.
 
 Panel contents:
+
 - **State chip** — icon `ph-seal-check` (approved) / `ph-flag` (flagged) / `ph-hourglass-medium` (pending), coloured `--st-good` / `--st-stop` / `--st-warn`. Panel border picks up the status colour when pending or flagged; background is a 6% tint of it.
 - **Milestone line** — "before the 25% deposit invoice" or "at booking confirmed, step 2".
 - **Projected margin indicator** — computed as `margin = income > 0 ? retained / income : 0`:
-  - `retained < 0` → **loss**, `--st-stop`: *"projected to run at a loss of $X"*
-  - `margin < 0.08` → **thin**, `--st-warn`: *"thin — N% on $X of income"*
-  - otherwise → **healthy**, `--st-good`: *"healthy — N% on $X of income"*
+  - `retained < 0` → **loss**, `--st-stop`: _"projected to run at a loss of $X"_
+  - `margin < 0.08` → **thin**, `--st-warn`: _"thin — N% on $X of income"_
+  - otherwise → **healthy**, `--st-good`: _"healthy — N% on $X of income"_
 - **Explanatory blurb**, different per model (verbatim copy in the prototype, `finRev.blurb`).
-- **Attribution line** — "Approved by *Name* · *when*" or "Flagged by *Name* · *when*"; hidden while pending.
+- **Attribution line** — "Approved by _Name_ · _when_" or "Flagged by _Name_ · _when_"; hidden while pending.
 - **Flag reason** — shown when flagged and a note exists.
 - **Actions** (hidden for external users): a reason textarea, **Approve it** / **Clear the flag and approve**, and **Red-flag it**.
 
-**Red-flagging requires a reason.** Submitting with an empty note does not flag — it raises a warn toast: *"Say what puts it at risk — the coordinator sees your words, not a flag on its own."* On success the reason is stored on `finReview.note`, pushed to the activity feed as `"red-flagged this event: <reason>"`, surfaced to the coordinator, and the toast reads *"Red-flagged — it sits with the coordinator until the numbers move."* Approving clears the note and toasts *"Approved — the milestone can go ahead."* Both actions clear the draft textarea.
+**Red-flagging requires a reason.** Submitting with an empty note does not flag — it raises a warn toast: _"Say what puts it at risk — the coordinator sees your words, not a flag on its own."_ On success the reason is stored on `finReview.note`, pushed to the activity feed as `"red-flagged this event: <reason>"`, surfaced to the coordinator, and the toast reads _"Red-flagged — it sits with the coordinator until the numbers move."_ Approving clears the note and toasts _"Approved — the milestone can go ahead."_ Both actions clear the draft textarea.
 
 ---
 
@@ -290,10 +310,10 @@ Once an event is concluded, actuals replace projections: `post = { tickets, tick
 
 ## Interactions & behaviour
 
-- **Role-based access.** `DEFAULT_PERMS` maps role → module keys; the Admin matrix mutates it live. A module absent from the role's list is absent from the sidebar and unreachable. Roles: `coordinator`, `design`, `tech`, `bar`, `admin`, `promoter` (labelled *"External coordinator · outside the venue"*).
+- **Role-based access.** `DEFAULT_PERMS` maps role → module keys; the Admin matrix mutates it live. A module absent from the role's list is absent from the sidebar and unreachable. Roles: `coordinator`, `design`, `tech`, `bar`, `admin`, `promoter` (labelled _"External coordinator · outside the venue"_).
 - **External scoping.** `promoter` users see only events whose `promoter` matches their org, and only `pipeline` + `portal`. All venue-side actions are hidden, not merely disabled.
-- **Command palette.** `⌘K` / `Ctrl+K` opens a centred 500px overlay (90px from top) searching events, screens and actions; `Esc` closes. Rows: icon, label, right-aligned hint. Empty state: *"Nothing matches that."*
-- **Toasts.** Bottom-centre, surface background, `--shadow-lg`, max 460px, auto-dismiss at 3400ms. Three kinds — `good` `ph-check-circle`, `warn` `ph-warning`, `stop` `ph-warning-octagon`. Every mutation raises one, and the copy explains the *consequence*, not the action.
+- **Command palette.** `⌘K` / `Ctrl+K` opens a centred 500px overlay (90px from top) searching events, screens and actions; `Esc` closes. Rows: icon, label, right-aligned hint. Empty state: _"Nothing matches that."_
+- **Toasts.** Bottom-centre, surface background, `--shadow-lg`, max 460px, auto-dismiss at 3400ms. Three kinds — `good` `ph-check-circle`, `warn` `ph-warning`, `stop` `ph-warning-octagon`. Every mutation raises one, and the copy explains the _consequence_, not the action.
 - **Activity feed.** Every mutation unshifts `{ who: initials, txt, when: 'just now' }` onto the event. This is the audit trail; keep it.
 - **Text editing.** Inputs write to a `drafts` map on input and commit on blur (`onDraft` / `commitText`). Names edited in Admin propagate everywhere immediately.
 - **Bar ticker.** A 1s interval increments a counter while the Bar screen is open, so the live take moves.
@@ -322,7 +342,7 @@ Event record (abbreviated): `id, name, date, dow, days, space, kind, owner, prom
 
 Persistence in the prototype: `localStorage['p3-prototype-v1']`, `{v: 13, events, perms, user, screen, evId, avail, entries, names, presets}`. Saved state at `v: 12` or `v: 13` is **patched forward, not reset** — missing `model` and `finReview` are backfilled per event. Replace wholesale with a real API; keep the forward-patching instinct for schema changes.
 
-Server-side, the pieces that must be real: authentication and role/permission enforcement (server-side, not just hidden UI), event CRUD with the stage-gate rules enforced on transition, an immutable activity log, hours records joining people ↔ shifts ↔ events, and integrations (Gather.rsvp, Facebook Graph, Eventfinda, Eventbrite, EPOS, Xero in/out, Mailchimp, Meta Ads, Slack, Telegram, Discord, Linktree) — the sidebar shows their health, and *Xero bills-in needs re-auth* is a modelled failure state worth keeping as a real one.
+Server-side, the pieces that must be real: authentication and role/permission enforcement (server-side, not just hidden UI), event CRUD with the stage-gate rules enforced on transition, an immutable activity log, hours records joining people ↔ shifts ↔ events, and integrations (Gather.rsvp, Facebook Graph, Eventfinda, Eventbrite, EPOS, Xero in/out, Mailchimp, Meta Ads, Slack, Telegram, Discord, Linktree) — the sidebar shows their health, and _Xero bills-in needs re-auth_ is a modelled failure state worth keeping as a real one.
 
 ## Assets
 
@@ -333,6 +353,7 @@ No image assets. The brand mark is three inline SVG circles in accent ramp steps
 - `design/Pickle Prototype.dc.html` — the full platform prototype (all twelve modules, all roles, all logic). Constants (`CFG`, `COV`, `STAGES`, `MODULES`, `ROLE_LABEL`, `DEFAULT_PERMS`, `USERS`, `PEOPLE`, `PRESETS`, `ASSET_SET`, `PLATFORMS`, …) are in the script block near line 3040; `calc()`, `gates()`, `crewPayout()` and `financeVals()` are the functions to port precisely.
 - `design/Night Sheet (existing).dc.html` — the venue's existing night-sheet artefact, for context on the workflow being replaced.
 - `advice-process.md` — who may confirm a booking, and how (added 17 Sep 2026). Replaces the finance review at confirmation.
+- `organisations.md` — how promoter organisations are to work: memberships in several, Owner / Booker / Viewer, joining, inviting, and promoters keeping their acts' details (added 21 Sep 2026). Not built yet.
 - `design/support.js` — the prototype's runtime. Reference only; do not port.
 - `design/_ds/nocturne-…/styles.css` — the design system's token and component layer. Take colours, type, spacing, radii and shadows from here.
 - `design/_ds/nocturne-…/readme.md` — Nocturne's own usage guide.
