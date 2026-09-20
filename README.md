@@ -21,23 +21,42 @@ It is an internal tool for one venue. There is no sign-up and no multi-tenancy.
 The sidebar is built from what a role is allowed to open, so different people
 see different subsets of this.
 
-| Module          | What it is for                                                                                                                                                         |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pipeline        | Every event, with where each of its eight parts stands. Opens the event record.                                                                                        |
-| Event record    | The hub for one show: booking status and its gates, holds on the room, artists and terms, licence, run times, department leads, the door count, and the activity feed. |
-| Ticketing       | Prices (every tier derives from one standard price), audience mix, attendance scenarios, and the sold count drawn against capacity and breakeven.                      |
-| Design          | The house asset set for each event, tiered hero / lead / support, with approvals, change requests and artwork uploads.                                                 |
-| Promotion       | The house list of listing channels per event, pushed and tracked, plus the content beats around a show.                                                                |
-| Tech production | Riders and tech specs per event, what is still missing and who to chase, and single-use links that let a touring act supply their own files and bank details.          |
-| Roster          | Shifts generated per event from role windows, assigned against people's availability. Assigning a shift creates the hours.                                             |
-| Hours           | Timesheets. Rostered shifts and logged task hours in one table, per person and per event, feeding the wage line in Finance.                                            |
-| Bar             | A budget per night, locked when tickets go live; the bar close read against it, by hand or from the till; nights rolled up by month.                                   |
-| Finance         | The settlement P&L, the finance review, deposit and invoice milestones, and payments to artists and promoters.                                                         |
-| Sign-offs       | What an outside promoter sees: their own events and terms, and a form for their own payment details.                                                                   |
-| Admin           | Accounts. Invitations, roles, deactivation, ending sessions, and linking an account to a person or an outside organisation.                                            |
+| Module          | What it is for                                                                                                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pipeline        | Every event, with where each of its eight parts stands. Opens the event record, and "New enquiry" starts a booking, for the venue's people and for outside promoters.             |
+| Event record    | The hub for one show: booking status and its gates, its owner, holds on the room, artists and terms, licence, run times, department leads, the door count, and the activity feed. |
+| Ticketing       | Prices (every tier derives from one standard price), audience mix, attendance scenarios, and the sold count drawn against capacity and breakeven.                                 |
+| Design          | The house asset set for each event, tiered hero / lead / support, with approvals, change requests and artwork uploads.                                                            |
+| Promotion       | The house list of listing channels per event, pushed and tracked, plus the content beats around a show.                                                                           |
+| Tech production | Riders and tech specs per event, what is still missing and who to chase, and single-use links that let a touring act supply their own files and bank details.                     |
+| Roster          | Shifts generated per event from role windows, assigned against people's availability. Assigning a shift creates the hours.                                                        |
+| Hours           | Timesheets. Rostered shifts and logged task hours in one table, per person and per event, feeding the wage line in Finance.                                                       |
+| Bar             | A budget per night, locked when tickets go live; the bar close read against it, by hand or from the till; nights rolled up by month.                                              |
+| Finance         | The settlement P&L, the finance review, deposit and invoice milestones, and payments to artists and promoters.                                                                    |
+| Sign-offs       | What an outside promoter sees: their own events and terms, and a form for their own payment details.                                                                              |
+| Admin           | Accounts. Invitations, roles, deactivation, ending sessions, and linking an account to a person or an outside organisation.                                                       |
 
 Home is in the navigation for the roles that have it, but it has not been
 built yet.
+
+### How an event starts
+
+"New enquiry" on the Pipeline opens one form, at `/events/new`, for anybody who
+can open Pipeline. The venue's people fill in the whole booking: the night, who
+is bringing it, who owns it, the acts and their fee ranges, the split, and the
+figures the projection runs off. They can hold the room in the same step.
+
+An outside promoter fills in the night they would like, the room, the kind of
+night, who is playing and a note. Everything else about their enquiry is decided
+on the server, whatever the request says. It belongs to their own organisation,
+its date is a preference until a coordinator locks it, and it carries no owner,
+no figures and no hold on the room. It waits under "Needs you" on Home,
+unclaimed, until somebody at the venue takes it on as its owner from the event
+record.
+
+The rules are in `src/lib/intake.ts`. A night is stored as UTC midnight of its
+calendar date (`src/lib/night.ts`), because the hold ladder matches nights
+exactly and the app runs in two timezones.
 
 ### How an event moves
 
