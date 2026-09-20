@@ -41,6 +41,8 @@ import { financeVals } from '../src/lib/finance'
 import { barBudgetFrom, isBarRole } from '../src/lib/bar'
 import { hashPassword } from '../src/lib/password'
 import { seedOnlyIfEmpty, seedPasswordFrom } from '../src/lib/seed-install'
+import { nightOfLocal } from '../src/lib/night'
+import { HOUSE_TASKS } from '../src/lib/intake'
 
 /**
  * The one bookable room.
@@ -171,17 +173,6 @@ const DEFAULT_PA = [
   { name: 'Artist 3', low: 100, high: 300 },
   { name: 'Artist 4', low: 100, high: 300 },
   { name: 'Artist 5', low: 100, high: 350 },
-]
-
-// The prototype writes `actual: 0` to mean "nothing logged yet". That is what
-// a nullable column is for — and it matters, because finance.ts reads
-// `actual ?? est`, so a stored 0 would wipe the estimate out of the wage line.
-const DEFAULT_TASKS = [
-  { team: 'Event coordination', est: 9, actual: null },
-  { team: 'Design & comms', est: 6, actual: null },
-  { team: 'Comms / socials', est: 3, actual: null },
-  { team: 'Production management', est: 1.5, actual: null },
-  { team: 'Bar admin & accounting', est: 3, actual: null },
 ]
 
 const EVENTS: SeedEvent[] = [
@@ -582,6 +573,7 @@ async function main() {
   await db.availability.deleteMany()
   await db.user.deleteMany()
   await db.person.deleteMany()
+  await db.payee.deleteMany()
   await db.modulePermission.deleteMany()
 
   console.log('permissions…')
@@ -640,7 +632,11 @@ async function main() {
   console.log('events…')
   for (const e of EVENTS) {
     const spaceName = e.space ?? 'Main'
-    const date = seedDate(today, e.days, e.dow)
+    // A night, as src/lib/night.ts stores one. The hold ladder matches a night
+    // by exact instant, so a seeded event and one started through the enquiry
+    // form on the same night have to store the same one, or two bookings could
+    // hold the same room without either ladder seeing the other.
+    const date = nightOfLocal(seedDate(today, e.days, e.dow))
     const lateBar = e.lateBar !== false
     const cap = capacityOf(MAIN_CAPACITY, e.format)
     const att: [number, number, number] = e.att ?? [
@@ -718,8 +714,15 @@ async function main() {
       })),
     })
 
+    // The house's standard off-site work unless the event says otherwise — the
+    // same list the enquiry form gives a new event, so the seed and the product
+    // cannot disagree about what an event is planned with. The prototype writes
+    // `actual: 0` to mean "nothing logged yet". That is what a nullable column
+    // is for — and it matters, because finance.ts reads `actual ?? est`, so a
+    // stored 0 would wipe the estimate out of the wage line.
+    const tasks = e.tasks ?? HOUSE_TASKS.map((t) => ({ team: t.name, est: t.est, actual: null }))
     await db.task.createMany({
-      data: (e.tasks ?? DEFAULT_TASKS).map((t) => ({
+      data: tasks.map((t) => ({
         eventId: created.id,
         name: t.team,
         est: t.est,
@@ -934,6 +937,39 @@ async function main() {
         at: addDays(today, -e.sinceDays),
       },
     })
+  }
+
+  // The organisations outside promoters act for. Scope is `Event.promoterId`
+  // matched against `User.organisationId` (src/lib/scope.ts), and until now
+  // only the migration that introduced those columns ever filled them in — so
+  // on a freshly seeded database Awhina and Devon saw no events at all, and
+  // could not have started an enquiry, which needs an organisation to belong
+  // to. The same three steps as that migration's backfill, in the same order.
+  console.log('organisations…')
+
+  // 1. One per distinct outside promoter. An internal event's promoter text
+  // names a staff member ("internal · Ana Kelliher"), not an organisation.
+  const outside = EVENTS.filter((e) => !e.internal && e.promoter.trim() !== '')
+  const organisationIds = new Map<string, string>()
+  for (const name of new Set(outside.map((e) => e.promoter.trim()))) {
+    const row = await db.payee.create({ data: { kind: 'PROMOTER', name, country: 'NZ' } })
+    organisationIds.set(name, row.id)
+  }
+
+  // 2. Point each of their events at it.
+  for (const e of outside) {
+    await db.event.update({
+      where: { id: e.id },
+      data: { promoterId: organisationIds.get(e.promoter.trim()) },
+    })
+  }
+
+  // 3. Point each outside account at theirs, by exact name. Anything that does
+  // not match is left null, which fails closed: that account sees nothing until
+  // somebody links it. Failing open here would be a disclosure.
+  for (const u of USERS) {
+    const organisationId = u.org ? organisationIds.get(u.org) : undefined
+    if (organisationId) await db.user.update({ where: { id: u.id }, data: { organisationId } })
   }
 
   // Org-wide labour, pooled by month and apportioned across that month's

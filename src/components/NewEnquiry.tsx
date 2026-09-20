@@ -1,28 +1,20 @@
-'use client'
-
-import { useState } from 'react'
+import Link from 'next/link'
 import styles from './NewEnquiry.module.css'
 
 /**
- * In the prototype this button raises a toast rather than creating anything:
- * an enquiry starts life as the public event sheet the promoter fills in, so
- * the venue never re-types it. That form does not exist yet, and neither does
- * the toast layer, so the explanation is shown inline instead.
+ * Opens the enquiry form at /events/new.
+ *
+ * In the prototype this button raised a toast rather than creating anything:
+ * an enquiry was to start life as a public event sheet the promoter filled in.
+ * That sheet was never built, and until the form was, this showed a note
+ * saying so. It is a plain link now, for the venue and for outside promoters
+ * alike — whoever draws it decides who sees it, with `mayStartEnquiry`.
  */
 export function NewEnquiry() {
-  const [open, setOpen] = useState(false)
   return (
-    <div className={styles.wrap}>
-      <button type="button" className={styles.button} onClick={() => setOpen((v) => !v)}>
-        <i className="ph ph-plus" aria-hidden="true" />
-        New enquiry
-      </button>
-      {open ? (
-        <p className={styles.note} role="status">
-          A new enquiry starts as the public event sheet — the promoter fills it, you never re-type
-          it. That form is not built yet.
-        </p>
-      ) : null}
-    </div>
+    <Link href="/events/new" className={styles.button}>
+      <i className="ph ph-plus" aria-hidden="true" />
+      New enquiry
+    </Link>
   )
 }

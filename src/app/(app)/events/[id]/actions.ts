@@ -4,6 +4,7 @@ import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
+import { internalContact } from '@/lib/intake'
 import { loadEventRecord } from '@/lib/event-record-data'
 import {
   canChangeEventRecord,
@@ -213,6 +214,57 @@ export async function setLead(
 
   refresh()
   return said(`${person.name} owns ${role.toLowerCase()} on this one.`)
+}
+
+/**
+ * Name the event's owner, or clear it.
+ *
+ * An outside promoter's enquiry arrives with nobody's name on it and sits in
+ * the unclaimed queue on Home until somebody takes it. The enquiry form names
+ * an owner when the venue starts a booking itself; once an event exists, this
+ * is the only place its owner changes. Modelled on `setLead` just above: the
+ * same refusal, the same scope, the same shape of read-then-write.
+ *
+ * On an internal night the booking contact string is kept in step with the
+ * owner, in the same write, because it is what the "Booking contact named"
+ * gate reads, not `ownerId` itself. An event an outside organisation brought
+ * already carries that organisation's own contact — left alone here.
+ */
+export async function setOwner(eventId: string, personId: string | null): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { internal: true } })
+
+  if (!personId) {
+    await db.event.update({
+      where: { id },
+      data: { ownerId: null, ...(ev.internal ? { promoter: internalContact(null) } : {}) },
+    })
+    await record(id, user, 'left this event without an owner')
+    refresh()
+    return said('Nobody owns this one now — it goes back to the unclaimed queue on Home.', 'warn')
+  }
+
+  const person = await db.person.findFirst({
+    where: { id: personId, active: true },
+    select: { id: true, name: true },
+  })
+  if (!person) return said('That person is not on the books.', 'stop')
+
+  await db.event.update({
+    where: { id },
+    data: {
+      ownerId: person.id,
+      ...(ev.internal ? { promoter: internalContact(person.name) } : {}),
+    },
+  })
+  await record(id, user, `made ${person.name} the owner`)
+
+  refresh()
+  return said(`${person.name} owns this one now — its gates come to them.`)
 }
 
 /**
