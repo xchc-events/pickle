@@ -356,8 +356,8 @@ Every event in the system begins with a staff member typing.
 > **Partly answered, 21 Sep 2026.** Until now nothing began at all: no code
 > could create an event. "New enquiry" now opens `/events/new`, and a promoter
 > who already has an account can send an enquiry from there. It arrives at
-> Enquiry with its date TBC, no owner and no figures, and sits unclaimed on Home
-> until somebody at the venue takes it. That covers the last two criteria below
+> Enquiry with its date TBC and no owner, carrying the figures they modelled as
+> their proposal, and sits unclaimed on Home until somebody at the venue takes it. That covers the last two criteria below
 > for signed-in promoters. The signed-out front door, with its throttle, is
 > still not built.
 
