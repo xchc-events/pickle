@@ -1,14 +1,18 @@
-import { CLOSE_TIMES, DOOR_TIMES, OUT_TIMES, timeMinutes } from './event-record'
 import { dateLabel } from './format'
 import { nightFromInput, nightsBetween } from './night'
 import type { Verdict } from './payments'
+import { clockFromInput, endNightFor, runProblems } from './run-times'
 import {
   attendanceProblem,
   countProblem,
   dollarsProblem,
   feeProblem,
+  HOUSE_MIX,
+  HOUSE_SPLIT_PERCENT,
   MAX_CREW,
   MAX_TOKENS,
+  mixProblem,
+  priceProblem,
   splitProblem,
   tidyName,
 } from './terms'
@@ -29,11 +33,14 @@ import { said, type Said } from './toast'
  * request carried. The form leaving a field out is a convenience; the POST
  * behind it is reachable by anybody who can sign in.
  *
- * What the venue's form has to capture is decided by what nothing else can
- * write. The owner, the booking model, the split, attendance, the cost inputs,
- * the brief and every act's status and fees have no editor anywhere yet, so an
- * event that did not get them here would never get them. Ticket prices are
- * left out for the opposite reason: Ticketing already owns them.
+ * An outside account now proposes the model's figures — the prices, the mix,
+ * who they expect, what it costs them, their people's fees — the same way a
+ * coordinator does, because that is the whole point of the live panel beside
+ * the form (`enquiry-model.ts`): the enquirer sees what the night pays before
+ * they send it, and what they typed is what a coordinator corrects rather than
+ * retypes afterwards. What stays the venue's to decide is what nobody outside
+ * the building can settle: the owner, the hold, the date lock, each act's
+ * status, the split, and whose organisation the booking belongs to.
  *
  * Pure over plain shapes, like event-record.ts and scope.ts, so every rule is
  * tested without a database — and because the form itself imports the
@@ -114,9 +121,8 @@ export const HOUSE_TASKS: readonly { name: string; est: number }[] = [
 /**
  * Where the venue's form *starts* its figures, from the same factory.
  *
- * Shown in the form, editable, and submitted by a coordinator who looked at
- * them. Never applied silently, and never applied to an outside account's
- * enquiry: a figure nobody at the venue has seen does not belong on a P&L.
+ * Shown in the form, editable, and submitted by whoever looked at them. Never
+ * applied silently.
  */
 export const HOUSE_STARTING_POINTS = {
   barHead: 20,
@@ -197,21 +203,21 @@ export interface RawEnquiry {
   spaceId: string
   kind: string
   format: string
+  /** `<input type="time">` values — '20:15', not a pick-list label. */
   doors: string
   barClose: string
   allOut: string
-  acts: RawAct[]
-  note: string
-
-  // --- the venue's own. Read for staff; never read for an outside account. ---
-  ownerId: string
+  /** `<input type="date">` value. Blank lets `endNightFor` work one out. */
+  endDate: string
   model: string
-  /** 'venue' | 'organisation' | 'name' */
-  bringing: string
-  organisationId: string
-  promoterName: string
-  /** A percentage, as typed: "62". */
-  split: string
+  /** A dollar figure, as typed: "25". */
+  std: string
+  door: string
+  /** Four percentages, as typed: "20". Must sum to 100 once read. */
+  mixSub: string
+  mixStd: string
+  mixSup: string
+  mixDoor: string
   attQuiet: string
   attLikely: string
   attGreat: string
@@ -221,6 +227,22 @@ export interface RawEnquiry {
   sound: string
   crew: string
   tok: string
+  acts: RawAct[]
+  note: string
+  /** Alternate dates, `YYYY-MM-DD`. Either or both may be blank. */
+  alt1: string
+  alt2: string
+
+  // --- the venue's own: who owns it, whose organisation it belongs to, the
+  // split, the brief, the hold. Read for staff; never read for an outside
+  // account. ---
+  ownerId: string
+  /** 'venue' | 'organisation' | 'name' */
+  bringing: string
+  organisationId: string
+  promoterName: string
+  /** A percentage, as typed: "62". */
+  split: string
   brief: string
   hold: boolean
 }
@@ -250,13 +272,13 @@ export interface CleanEnquiry {
   doors: string | null
   barClose: string | null
   allOut: string | null
-  acts: CleanAct[]
-  note: string | null
-  ownerId: string | null
+  /** A night — see night.ts. Null while no end has been settled. */
+  endDate: Date | null
   model: BookingModelKey
-  bringing: Bringing
-  /** 0–1, as the schema stores it. */
-  split: number
+  std: number
+  door: number
+  /** [subsidised, standard, supporter, door] — FRACTIONS summing to 1. */
+  mix: [number, number, number, number]
   att: [number, number, number]
   barHead: number
   gear: number
@@ -264,11 +286,24 @@ export interface CleanEnquiry {
   sound: SoundKey
   crew: number
   tok: number
+  acts: CleanAct[]
+  note: string | null
+  /** Up to two other nights they could also do. */
+  alternates: Date[]
+  ownerId: string | null
+  bringing: Bringing
+  /** 0–1, as the schema stores it. */
+  split: number
   brief: string | null
   hold: boolean
 }
 
-/** What an outside account gets to say: the night, the room, what it is, who is on. */
+/**
+ * What an outside account gets to say: the night, the room, what it is, who
+ * is on, and — now that the enquirer models the night — every input the
+ * model reads. Their proposal, corrected by the venue afterwards, never
+ * re-typed.
+ */
 type Theirs = Pick<
   CleanEnquiry,
   | 'name'
@@ -279,11 +314,27 @@ type Theirs = Pick<
   | 'doors'
   | 'barClose'
   | 'allOut'
+  | 'endDate'
+  | 'model'
+  | 'std'
+  | 'door'
+  | 'mix'
+  | 'att'
+  | 'barHead'
+  | 'gear'
+  | 'adv'
+  | 'sound'
+  | 'crew'
+  | 'tok'
   | 'acts'
   | 'note'
+  | 'alternates'
 >
 
-/** Everything else, which is the venue's to say. */
+/**
+ * What nobody outside the building can settle: the owner, the hold, the date
+ * lock, the split, the brief, and whose organisation the booking belongs to.
+ */
 type VenueOnly = Omit<CleanEnquiry, keyof Theirs>
 
 export type FieldKey =
@@ -295,10 +346,15 @@ export type FieldKey =
   | 'doors'
   | 'barClose'
   | 'allOut'
+  | 'endDate'
   | 'acts'
   | 'note'
+  | 'alternates'
   | 'ownerId'
   | 'model'
+  | 'std'
+  | 'door'
+  | 'mix'
   | 'bringing'
   | 'organisationId'
   | 'promoterName'
@@ -326,10 +382,15 @@ export const FIELD_ORDER: readonly FieldKey[] = [
   'doors',
   'barClose',
   'allOut',
+  'endDate',
   'acts',
   'note',
+  'alternates',
   'ownerId',
   'model',
+  'std',
+  'door',
+  'mix',
   'bringing',
   'organisationId',
   'promoterName',
@@ -374,21 +435,13 @@ function figure(raw: string): number | null {
   return /^\d+(\.\d+)?$/.test(t) ? Number(t) : null
 }
 
-/** A run time: blank is "not decided", otherwise one the venue actually offers. */
-function runTime(raw: string, offered: readonly string[]): { value: string | null; bad: boolean } {
-  const t = raw.trim()
-  if (t === '') return { value: null, bad: false }
-  return offered.includes(t) ? { value: t, bad: false } : { value: null, bad: true }
-}
-
 /**
  * The bill. One message for the whole section — the first thing wrong with it
  * — because the form shows it under the acts rather than under a row.
  *
- * An outside account names its acts and that is all: every one goes on as
- * enquired with no fee, whatever came with it. A fee floor and ceiling are what
- * the venue agrees to pay, and the status is the venue's record of where that
- * conversation stands.
+ * An outside account's fee is their proposal now, corrected by the venue on
+ * the event record — but the status stays the venue's record of where the
+ * conversation stands, whatever the row claims.
  */
 function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErrors): CleanAct[] {
   const acts: CleanAct[] = []
@@ -399,16 +452,9 @@ function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErro
 
   for (const row of rows) {
     const name = tidyName(row.name)
-
-    if (external) {
-      if (name === '') continue
-      if (name.length > 80) fail("Keep each act's name under 80 characters.")
-      acts.push({ name, status: 'enquired', low: 0, high: 0 })
-      continue
-    }
-
     const lowTyped = row.low.trim()
     const highTyped = row.high.trim()
+
     // A row nobody filled in is not a mistake. A fee with nobody's name on it is.
     if (name === '' && lowTyped === '' && highTyped === '') continue
     if (name === '') {
@@ -417,21 +463,20 @@ function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErro
     }
     if (name.length > 80) fail("Keep each act's name under 80 characters.")
 
-    const statusTyped = row.status.trim()
-    const status = statusTyped === '' ? 'enquired' : statusTyped
-    if (!isActStatus(status)) fail('Each act is enquired, pencilled or confirmed.')
+    let status: ActStatus = 'enquired'
+    if (!external) {
+      const statusTyped = row.status.trim()
+      const typed = statusTyped === '' ? 'enquired' : statusTyped
+      if (!isActStatus(typed)) fail('Each act is enquired, pencilled or confirmed.')
+      status = isActStatus(typed) ? typed : 'enquired'
+    }
 
     const low = figure(lowTyped)
     const high = figure(highTyped)
     const feeIssue = feeProblem(low ?? NaN, high ?? NaN)
     if (feeIssue) fail(feeIssue)
 
-    acts.push({
-      name,
-      status: isActStatus(status) ? status : 'enquired',
-      low: low ?? 0,
-      high: high ?? 0,
-    })
+    acts.push({ name, status, low: low ?? 0, high: high ?? 0 })
   }
 
   if (acts.length > MAX_ACTS) {
@@ -442,12 +487,38 @@ function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErro
 }
 
 /**
- * The part of the form anybody may fill in.
- *
- * `theirs` is null while any of it cannot be made sense of; `errors` says
- * what. The room and the format come back on their own as well, because the
- * venue's attendance check wants the room's capacity even when, say, the name
- * is what is wrong — every problem is reported at once, not one a submit.
+ * Up to two other nights they could also do, alongside the one they asked
+ * for — blank slots dropped, each checked the way the preferred date is.
+ */
+function cleanAlternates(raw: RawEnquiry, ctx: IntakeContext, errors: FieldErrors): Date[] {
+  const typed = [raw.alt1, raw.alt2].map((t) => t.trim()).filter((t) => t !== '')
+  const alternates: Date[] = []
+  let problem: string | null = null
+  const fail = (why: string) => {
+    problem ??= why
+  }
+
+  for (const t of typed) {
+    const d = nightFromInput(t)
+    if (!d) {
+      fail('That is not a date.')
+      continue
+    }
+    if (ctx.user.external && nightsBetween(ctx.today, d) < 0) {
+      fail('That night has already been — pick one still to come.')
+      continue
+    }
+    alternates.push(d)
+  }
+
+  if (problem) errors.alternates = problem
+  return alternates
+}
+
+/**
+ * The part of the form anybody may fill in — now the model's inputs too, not
+ * only the night and who is on. `theirs` is null while any of it cannot be
+ * made sense of; `errors` says what.
  */
 function cleanTheirs(
   raw: RawEnquiry,
@@ -486,120 +557,74 @@ function cleanTheirs(
   const format = raw.format.trim()
   if (!isFormat(format)) errors.format = 'Pick how the room is set.'
 
-  const doors = runTime(raw.doors, DOOR_TIMES)
-  const barClose = runTime(raw.barClose, CLOSE_TIMES)
-  const allOut = runTime(raw.allOut, OUT_TIMES)
-  if (doors.bad) errors.doors = 'Pick a time from the list.'
-  if (barClose.bad) errors.barClose = 'Pick a time from the list.'
-  if (allOut.bad) errors.allOut = 'Pick a time from the list.'
-
-  // `timeMinutes` carries the small hours past midnight, so a 1:00am close is
-  // after 8:00pm doors rather than seven hours before them.
-  if (doors.value && barClose.value && timeMinutes(barClose.value) <= timeMinutes(doors.value)) {
-    errors.barClose = 'The bar cannot close before the doors open.'
+  // Run times: any minute is allowed now, so a clock reading is only ever
+  // refused for not being one at all. The relationship between them — doors
+  // before bar close, an end after everyone is meant to be out — is
+  // run-times.ts's `runProblems`, the same rule the event record uses.
+  const clock = (typed: string, key: 'doors' | 'barClose' | 'allOut'): string | null => {
+    const t = typed.trim()
+    if (t === '') return null
+    const value = clockFromInput(t)
+    if (!value) errors[key] = 'That is not a time.'
+    return value
   }
-  if (allOut.value && barClose.value) {
-    if (timeMinutes(allOut.value) < timeMinutes(barClose.value)) {
-      errors.allOut = 'Everyone out cannot be before the bar closes.'
-    }
-  } else if (allOut.value && doors.value) {
-    if (timeMinutes(allOut.value) <= timeMinutes(doors.value)) {
-      errors.allOut = 'Everyone out cannot be before the doors open.'
-    }
+  const doors = clock(raw.doors, 'doors')
+  const barClose = clock(raw.barClose, 'barClose')
+  const allOut = clock(raw.allOut, 'allOut')
+
+  const endDateTyped = raw.endDate.trim()
+  let endDate: Date | null
+  if (endDateTyped === '') {
+    endDate = date ? endNightFor(date, doors, allOut) : null
+  } else {
+    endDate = nightFromInput(endDateTyped)
+    if (!endDate) errors.endDate = 'Pick the night it ends.'
   }
 
-  const acts = cleanActs(raw.acts, external, errors)
-
-  const noteTyped = raw.note.trim()
-  if (noteTyped.length > 1000) errors.note = 'Keep the note under 1,000 characters.'
-  const note = noteTyped === '' ? null : noteTyped
-
-  const knownFormat = isFormat(format) ? format : null
-  if (!date || !space || !isKind(kind) || !isFormat(format)) {
-    return { theirs: null, space, format: knownFormat }
+  if (date) {
+    const runErrors = runProblems({ date, doors, barClose, endDate, allOut })
+    if (!errors.doors && runErrors.doors) errors.doors = runErrors.doors
+    if (!errors.barClose && runErrors.barClose) errors.barClose = runErrors.barClose
+    if (!errors.endDate && runErrors.endDate) errors.endDate = runErrors.endDate
+    if (!errors.allOut && runErrors.allOut) errors.allOut = runErrors.allOut
   }
-  return {
-    theirs: {
-      name,
-      date,
-      spaceId,
-      kind,
-      format,
-      doors: doors.value,
-      barClose: barClose.value,
-      allOut: allOut.value,
-      acts,
-      note,
-    },
-    space,
-    format,
-  }
-}
-
-/**
- * What the venue says about an outside account's enquiry, which is all of it.
- *
- * Their date is a preference until a coordinator locks it, so it arrives TBC.
- * Nobody owns it yet — it lands in the unclaimed queue on Home. It belongs to
- * the organisation on their *session*, never to one named in the request. And
- * nothing they typed is a figure: no split, no attendance, no costs, no hold
- * on the room. A promoter who could set those could write their own P&L, and
- * one who could place holds could block every Saturday of the summer.
- */
-function venueSideOfTheirs(organisationId: string): VenueOnly {
-  return {
-    dateTbc: true,
-    ownerId: null,
-    model: 'curator',
-    bringing: { by: 'organisation', organisationId },
-    split: 0,
-    att: [0, 0, 0],
-    barHead: 0,
-    gear: 0,
-    adv: 0,
-    sound: 'inhouse',
-    crew: 0,
-    tok: 0,
-    brief: null,
-    hold: false,
-  }
-}
-
-/** The venue's own fields, from a coordinator's form. Null while any of it is wrong. */
-function cleanVenueOnly(
-  raw: RawEnquiry,
-  room: { space: IntakeSpace | null; format: Format | null },
-  errors: FieldErrors,
-): VenueOnly | null {
-  // Whether this person exists is the database's to answer, in intake-data.ts.
-  const ownerTyped = raw.ownerId.trim()
-  const ownerId = ownerTyped === '' ? null : ownerTyped
 
   const modelTyped = raw.model.trim()
   const model = modelTyped === '' ? 'curator' : modelTyped
   if (!isModel(model)) errors.model = 'Pick how the venue and the promoter are working together.'
 
-  let bringing: Bringing | null = null
-  const by = raw.bringing.trim()
-  if (by === 'venue') {
-    bringing = { by: 'venue' }
-  } else if (by === 'organisation') {
-    const organisationId = raw.organisationId.trim()
-    if (organisationId === '') errors.organisationId = 'Pick the organisation bringing it.'
-    else bringing = { by: 'organisation', organisationId }
-  } else if (by === 'name') {
-    const name = tidyName(raw.promoterName)
-    if (name.length < 2 || name.length > 80) errors.promoterName = 'Name whoever is bringing it.'
-    else bringing = { by: 'name', name }
-  } else {
-    errors.bringing = 'Say who is bringing this.'
+  const price = (typed: string, key: 'std' | 'door'): number => {
+    const n = figure(typed)
+    const issue = priceProblem(n ?? NaN)
+    if (issue) {
+      errors[key] = issue
+      return 0
+    }
+    return n ?? 0
   }
+  const std = price(raw.std, 'std')
+  const door = price(raw.door, 'door')
 
-  // Typed as a percentage, stored as the share the schema keeps.
-  const percent = figure(raw.split)
-  const splitIssue = splitProblem(percent ?? NaN)
-  if (splitIssue) errors.split = splitIssue
-  const split = (percent ?? 0) / 100
+  const mixTyped: [string, string, string, string] = [
+    raw.mixSub,
+    raw.mixStd,
+    raw.mixSup,
+    raw.mixDoor,
+  ]
+  const mixBlank = mixTyped.every((t) => t.trim() === '')
+  const mixPercent: [number, number, number, number] = mixBlank
+    ? [...HOUSE_MIX]
+    : [
+        figure(mixTyped[0]) ?? NaN,
+        figure(mixTyped[1]) ?? NaN,
+        figure(mixTyped[2]) ?? NaN,
+        figure(mixTyped[3]) ?? NaN,
+      ]
+  const mixIssue = mixProblem(mixPercent)
+  if (mixIssue) errors.mix = mixIssue
+  const mix: [number, number, number, number] = mixIssue
+    ? [0, 0, 0, 0]
+    : [mixPercent[0] / 100, mixPercent[1] / 100, mixPercent[2] / 100, mixPercent[3] / 100]
 
   const heads: [number, number, number] = [
     figure(raw.attQuiet) ?? NaN,
@@ -607,12 +632,8 @@ function cleanVenueOnly(
     figure(raw.attGreat) ?? NaN,
   ]
   const roomInfo =
-    room.space && room.format
-      ? {
-          name: room.space.name,
-          holds: capacityOf(room.space, room.format),
-          seated: room.format === 'Cabaret',
-        }
+    space && isFormat(format)
+      ? { name: space.name, holds: capacityOf(space, format), seated: format === 'Cabaret' }
       : null
   const attIssue = attendanceProblem(heads, roomInfo)
   let att: [number, number, number] = [0, 0, 0]
@@ -651,26 +672,112 @@ function cleanVenueOnly(
   const crew = count(raw.crew, 'crew', MAX_CREW)
   const tok = count(raw.tok, 'tok', MAX_TOKENS)
 
+  const acts = cleanActs(raw.acts, external, errors)
+
+  const noteTyped = raw.note.trim()
+  if (noteTyped.length > 1000) errors.note = 'Keep the note under 1,000 characters.'
+  const note = noteTyped === '' ? null : noteTyped
+
+  const alternates = cleanAlternates(raw, ctx, errors)
+
+  const knownFormat = isFormat(format) ? format : null
+  if (!date || !space || !isKind(kind) || !isFormat(format) || !isModel(model) || !isSound(sound)) {
+    return { theirs: null, space, format: knownFormat }
+  }
+  return {
+    theirs: {
+      name,
+      date,
+      spaceId,
+      kind,
+      format,
+      doors,
+      barClose,
+      allOut,
+      endDate,
+      model,
+      std,
+      door,
+      mix,
+      att,
+      barHead,
+      gear,
+      adv,
+      sound,
+      crew,
+      tok,
+      acts,
+      note,
+      alternates,
+    },
+    space,
+    format,
+  }
+}
+
+/**
+ * What only the venue can say about an outside account's enquiry.
+ *
+ * Their date is a preference until a coordinator locks it, so it arrives TBC.
+ * Nobody owns it yet — it lands in the unclaimed queue on Home. It belongs to
+ * the organisation on their *session*, never to one named in the request. The
+ * split stays the venue's standing offer until a coordinator settles another
+ * with them; every act they named arrives enquired, whatever status they sent
+ * — that is the venue's record of where the conversation stands, not theirs
+ * to write. And nothing they typed holds the room or carries a brief only
+ * staff have seen.
+ */
+function venueSideOfTheirs(organisationId: string): VenueOnly {
+  return {
+    dateTbc: true,
+    ownerId: null,
+    bringing: { by: 'organisation', organisationId },
+    split: HOUSE_SPLIT_PERCENT / 100,
+    brief: null,
+    hold: false,
+  }
+}
+
+/** The venue's own fields, from a coordinator's form. Null while any of it is wrong. */
+function cleanVenueOnly(raw: RawEnquiry, errors: FieldErrors): VenueOnly | null {
+  // Whether this person exists is the database's to answer, in intake-data.ts.
+  const ownerTyped = raw.ownerId.trim()
+  const ownerId = ownerTyped === '' ? null : ownerTyped
+
+  let bringing: Bringing | null = null
+  const by = raw.bringing.trim()
+  if (by === 'venue') {
+    bringing = { by: 'venue' }
+  } else if (by === 'organisation') {
+    const organisationId = raw.organisationId.trim()
+    if (organisationId === '') errors.organisationId = 'Pick the organisation bringing it.'
+    else bringing = { by: 'organisation', organisationId }
+  } else if (by === 'name') {
+    const name = tidyName(raw.promoterName)
+    if (name.length < 2 || name.length > 80) errors.promoterName = 'Name whoever is bringing it.'
+    else bringing = { by: 'name', name }
+  } else {
+    errors.bringing = 'Say who is bringing this.'
+  }
+
+  // Typed as a percentage, stored as the share the schema keeps.
+  const percent = figure(raw.split)
+  const splitIssue = splitProblem(percent ?? NaN)
+  if (splitIssue) errors.split = splitIssue
+  const split = (percent ?? 0) / 100
+
   const briefTyped = raw.brief.trim()
   if (briefTyped.length > 280) {
     errors.brief = 'Keep the brief to a line or two — under 280 characters.'
   }
   const brief = briefTyped === '' ? null : briefTyped
 
-  if (!isModel(model) || !isSound(sound) || !bringing) return null
+  if (!bringing) return null
   return {
     dateTbc: raw.dateTbc,
     ownerId,
-    model,
     bringing,
     split,
-    att,
-    barHead,
-    gear,
-    adv,
-    sound,
-    crew,
-    tok,
     brief,
     hold: raw.hold,
   }
@@ -683,10 +790,10 @@ function cleanVenueOnly(
  * **Who is asking decides which fields are read at all.** For an outside
  * account the venue's own fields are never parsed, let alone trusted: the
  * enquiry is the whitelisted half (`cleanTheirs`) plus values fixed here
- * (`venueSideOfTheirs`), so a hand-written POST naming an owner, a split, a
- * fee or somebody else's organisation changes nothing. Junk in those fields is
- * not an error either — refusing an enquiry over a number nobody will read
- * would be a refusal with no reason behind it.
+ * (`venueSideOfTheirs`), so a hand-written POST naming an owner, a hold or
+ * somebody else's organisation changes nothing. Junk in those fields is not
+ * an error either — refusing an enquiry over a value nobody will read would
+ * be a refusal with no reason behind it.
  *
  * Refuses rather than clamps, throughout: a figure that is nearly right goes
  * back to the person who typed it, not onto the record.
@@ -705,8 +812,8 @@ export function cleanEnquiry(raw: RawEnquiry, ctx: IntakeContext): Cleaned {
     return { ok: true, value: { ...theirs, ...venueSideOfTheirs(organisationId) } }
   }
 
-  const { theirs, space, format } = cleanTheirs(raw, ctx, errors)
-  const venue = cleanVenueOnly(raw, { space, format }, errors)
+  const { theirs } = cleanTheirs(raw, ctx, errors)
+  const venue = cleanVenueOnly(raw, errors)
   if (!theirs || !venue || !clear(errors)) return { ok: false, errors }
   return { ok: true, value: { ...theirs, ...venue } }
 }
@@ -737,8 +844,15 @@ export function startedLine(x: {
   date: Date
   dateTbc: boolean
   note: string | null
+  alternates: Date[]
 }): string {
-  const when = dateLabel(x.date)
+  const altSuffix =
+    x.alternates.length === 0
+      ? ''
+      : x.alternates.length === 1
+        ? ` (or ${dateLabel(x.alternates[0])})`
+        : ` (or ${dateLabel(x.alternates[0])} or ${dateLabel(x.alternates[1])})`
+  const when = dateLabel(x.date) + altSuffix
   // An outside account's date is always a preference, so it says so instead
   // of carrying "date TBC" on every line.
   const line = x.external
@@ -782,17 +896,14 @@ export const FIELD = {
   doors: 'doors',
   barClose: 'barClose',
   allOut: 'allOut',
-  note: 'note',
-  actName: 'actName',
-  actStatus: 'actStatus',
-  actLow: 'actLow',
-  actHigh: 'actHigh',
-  ownerId: 'ownerId',
+  endDate: 'endDate',
   model: 'model',
-  bringing: 'bringing',
-  organisationId: 'organisationId',
-  promoterName: 'promoterName',
-  split: 'split',
+  std: 'std',
+  door: 'door',
+  mixSub: 'mixSub',
+  mixStd: 'mixStd',
+  mixSup: 'mixSup',
+  mixDoor: 'mixDoor',
   attQuiet: 'attQuiet',
   attLikely: 'attLikely',
   attGreat: 'attGreat',
@@ -802,6 +913,18 @@ export const FIELD = {
   sound: 'sound',
   crew: 'crew',
   tok: 'tok',
+  actName: 'actName',
+  actStatus: 'actStatus',
+  actLow: 'actLow',
+  actHigh: 'actHigh',
+  note: 'note',
+  alt1: 'alt1',
+  alt2: 'alt2',
+  ownerId: 'ownerId',
+  bringing: 'bringing',
+  organisationId: 'organisationId',
+  promoterName: 'promoterName',
+  split: 'split',
   brief: 'brief',
   hold: 'hold',
 } as const
@@ -846,14 +969,14 @@ export function readEnquiryForm(form: FormData): RawEnquiry {
     doors: text(FIELD.doors),
     barClose: text(FIELD.barClose),
     allOut: text(FIELD.allOut),
-    acts,
-    note: text(FIELD.note),
-    ownerId: text(FIELD.ownerId),
+    endDate: text(FIELD.endDate),
     model: text(FIELD.model),
-    bringing: text(FIELD.bringing),
-    organisationId: text(FIELD.organisationId),
-    promoterName: text(FIELD.promoterName),
-    split: text(FIELD.split),
+    std: text(FIELD.std),
+    door: text(FIELD.door),
+    mixSub: text(FIELD.mixSub),
+    mixStd: text(FIELD.mixStd),
+    mixSup: text(FIELD.mixSup),
+    mixDoor: text(FIELD.mixDoor),
     attQuiet: text(FIELD.attQuiet),
     attLikely: text(FIELD.attLikely),
     attGreat: text(FIELD.attGreat),
@@ -863,6 +986,15 @@ export function readEnquiryForm(form: FormData): RawEnquiry {
     sound: text(FIELD.sound),
     crew: text(FIELD.crew),
     tok: text(FIELD.tok),
+    acts,
+    note: text(FIELD.note),
+    alt1: text(FIELD.alt1),
+    alt2: text(FIELD.alt2),
+    ownerId: text(FIELD.ownerId),
+    bringing: text(FIELD.bringing),
+    organisationId: text(FIELD.organisationId),
+    promoterName: text(FIELD.promoterName),
+    split: text(FIELD.split),
     brief: text(FIELD.brief),
     hold: ticked(FIELD.hold),
   }
