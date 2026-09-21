@@ -2,15 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useToast } from '@/components/Toast'
-import {
-  LICENCE_STATES,
-  DOOR_TIMES,
-  CLOSE_TIMES,
-  OUT_TIMES,
-  type DealState,
-  type LicenceState,
-} from '@/lib/event-record'
-import { setDateTbc, setDeal, setLicence, setRunTime } from './actions'
+import { LICENCE_STATES, type DealState, type LicenceState } from '@/lib/event-record'
+import { nightInput } from '@/lib/night'
+import { clockToInput } from '@/lib/run-times'
+import { setDateTbc, setDeal, setEndDate, setLicence, setRunTime } from './actions'
 import styles from './event.module.css'
 import type { DealState as DbDealState } from '@/generated/prisma/client'
 
@@ -22,44 +17,73 @@ import type { DealState as DbDealState } from '@/generated/prisma/client'
  * themselves — nothing here is a permission boundary.
  */
 
-function TimeSelect({
+function TimeField({
   eventId,
   field,
   label,
   value,
-  options,
   note,
 }: {
   eventId: string
   field: 'doors' | 'barClose' | 'allOut'
   label: string
   value: string | null
-  options: readonly string[]
   note?: string
 }) {
   const say = useToast()
   const [pending, start] = useTransition()
+  const [draft, setDraft] = useState(() => clockToInput(value))
+
+  // Committed on blur, not on every tick of the native picker — the same
+  // guard as Acts.tsx's commitName: disabling the field mid-save (React
+  // reacting to the transition) blurs it too, and without the `pending`
+  // check that synthetic blur would resend the same value a second time.
+  const commit = () => {
+    if (pending) return
+    if (draft === clockToInput(value)) return
+    start(async () => say(await setRunTime(eventId, field, draft)))
+  }
 
   return (
     <label className={styles.timeField}>
       <span className={styles.factKey}>{label}</span>
-      <select
+      <input
+        type="time"
         className={styles.select}
-        defaultValue={value ?? ''}
+        value={draft}
         disabled={pending}
-        onChange={(e) => {
-          const next = e.target.value
-          start(async () => say(await setRunTime(eventId, field, next)))
-        }}
-      >
-        <option value="">not set</option>
-        {options.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+      />
       {note ? <span className={styles.factNote}>{note}</span> : null}
+    </label>
+  )
+}
+
+function EndsField({ eventId, value }: { eventId: string; value: Date | null }) {
+  const say = useToast()
+  const [pending, start] = useTransition()
+  const [draft, setDraft] = useState(() => (value ? nightInput(value) : ''))
+
+  const commit = () => {
+    if (pending) return
+    const saved = value ? nightInput(value) : ''
+    if (draft === saved) return
+    start(async () => say(await setEndDate(eventId, draft)))
+  }
+
+  return (
+    <label className={styles.timeField}>
+      <span className={styles.factKey}>Ends</span>
+      <input
+        type="date"
+        className={styles.select}
+        value={draft}
+        disabled={pending}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+      />
+      <span className={styles.factNote}>blank infers it from doors and everyone out</span>
     </label>
   )
 }
@@ -69,38 +93,38 @@ export function RunTimes({
   doors,
   barClose,
   allOut,
+  endDate,
   late,
 }: {
   eventId: string
   doors: string | null
   barClose: string | null
   allOut: string | null
+  endDate: Date | null
   late: boolean
 }) {
   return (
     <div className={styles.times}>
-      <TimeSelect
+      <TimeField
         eventId={eventId}
         field="doors"
         label="Doors"
         value={doors}
-        options={DOOR_TIMES}
         note="every shift offsets from here"
       />
-      <TimeSelect
+      <TimeField
         eventId={eventId}
         field="barClose"
         label="Bar close"
         value={barClose}
-        options={CLOSE_TIMES}
         note={late ? 'past midnight — needs a special licence' : 'within the standard licence'}
       />
-      <TimeSelect
+      <EndsField eventId={eventId} value={endDate} />
+      <TimeField
         eventId={eventId}
         field="allOut"
         label="Everyone out"
         value={allOut}
-        options={OUT_TIMES}
         note="clean-up works back from it"
       />
     </div>

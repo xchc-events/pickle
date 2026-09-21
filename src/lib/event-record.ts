@@ -20,60 +20,13 @@ import type { Verdict } from './payments'
 // ------------------------------------------------------------------ time ---
 
 /**
- * The pick-lists for the three run times. Specification: these are the times
- * the venue actually offers, not a general time picker.
+ * Run times are any time of day, written the way the venue says them:
+ * `'8:15pm'`, `'1:00am'`. There were three pick-lists here once, offering
+ * doors, bar close and everyone out on the half hour from fixed ranges, and a
+ * comment calling them specification. They went on 21 September 2026: a night
+ * starts and ends when it does. What a time may be, and how a night's times
+ * have to sit against each other and its end date, is src/lib/run-times.ts.
  */
-export const DOOR_TIMES = [
-  '4:00pm',
-  '4:30pm',
-  '5:00pm',
-  '5:30pm',
-  '6:00pm',
-  '6:30pm',
-  '7:00pm',
-  '7:30pm',
-  '8:00pm',
-  '8:30pm',
-  '9:00pm',
-  '9:30pm',
-  '10:00pm',
-] as const
-
-export const CLOSE_TIMES = [
-  '8:00pm',
-  '8:30pm',
-  '9:00pm',
-  '9:30pm',
-  '10:00pm',
-  '10:30pm',
-  '11:00pm',
-  '11:30pm',
-  '12:00am',
-  '12:30am',
-  '1:00am',
-  '1:30am',
-  '2:00am',
-  '2:30am',
-  '3:00am',
-] as const
-
-export const OUT_TIMES = [
-  '8:30pm',
-  '9:00pm',
-  '9:30pm',
-  '10:00pm',
-  '10:30pm',
-  '11:00pm',
-  '11:30pm',
-  '12:00am',
-  '12:30am',
-  '1:00am',
-  '1:30am',
-  '2:00am',
-  '2:30am',
-  '3:00am',
-  '3:30am',
-] as const
 
 /**
  * A run time as minutes from midnight, with hours after midnight carried past

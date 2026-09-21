@@ -4,6 +4,7 @@ import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
 import { canChangeEventRecord, headsLine } from '@/lib/event-record'
+import { dateLabel } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
@@ -275,6 +276,9 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                   ? 'still a best guess — an enquiry cannot move on until it is held'
                   : 'held in the calendar'}
               </span>
+              {ev.endDate && dateLabel(ev.endDate) !== ev.date ? (
+                <span className={styles.factNote}>ends {dateLabel(ev.endDate)}</span>
+              ) : null}
             </div>
           </div>
 
@@ -284,6 +288,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               doors={ev.doors}
               barClose={ev.barClose}
               allOut={ev.allOut}
+              endDate={ev.endDate}
               late={ev.licenceLate}
             />
           ) : (

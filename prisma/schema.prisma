@@ -478,6 +478,16 @@ model Event {
   doors     String?
   barClose  String?
   allOut    String?
+  /// The night it ends, stored the way `date` is (see src/lib/night.ts).
+  ///
+  /// `date` was the whole of when an event happens, which made a festival
+  /// over a weekend impossible to say, and left "everyone out at 1:00am" to be
+  /// understood as the next morning by a rule about the small hours. The rule
+  /// stays for what still reads a bare time — the licence gate asks whether
+  /// the bar runs past midnight — but when a night ends is now written down:
+  /// the same date for an afternoon workshop, the next for a gig that runs
+  /// past midnight, later for anything longer. Null while no end time is set.
+  endDate   DateTime?
 
   // --- cost inputs ---
   barHead   Float  @default(0)
