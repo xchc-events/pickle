@@ -75,6 +75,14 @@ const ARGS: Record<string, unknown[]> = {
   takeTheNight: ['hold_theirs'],
   dropTheHold: ['hold_theirs'],
   challengeTheHold: ['hold_theirs'],
+  setActStatus: ['artist_theirs', 'confirmed'],
+  setActFees: ['artist_theirs', 500, 800],
+  renameAct: ['artist_theirs', 'The Hot Coals'],
+  addAct: ['Two Tides'],
+  removeAct: ['artist_theirs'],
+  setSplit: [60],
+  setModel: ['dry'],
+  setFigures: [{ att: [60, 90, 120], barHead: 10, gear: 250, adv: 120, crew: 4, tok: 2 }],
 }
 
 const call = (name: string) => actions[name]!(EVENT, ...(ARGS[name] ?? []))
@@ -144,6 +152,18 @@ describe('the actions under test', () => {
         'takeTheNight',
         'dropTheHold',
         'challengeTheHold',
+        // The acts and terms editor — see the section comment above
+        // setActStatus in actions.ts. Covered in full, including every
+        // write, activity line and toast, in terms-actions.test.ts; this
+        // file only has to prove each of the eight is gated the same way.
+        'setActStatus',
+        'setActFees',
+        'renameAct',
+        'addAct',
+        'removeAct',
+        'setSplit',
+        'setModel',
+        'setFigures',
       ]),
     )
   })

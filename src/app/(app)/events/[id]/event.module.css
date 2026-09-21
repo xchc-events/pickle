@@ -968,3 +968,120 @@ details[open] > .partToggle::after {
 .partToggle:hover .partName {
   color: var(--color-accent);
 }
+
+/* ---------------------------------------------------- acts editor --- */
+/* Venue only, drawn in place of the read-only name/status/fee spans.
+   Reuses .artist/.artistMain/.artistFiles/.unlinked/.none/.artists exactly —
+   only the controls inside the row are new. Each composes with .select for
+   its chrome and only overrides width, so an input, a select and a button
+   all keep the one look. */
+
+.nameInput {
+  flex: 1 1 160px;
+  min-width: 120px;
+  width: auto;
+}
+
+.statusSelect {
+  flex: none;
+  width: auto;
+}
+
+.feeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.feeInput {
+  flex: none;
+  width: 68px;
+}
+
+.smallBtn {
+  flex: none;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent-200);
+  border-radius: var(--radius-sm);
+  padding: 4px 11px;
+}
+
+.smallBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.removeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-500);
+  cursor: pointer;
+}
+
+.removeBtn:hover:not(:disabled) {
+  color: var(--st-stop);
+  border-color: var(--st-stop);
+}
+
+.removeBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.addAct {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+/* --------------------------------------------------- terms editor --- */
+/* Venue only. The split and figures boxes reuse .gates/.gatesTitle — the
+   same bordered-box-with-a-caption idiom the gates panel already uses —
+   and the figures fields reuse .timeField/.factKey/.select, the exact
+   building blocks RunTimes uses above. */
+
+.splitRange {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 9px 0;
+}
+
+.splitRange input[type='range'] {
+  flex: 1;
+  accent-color: var(--color-accent);
+}
+
+.splitReadout {
+  flex: none;
+  min-width: 74px;
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+}
+
+.presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.figGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: var(--space-2);
+  margin: 9px 0;
+}

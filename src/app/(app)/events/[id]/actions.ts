@@ -19,7 +19,32 @@ import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-
 import { affectedLine, type AffectedHold } from '@/lib/holds'
 import type { SessionUser } from '@/lib/session'
 import { cleanDoor } from '@/lib/actuals'
+import {
+  actLockedBecause,
+  actNameProblem,
+  attendanceProblem,
+  countProblem,
+  dollarsProblem,
+  feeProblem,
+  figuresLine,
+  isBillStatus,
+  isFigures,
+  lockedBecause,
+  MAX_CREW,
+  MAX_TOKENS,
+  modelLockedBecause,
+  modelSaid,
+  splitProblem,
+  splitSaid,
+  statusSaid,
+  tidyName,
+  type BillStatus,
+  type Figures,
+} from '@/lib/terms'
+import { capacityOf } from '@/lib/ticketing'
 import type {
+  ArtistStatus,
+  BookingModel,
   BookingStatus as BookingStatusRow,
   DealState,
   Licence,
@@ -265,6 +290,361 @@ export async function setOwner(eventId: string, personId: string | null): Promis
 
   refresh()
   return said(`${person.name} owns this one now — its gates come to them.`)
+}
+
+/**
+ * The acts and terms editor.
+ *
+ * Nothing before this could change `EventArtist.status/low/high/name`,
+ * `Event.split/model` or the figures the projection runs off — an enquiry an
+ * outside promoter sends in arrives with every act "enquired" at $0, split 0
+ * and no figures, and had no way to ever clear the Negotiating gates ("At
+ * least one act confirmed", "Fee floor and ceiling agreed", "Split agreed").
+ * These eight give the venue that one write each, and nowhere else gets it:
+ * an outside promoter may open the event record and change nothing on it.
+ *
+ * An act id is looked up scoped to the event — `db.eventArtist.findFirst({
+ * where: { id, eventId } })` — for the same reason a hold id is handed to its
+ * writer scoped to the event in the hold ladder above: it came from the
+ * browser and could name any act on any night, not only one on this bill. A
+ * miss is refused in words, not a 404 — the event itself is theirs to read,
+ * so there is no existence left to hide, only an act that is not here.
+ *
+ * The rules — what a fee, a split, an attendance figure or a name is allowed
+ * to be, and what locks a bill or a booking model — live in @/lib/terms, the
+ * one place the enquiry form and this editor agree. Nothing here repeats a
+ * rule or hard-codes a message that already lives there.
+ */
+
+const ARTIST_STATUS_DB: Record<BillStatus, ArtistStatus> = {
+  enquired: 'ENQUIRED',
+  pencilled: 'PENCILLED',
+  confirmed: 'CONFIRMED',
+  declined: 'DECLINED',
+}
+
+const MODEL_DB: Record<'dry' | 'curator', BookingModel> = {
+  dry: 'DRY',
+  curator: 'CURATOR',
+}
+
+/**
+ * Move an act to a new status on the bill.
+ *
+ * A paid act's line is frozen by `actLockedBecause`: their fee is already
+ * part of a settlement, and moving them to declined pulls their fee back out
+ * of the floor — a number that has already gone to somebody is not one this
+ * can move again.
+ */
+export async function setActStatus(
+  eventId: string,
+  artistId: string,
+  status: string,
+): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const act = await db.eventArtist.findFirst({ where: { id: artistId, eventId: id } })
+  if (!act) return said('That act is not on this bill.', 'stop')
+
+  const actLocked = actLockedBecause(act)
+  if (actLocked) return said(actLocked, 'stop')
+
+  if (!isBillStatus(status)) return said('That is not a status an act can have.', 'stop')
+
+  await db.eventArtist.update({
+    where: { id: artistId },
+    data: { status: ARTIST_STATUS_DB[status] },
+  })
+  await record(id, user, `marked ${act.name} ${status}`)
+
+  refresh()
+  return statusSaid(act.name, status)
+}
+
+/**
+ * Set an act's fee floor and ceiling.
+ *
+ * Frozen once paid, same as `setActStatus` — the fee is what the settlement
+ * was built from, and changing it here would leave the settlement wrong
+ * without anybody knowing there was ever a reason to redo it.
+ */
+export async function setActFees(
+  eventId: string,
+  artistId: string,
+  low: number,
+  high: number,
+): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const act = await db.eventArtist.findFirst({ where: { id: artistId, eventId: id } })
+  if (!act) return said('That act is not on this bill.', 'stop')
+
+  const actLocked = actLockedBecause(act)
+  if (actLocked) return said(actLocked, 'stop')
+
+  const problem = feeProblem(low, high)
+  if (problem) return said(problem, 'warn')
+
+  await db.eventArtist.update({ where: { id: artistId }, data: { low, high } })
+  await record(id, user, `set ${act.name}’s fee range to ${money(low)}–${money(high)}`)
+
+  refresh()
+  return said(`${act.name} is ${money(low)}–${money(high)} — the floor and ceiling moved with it.`)
+}
+
+/**
+ * Rename an act.
+ *
+ * Not frozen by a paid line — unlike status and fees, a name is not a money
+ * figure the settlement was built from, so correcting a typo after payment
+ * costs the settlement nothing.
+ */
+export async function renameAct(eventId: string, artistId: string, name: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const act = await db.eventArtist.findFirst({ where: { id: artistId, eventId: id } })
+  if (!act) return said('That act is not on this bill.', 'stop')
+
+  // The id and the name both come from the browser. A name that is not text
+  // at all reads as no name, and is refused as one.
+  const tidied = tidyName(typeof name === 'string' ? name : '')
+  if (tidied === act.name) return said('Nothing changed.', 'warn')
+
+  const problem = actNameProblem(tidied)
+  if (problem) return said(problem, 'warn')
+
+  await db.eventArtist.update({ where: { id: artistId }, data: { name: tidied } })
+  await record(id, user, `renamed ${act.name} to ${tidied}`)
+
+  refresh()
+  return said(
+    `Renamed ${act.name} to ${tidied}. Listings, the contract and the door list all read this field.`,
+  )
+}
+
+/**
+ * Add an act to the bill.
+ *
+ * Ordered one past the current highest `order`, so a new act always lands at
+ * the bottom of the bill rather than wherever an unset default would put it.
+ * Twelve is the most one booking takes — the prototype's own ceiling — so a
+ * thirteenth is refused rather than silently accepted somewhere a door list
+ * or a contract would never expect to find it.
+ */
+export async function addAct(eventId: string, name: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const tidied = tidyName(typeof name === 'string' ? name : '')
+  const problem = actNameProblem(tidied)
+  if (problem) return said(problem, 'warn')
+
+  const existing = await db.eventArtist.findMany({
+    where: { eventId: id },
+    select: { order: true },
+  })
+  if (existing.length >= 12) return said('Twelve acts is the most one booking takes.', 'warn')
+
+  const order = existing.length === 0 ? 0 : Math.max(...existing.map((a) => a.order)) + 1
+
+  await db.eventArtist.create({
+    data: { eventId: id, name: tidied, status: 'ENQUIRED', low: 0, high: 0, order },
+  })
+  await record(id, user, `added ${tidied} to the bill`)
+
+  refresh()
+  return said(
+    `Added ${tidied} to the bill — set their fee range and the floor and ceiling move with it.`,
+  )
+}
+
+/**
+ * Take an act off the bill entirely.
+ *
+ * Different from marking them declined: declined keeps their row as a record
+ * of what happened with the enquiry, while this removes it, for an act that
+ * should never have been listed at all. Frozen once paid, same as
+ * `setActStatus` — a paid line is part of the settlement and does not
+ * disappear from the bill that produced it.
+ */
+export async function removeAct(eventId: string, artistId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const act = await db.eventArtist.findFirst({ where: { id: artistId, eventId: id } })
+  if (!act) return said('That act is not on this bill.', 'stop')
+
+  const actLocked = actLockedBecause(act)
+  if (actLocked) return said(actLocked, 'stop')
+
+  await db.eventArtist.delete({ where: { id: artistId } })
+  await record(id, user, `took ${act.name} off the bill`)
+
+  refresh()
+  return said(`${act.name} removed from the bill.`, 'warn')
+}
+
+/** Set the split, stored as a fraction of 1 the way every read of it expects. */
+export async function setSplit(eventId: string, percent: number): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({ where: { id }, select: { concluded: true } })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const problem = splitProblem(percent)
+  if (problem) return said(problem, 'warn')
+
+  await db.event.update({ where: { id }, data: { split: percent / 100 } })
+  await record(id, user, `set the split to ${percent}% to their people`)
+
+  refresh()
+  return splitSaid(percent)
+}
+
+/**
+ * Switch the booking model.
+ *
+ * Refused once a deposit or the settlement invoice has been raised: dry hire
+ * and the curator model each read a different milestone ladder in Finance
+ * (see `milestonesFor`), so switching after money has already moved against
+ * one ladder would leave a milestone raised against a model the booking no
+ * longer has.
+ */
+export async function setModel(eventId: string, model: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const ev = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: { concluded: true, model: true, depositRaisedAt: true, invoiceRaisedAt: true },
+  })
+  const locked = lockedBecause(ev) ?? modelLockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  if (model !== 'dry' && model !== 'curator') return said('That is not a booking model.', 'stop')
+
+  const current = ev.model === 'DRY' ? 'dry' : 'curator'
+  if (model === current) return said('Nothing changed.', 'warn')
+
+  await db.event.update({ where: { id }, data: { model: MODEL_DB[model] } })
+  await record(id, user, `set the booking to ${model === 'dry' ? 'dry hire' : 'curator model'}`)
+
+  refresh()
+  return modelSaid(model)
+}
+
+/**
+ * Save what the projection and the settlement run off: attendance, bar spend
+ * a head, gear and hire, promotion, crew and tokens a head.
+ *
+ * Figures arrive as numbers, already parsed by the form — never strings —
+ * and a bad one is refused rather than clamped to something nearby, the same
+ * reasoning as `countDoor`: every one of these reaches the settlement and
+ * then a person, so silently substituting a "close enough" value would be
+ * deciding something on their behalf. Attendance is bounded by what the room
+ * holds; crew and tokens a head by the same ceilings the enquiry form has
+ * always had, because tokens are per head and the room says nothing about
+ * them. What is not a set of figures at all is turned away before any rule
+ * sees it: the endpoint takes whatever a signed-in person cares to send.
+ */
+export async function setFigures(eventId: string, f: Figures): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+  if (!isFigures(f)) return said('Those are not figures.', 'stop')
+
+  const ev = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: {
+      concluded: true,
+      att: true,
+      barHead: true,
+      gear: true,
+      adv: true,
+      crew: true,
+      tok: true,
+      format: true,
+      space: { select: { name: true, capacity: true, seatedCapacity: true } },
+      barBudget: { select: { id: true } },
+    },
+  })
+  const locked = lockedBecause(ev)
+  if (locked) return said(locked, 'stop')
+
+  const before: Figures = {
+    att: ev.att as [number, number, number],
+    barHead: ev.barHead,
+    gear: ev.gear,
+    adv: ev.adv,
+    crew: ev.crew,
+    tok: ev.tok,
+  }
+
+  const line = figuresLine(before, f)
+  if (!line) return said('Nothing changed.', 'warn')
+
+  const holds = capacityOf(ev.space, ev.format)
+  const room = { name: ev.space.name, holds, seated: ev.format === 'Cabaret' }
+  const problem =
+    attendanceProblem(f.att, room) ??
+    dollarsProblem(f.barHead) ??
+    dollarsProblem(f.gear) ??
+    dollarsProblem(f.adv) ??
+    countProblem(f.crew, MAX_CREW) ??
+    countProblem(f.tok, MAX_TOKENS)
+  if (problem) return said(problem, 'warn')
+
+  await db.event.update({
+    where: { id },
+    data: { att: f.att, barHead: f.barHead, gear: f.gear, adv: f.adv, crew: f.crew, tok: f.tok },
+  })
+  await record(id, user, line)
+
+  refresh()
+  return said(
+    'Figures saved — the projection and the settlement read them now.' +
+      (ev.barBudget ? ' The bar budget stays as it was locked.' : ''),
+  )
 }
 
 /**

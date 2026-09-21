@@ -15,9 +15,12 @@ import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
 import { Holds } from './Holds'
 import { Parts } from './Parts'
+import { ActsEditor } from './Acts'
+import { FiguresForm, ModelPicker, SplitEditor } from './Terms'
 import { barRefusal } from '@/lib/bar'
 import styles from './event.module.css'
 import type { LeadRole } from '@/generated/prisma/client'
+import type { Figures } from '@/lib/terms'
 
 /**
  * The event record — the hub.
@@ -69,9 +72,43 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   // picker's value needs, and matching ev.ownerName against `people` would be
   // wrong — names are not unique. Read only for whoever is allowed to change
   // it, the same as `people` above.
+  //
+  // Extended into the one read the Artists and Terms editors need too — the
+  // figures columns loadEventRecord does not select, and each act's `paid`,
+  // scoped to the event by construction since it rides the same row — rather
+  // than a second query for fields that live on this same record.
   const ownerRow = canChange
-    ? await db.event.findUnique({ where: { id: ev.id }, select: { ownerId: true } })
+    ? await db.event.findUnique({
+        where: { id: ev.id },
+        select: {
+          ownerId: true,
+          att: true,
+          barHead: true,
+          gear: true,
+          adv: true,
+          crew: true,
+          tok: true,
+          artists: { select: { id: true, paid: true } },
+        },
+      })
     : null
+
+  // Merged onto the read-only artist rows loadEventRecord already built, so
+  // the editor gets one `paid` flag per act without carrying a second shape.
+  const paidById = new Map(ownerRow?.artists.map((a) => [a.id, a.paid]) ?? [])
+  const acts = ev.artists.map((a) => ({ ...a, paid: paidById.get(a.id) ?? false }))
+
+  // A concrete Figures even for somebody who cannot change the record —
+  // simpler than threading a null through, and never rendered for them since
+  // the editor below is gated on `canChange` the same as everything else here.
+  const figures: Figures = {
+    att: (ownerRow?.att ?? [0, 0, 0]) as [number, number, number],
+    barHead: ownerRow?.barHead ?? 0,
+    gear: ownerRow?.gear ?? 0,
+    adv: ownerRow?.adv ?? 0,
+    crew: ownerRow?.crew ?? 0,
+    tok: ownerRow?.tok ?? 0,
+  }
 
   // The room ladder. Loaded here rather than folded into loadEventRecord:
   // holds are about the room and the night, not about the event's own state.
@@ -303,7 +340,9 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             takes their fee out of both.
           </p>
 
-          {ev.artists.length === 0 ? (
+          {canChange && !ev.concluded ? (
+            <ActsEditor eventId={ev.id} acts={acts} />
+          ) : ev.artists.length === 0 ? (
             <p className={styles.none}>Nobody on the bill yet.</p>
           ) : (
             <ul className={styles.artists}>
@@ -395,6 +434,18 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               </p>
             </div>
           </div>
+
+          {/* The venue's own terms: what share their people get, which
+              booking model this runs under, and the figures the projection
+              is built from. Not for a promoter, and not once the night is
+              concluded — its figures are the settlement's by then. */}
+          {canChange && !ev.concluded ? (
+            <>
+              <SplitEditor eventId={ev.id} split={ev.split} />
+              <ModelPicker eventId={ev.id} model={ev.model} />
+              <FiguresForm eventId={ev.id} figures={figures} />
+            </>
+          ) : null}
 
           {/* The panel records the promoter's answer on the venue's side —
               "They agreed", "Put it back to them". It is not the promoter's

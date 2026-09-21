@@ -2,6 +2,16 @@ import { CLOSE_TIMES, DOOR_TIMES, OUT_TIMES, timeMinutes } from './event-record'
 import { dateLabel } from './format'
 import { nightFromInput, nightsBetween } from './night'
 import type { Verdict } from './payments'
+import {
+  attendanceProblem,
+  countProblem,
+  dollarsProblem,
+  feeProblem,
+  MAX_CREW,
+  MAX_TOKENS,
+  splitProblem,
+  tidyName,
+} from './terms'
 import { capacityOf } from './ticketing'
 import { said, type Said } from './toast'
 
@@ -348,9 +358,7 @@ export function firstError(errors: FieldErrors): string | null {
 /** A year back is a night being put on the books late. Further is a typo in the year. */
 const MAX_NIGHTS_BACK = 366
 const MAX_NIGHTS_AHEAD = 1100
-const MAX_DOLLARS = 100_000
 
-const tidy = (s: string): string => s.trim().replace(/\s+/g, ' ')
 const clear = (errors: FieldErrors): boolean => Object.keys(errors).length === 0
 
 /**
@@ -390,7 +398,7 @@ function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErro
   }
 
   for (const row of rows) {
-    const name = tidy(row.name)
+    const name = tidyName(row.name)
 
     if (external) {
       if (name === '') continue
@@ -415,9 +423,8 @@ function cleanActs(rows: readonly RawAct[], external: boolean, errors: FieldErro
 
     const low = figure(lowTyped)
     const high = figure(highTyped)
-    if (low === null || high === null) fail('A fee is a dollar figure, zero or more.')
-    else if (low > MAX_DOLLARS || high > MAX_DOLLARS) fail('Check that fee — it is over $100,000.')
-    else if (high < low) fail("An act's top fee cannot be under its floor.")
+    const feeIssue = feeProblem(low ?? NaN, high ?? NaN)
+    if (feeIssue) fail(feeIssue)
 
     acts.push({
       name,
@@ -449,7 +456,7 @@ function cleanTheirs(
 ): { theirs: Theirs | null; space: IntakeSpace | null; format: Format | null } {
   const external = ctx.user.external
 
-  const name = tidy(raw.name)
+  const name = tidyName(raw.name)
   if (name.length < 2) errors.name = 'Give the event a name — it is what every screen calls it.'
   else if (name.length > 120) errors.name = 'Keep the name under 120 characters.'
 
@@ -581,7 +588,7 @@ function cleanVenueOnly(
     if (organisationId === '') errors.organisationId = 'Pick the organisation bringing it.'
     else bringing = { by: 'organisation', organisationId }
   } else if (by === 'name') {
-    const name = tidy(raw.promoterName)
+    const name = tidyName(raw.promoterName)
     if (name.length < 2 || name.length > 80) errors.promoterName = 'Name whoever is bringing it.'
     else bringing = { by: 'name', name }
   } else {
@@ -590,33 +597,39 @@ function cleanVenueOnly(
 
   // Typed as a percentage, stored as the share the schema keeps.
   const percent = figure(raw.split)
-  if (percent === null || percent > 100) errors.split = 'The split is a percentage from 0 to 100.'
+  const splitIssue = splitProblem(percent ?? NaN)
+  if (splitIssue) errors.split = splitIssue
   const split = (percent ?? 0) / 100
 
-  const heads = [figure(raw.attQuiet), figure(raw.attLikely), figure(raw.attGreat)]
+  const heads: [number, number, number] = [
+    figure(raw.attQuiet) ?? NaN,
+    figure(raw.attLikely) ?? NaN,
+    figure(raw.attGreat) ?? NaN,
+  ]
+  const roomInfo =
+    room.space && room.format
+      ? {
+          name: room.space.name,
+          holds: capacityOf(room.space, room.format),
+          seated: room.format === 'Cabaret',
+        }
+      : null
+  const attIssue = attendanceProblem(heads, roomInfo)
   let att: [number, number, number] = [0, 0, 0]
-  if (heads.some((n) => n === null || !Number.isInteger(n))) {
-    errors.att = 'Attendance is a head count — whole numbers.'
+  if (attIssue) {
+    errors.att = attIssue
   } else {
-    att = [heads[0] ?? 0, heads[1] ?? 0, heads[2] ?? 0]
-    if (att[0] > att[1] || att[1] > att[2]) {
-      errors.att = 'Attendance runs quiet, likely, great — each at least the one before.'
-    } else if (room.space && room.format) {
-      const holds = capacityOf(room.space, room.format)
-      if (att[2] > holds) {
-        const seated = room.format === 'Cabaret' ? ' seated' : ''
-        errors.att = `${room.space.name} holds ${holds}${seated} — a great night cannot be more than that.`
-      }
-    }
+    att = heads
   }
 
   const dollars = (typed: string, key: 'barHead' | 'gear' | 'adv'): number => {
     const n = figure(typed)
-    if (n === null || n > MAX_DOLLARS) {
-      errors[key] = 'That is a dollar figure, zero or more.'
+    const issue = dollarsProblem(n ?? NaN)
+    if (issue) {
+      errors[key] = issue
       return 0
     }
-    return n
+    return n ?? 0
   }
   const barHead = dollars(raw.barHead, 'barHead')
   const gear = dollars(raw.gear, 'gear')
@@ -628,14 +641,15 @@ function cleanVenueOnly(
 
   const count = (typed: string, key: 'crew' | 'tok', most: number): number => {
     const n = figure(typed)
-    if (n === null || !Number.isInteger(n) || n > most) {
-      errors[key] = 'Crew and tokens are whole numbers, zero or more.'
+    const issue = countProblem(n ?? NaN, most)
+    if (issue) {
+      errors[key] = issue
       return 0
     }
-    return n
+    return n ?? 0
   }
-  const crew = count(raw.crew, 'crew', 100)
-  const tok = count(raw.tok, 'tok', 20)
+  const crew = count(raw.crew, 'crew', MAX_CREW)
+  const tok = count(raw.tok, 'tok', MAX_TOKENS)
 
   const briefTyped = raw.brief.trim()
   if (briefTyped.length > 280) {
