@@ -72,20 +72,20 @@ const raw = (over: Partial<RawEnquiry> = {}): RawEnquiry => ({
   spaceId: 'space_main',
   kind: 'live',
   format: 'Live music',
-  doors: '8:00pm',
-  barClose: '1:00am',
-  allOut: '2:00am',
-  acts: [
-    { name: 'Hiwa', status: 'confirmed', low: '400', high: '900' },
-    { name: 'Tautoko', status: 'pencilled', low: '250', high: '500' },
-  ],
-  note: 'They want the back bar open.',
-  ownerId: 'person_ana',
+  doors: '20:00',
+  barClose: '01:00',
+  allOut: '02:00',
+  // Blank: doors 8pm to all-out 2am auto-fills to the next night — see "the
+  // run times" below. Left this way so tests that override `date` do not
+  // also have to keep a hand-typed `endDate` in step with it.
+  endDate: '',
   model: 'curator',
-  bringing: 'organisation',
-  organisationId: 'org_koura',
-  promoterName: '',
-  split: '62',
+  std: '25',
+  door: '30',
+  mixSub: '20',
+  mixStd: '40',
+  mixSup: '15',
+  mixDoor: '25',
   attQuiet: '88',
   attLikely: '136',
   attGreat: '198',
@@ -95,6 +95,18 @@ const raw = (over: Partial<RawEnquiry> = {}): RawEnquiry => ({
   sound: 'inhouse',
   crew: '6',
   tok: '2',
+  acts: [
+    { name: 'Hiwa', status: 'confirmed', low: '400', high: '900' },
+    { name: 'Tautoko', status: 'pencilled', low: '250', high: '500' },
+  ],
+  note: 'They want the back bar open.',
+  alt1: '',
+  alt2: '',
+  ownerId: 'person_ana',
+  bringing: 'organisation',
+  organisationId: 'org_koura',
+  promoterName: '',
+  split: '62',
   brief: 'Loud, warm, local.',
   hold: true,
   ...over,
@@ -241,13 +253,20 @@ describe('cleanEnquiry, for a coordinator', () => {
       doors: '8:00pm',
       barClose: '1:00am',
       allOut: '2:00am',
+      endDate: nightOf(2026, 9, 4),
+      model: 'curator',
+      std: 25,
+      door: 30,
+      // Percentages on the form, fractions on the record — the order
+      // finance.ts reads: subsidised, standard, supporter, door.
+      mix: [0.2, 0.4, 0.15, 0.25],
       acts: [
         { name: 'Hiwa', status: 'confirmed', low: 400, high: 900 },
         { name: 'Tautoko', status: 'pencilled', low: 250, high: 500 },
       ],
       note: 'They want the back bar open.',
+      alternates: [],
       ownerId: 'person_ana',
-      model: 'curator',
       bringing: { by: 'organisation', organisationId: 'org_koura' },
       // A percentage on the form, 0–1 on the record, because that is how the
       // schema stores it and how finance.ts reads it.
@@ -268,7 +287,7 @@ describe('cleanEnquiry, for a coordinator', () => {
     expect(cleaned().date.toISOString()).toBe('2026-10-03T00:00:00.000Z')
   })
 
-  it('reads a time nobody picked as not decided yet, rather than as midnight', () => {
+  it('reads a time nobody typed as not decided yet, rather than as midnight', () => {
     const value = cleaned({ doors: '', barClose: '', allOut: '' })
     expect(value.doors).toBeNull()
     expect(value.barClose).toBeNull()
@@ -387,51 +406,70 @@ describe('the room, the kind and the format', () => {
 })
 
 describe('the run times', () => {
-  const NOT_ON_THE_LIST = 'Pick a time from the list.'
-
-  it('only takes a time the venue offers', () => {
-    expect(refusal({ doors: '3:00pm', barClose: '', allOut: '' }).doors).toBe(NOT_ON_THE_LIST)
-    expect(refusal({ doors: '', barClose: '7:00pm', allOut: '' }).barClose).toBe(NOT_ON_THE_LIST)
-    expect(refusal({ doors: '', barClose: '', allOut: '4:00am' }).allOut).toBe(NOT_ON_THE_LIST)
+  it('takes any time, not just one off a fixed list', () => {
+    const value = cleaned({ doors: '15:00', barClose: '19:30', allOut: '' })
+    expect(value.doors).toBe('3:00pm')
+    expect(value.barClose).toBe('7:30pm')
   })
 
-  it('will not close the bar before the doors open', () => {
-    expect(refusal({ doors: '9:00pm', barClose: '8:00pm', allOut: '' }).barClose).toBe(
-      'The bar cannot close before the doors open.',
+  it('refuses a time that is not a time', () => {
+    const why = 'That is not a time.'
+    expect(refusal({ doors: 'noon' }).doors).toBe(why)
+    expect(refusal({ barClose: '25:99' }).barClose).toBe(why)
+    expect(refusal({ allOut: 'whenever' }).allOut).toBe(why)
+  })
+
+  it('reads a time nobody typed as not decided yet, rather than as midnight', () => {
+    const value = cleaned({ doors: '', barClose: '', allOut: '' })
+    expect(value.doors).toBeNull()
+    expect(value.barClose).toBeNull()
+    expect(value.allOut).toBeNull()
+  })
+
+  it('fills in the end night nobody typed — 8pm to 1am gives the next night', () => {
+    const value = cleaned({ doors: '20:00', allOut: '01:00', endDate: '' })
+    expect(value.endDate).toEqual(nightOf(2026, 9, 4))
+  })
+
+  it('keeps a typed end date rather than working one out', () => {
+    const value = cleaned({ doors: '20:00', allOut: '01:00', endDate: '2026-10-06' })
+    expect(value.endDate).toEqual(nightOf(2026, 9, 6))
+  })
+
+  it('refuses an end date that is not a date', () => {
+    const why = 'Pick the night it ends.'
+    expect(refusal({ endDate: 'whenever' }).endDate).toBe(why)
+    expect(refusal({ endDate: '2026-02-30' }).endDate).toBe(why)
+  })
+
+  it('will not end before it starts', () => {
+    expect(refusal({ endDate: '2026-10-02' }).endDate).toBe(
+      'The night cannot end before it starts.',
     )
   })
 
-  it('will not close the bar at the moment the doors open either', () => {
-    expect(refusal({ doors: '8:00pm', barClose: '8:00pm', allOut: '' }).barClose).toBe(
-      'The bar cannot close before the doors open.',
+  it('will not run more than two weeks start to finish', () => {
+    expect(refusal({ endDate: '2026-10-18' }).endDate).toBe(
+      'That is more than two weeks from start to finish — check the dates.',
     )
   })
 
-  /**
-   * The load-bearing one: 1am is *after* 8pm, not thirteen hours before it.
-   * `timeMinutes` carries the small hours past 1440 and this is what depends
-   * on that.
-   */
-  it('reads a bar closing after midnight as later in the night, not earlier', () => {
-    const value = cleaned({ doors: '8:00pm', barClose: '1:00am', allOut: '2:00am' })
+  it('will not empty the room before the doors open', () => {
+    const value = refusal({ doors: '20:00', endDate: '2026-10-03', allOut: '19:00', barClose: '' })
+    expect(value.allOut).toBe('Everyone out has to be after the doors open.')
+  })
+
+  it('will not close the bar at the moment the doors open', () => {
+    const value = refusal({ doors: '20:00', barClose: '20:00', allOut: '', endDate: '' })
+    expect(value.barClose).toBe('The bar closes after the doors open and before everyone is out.')
+  })
+
+  it('lets the bar close exactly when everyone is out — that is a normal night', () => {
+    // Doors 8pm, bar closes and everyone is out at 1am — the same instant,
+    // the next night along.
+    const value = cleaned({ doors: '20:00', barClose: '01:00', allOut: '01:00', endDate: '' })
     expect(value.barClose).toBe('1:00am')
-  })
-
-  it('will not empty the room before the bar closes', () => {
-    expect(refusal({ doors: '8:00pm', barClose: '1:00am', allOut: '12:00am' }).allOut).toBe(
-      'Everyone out cannot be before the bar closes.',
-    )
-  })
-
-  it('lets everyone out at the moment the bar closes — that is a normal night', () => {
-    expect(cleaned({ doors: '8:00pm', barClose: '1:00am', allOut: '1:00am' }).allOut).toBe('1:00am')
-  })
-
-  it('measures everyone-out against the doors when no bar close is set', () => {
-    const why = 'Everyone out cannot be before the doors open.'
-    expect(refusal({ doors: '9:00pm', barClose: '', allOut: '8:30pm' }).allOut).toBe(why)
-    expect(refusal({ doors: '8:30pm', barClose: '', allOut: '8:30pm' }).allOut).toBe(why)
-    expect(cleaned({ doors: '8:30pm', barClose: '', allOut: '9:00pm' }).allOut).toBe('9:00pm')
+    expect(value.allOut).toBe('1:00am')
   })
 })
 
@@ -510,6 +548,31 @@ describe('the note and the brief', () => {
     expect(cleaned({ brief: chars(280) }).brief).toBe(chars(280))
     expect(refusal({ brief: chars(281) }).brief).toBe(
       'Keep the brief to a line or two — under 280 characters.',
+    )
+  })
+})
+
+describe('alternate dates', () => {
+  it('takes up to two, dropping blanks', () => {
+    expect(cleaned({ alt1: nights(1), alt2: nights(2) }).alternates).toEqual([
+      nightOf(2026, 8, 19),
+      nightOf(2026, 8, 20),
+    ])
+    expect(cleaned({ alt1: nights(1), alt2: '' }).alternates).toEqual([nightOf(2026, 8, 19)])
+    expect(cleaned({ alt1: '', alt2: '' }).alternates).toEqual([])
+  })
+
+  it('refuses one that is not a date', () => {
+    expect(refusal({ alt1: 'whenever' }).alternates).toBe('That is not a date.')
+  })
+
+  it('lets staff note one that has already been', () => {
+    expect(cleaned({ alt1: nights(-10) }).alternates).toEqual([nightOf(2026, 8, 8)])
+  })
+
+  it('refuses one before today for an outside account', () => {
+    expect(refusal({ alt1: nights(-1) }, outside).alternates).toBe(
+      'That night has already been — pick one still to come.',
     )
   })
 })
@@ -702,10 +765,15 @@ describe('reporting the problems', () => {
       'doors',
       'barClose',
       'allOut',
+      'endDate',
       'acts',
       'note',
+      'alternates',
       'ownerId',
       'model',
+      'std',
+      'door',
+      'mix',
       'bringing',
       'organisationId',
       'promoterName',
@@ -755,6 +823,13 @@ describe('an outside account', () => {
     organisationId: 'org_somebody_else',
     promoterName: 'Somebody Else Presents',
     split: '100',
+    endDate: '2026-10-05',
+    std: '35',
+    door: '45',
+    mixSub: '10',
+    mixStd: '50',
+    mixSup: '15',
+    mixDoor: '25',
     attQuiet: '200',
     attLikely: '210',
     attGreat: '220',
@@ -773,9 +848,10 @@ describe('an outside account', () => {
     ...over,
   })
 
-  it('builds the enquiry from a whitelist, whatever the POST said', () => {
+  it('builds the enquiry from a whitelist, whatever the POST said — and keeps what they proposed', () => {
     expect(cleaned(hostile(), outside)).toEqual({
-      // Theirs to say: the night they want, the room, what it is, and who is on.
+      // Theirs to say: the night, the room, what it is, who is on — and now
+      // every input the live model reads, as their proposal.
       name: 'Kōura Records presents Hiwa',
       date: NIGHT,
       spaceId: 'space_main',
@@ -784,25 +860,30 @@ describe('an outside account', () => {
       doors: '8:00pm',
       barClose: '1:00am',
       allOut: '2:00am',
-      note: 'They want the back bar open.',
+      endDate: nightOf(2026, 9, 5),
+      model: 'dry',
+      std: 35,
+      door: 45,
+      mix: [0.1, 0.5, 0.15, 0.25],
+      att: [200, 210, 220],
+      barHead: 99,
+      gear: 9000,
+      adv: 9000,
+      sound: 'wheke',
+      crew: 40,
+      tok: 20,
       acts: [
-        { name: 'Hiwa', status: 'enquired', low: 0, high: 0 },
-        { name: 'Tautoko', status: 'enquired', low: 0, high: 0 },
+        { name: 'Hiwa', status: 'enquired', low: 900, high: 1800 },
+        { name: 'Tautoko', status: 'enquired', low: 400, high: 800 },
       ],
+      note: 'They want the back bar open.',
+      alternates: [],
       // The venue's, whatever they sent. Their date is a preference until a
       // coordinator locks it; their organisation is the one on their session.
       dateTbc: true,
       ownerId: null,
-      model: 'curator',
       bringing: { by: 'organisation', organisationId: 'org_koura' },
-      split: 0,
-      att: [0, 0, 0],
-      barHead: 0,
-      gear: 0,
-      adv: 0,
-      sound: 'inhouse',
-      crew: 0,
-      tok: 0,
+      split: 0.6,
       brief: null,
       hold: false,
     })
@@ -828,12 +909,14 @@ describe('an outside account', () => {
     expect(cleaned(hostile(), outside).hold).toBe(false)
   })
 
-  it('cannot put a figure anywhere near the P&L', () => {
+  it('still fixes what is not theirs to set, whatever they sent', () => {
     const value = cleaned(hostile(), outside)
-    expect([value.split, ...value.att, value.barHead, value.gear, value.adv, value.crew]).toEqual([
-      0, 0, 0, 0, 0, 0, 0, 0,
-    ])
-    expect(value.acts.every((a) => a.low === 0 && a.high === 0)).toBe(true)
+    expect(value.split).toBe(0.6)
+    expect(value.ownerId).toBeNull()
+    expect(value.brief).toBeNull()
+    expect(value.hold).toBe(false)
+    expect(value.dateTbc).toBe(true)
+    expect(value.acts.every((a) => a.status === 'enquired')).toBe(true)
   })
 
   /**
@@ -845,20 +928,45 @@ describe('an outside account', () => {
     const value = cleaned(
       hostile({
         split: 'abc',
-        attQuiet: 'x',
-        model: 'freehold',
-        sound: 'pa',
-        gear: 'NaN',
-        crew: '-9',
-        tok: 'lots',
-        barHead: '1e999',
+        bringing: 'nonsense',
+        organisationId: '',
+        promoterName: '',
+        ownerId: 'not_a_real_person',
+        brief: chars(281),
+        hold: true,
       }),
       outside,
     )
-    expect(value.split).toBe(0)
-    expect(value.att).toEqual([0, 0, 0])
-    expect(value.model).toBe('curator')
-    expect(value.sound).toBe('inhouse')
+    expect(value.split).toBe(0.6)
+    expect(value.ownerId).toBeNull()
+    expect(value.brief).toBeNull()
+    expect(value.hold).toBe(false)
+  })
+
+  /**
+   * Everything else they typed is now their proposal, corrected by the venue
+   * afterwards rather than trusted outright — so junk in it is refused with
+   * the exact words a coordinator would read for the same mistake.
+   */
+  it('is refused, the same as the venue, for junk in a figure they DO set', () => {
+    expect(refusal(hostile({ attQuiet: 'x' }), outside).att).toBe(
+      'Attendance is a head count — whole numbers.',
+    )
+    expect(refusal(hostile({ std: '-5' }), outside).std).toBe(
+      'A ticket price is a dollar figure, zero or more.',
+    )
+    expect(refusal(hostile({ mixStd: '40' }), outside).mix).toBe(
+      'The mix has to add up to 100% — everybody who comes buys one of the four.',
+    )
+    expect(
+      refusal(
+        hostile({ acts: [{ name: 'Hiwa', status: 'confirmed', low: '900', high: '400' }] }),
+        outside,
+      ).acts,
+    ).toBe("An act's top fee cannot be under its floor.")
+    expect(refusal(hostile({ model: 'freehold' }), outside).model).toBe(
+      'Pick how the venue and the promoter are working together.',
+    )
   })
 
   /** The fields they DO set are still theirs to get wrong. */
@@ -916,6 +1024,8 @@ describe('startedLine', () => {
    */
   const label = dateLabel(NIGHT)
   const NOTE = 'They want the back bar open.'
+  const ALT1 = nightOf(2026, 9, 10)
+  const ALT2 = nightOf(2026, 9, 17)
 
   const line = (over: Partial<Parameters<typeof startedLine>[0]> = {}): string =>
     startedLine({
@@ -925,6 +1035,7 @@ describe('startedLine', () => {
       date: NIGHT,
       dateTbc: false,
       note: null,
+      alternates: [],
       ...over,
     })
 
@@ -952,6 +1063,24 @@ describe('startedLine', () => {
     expect(
       line({ external: true, organisationName: 'Kōura Records', dateTbc: true, note: NOTE }),
     ).toBe(`sent this enquiry for Kōura Records — Main, preferred date ${label} — “${NOTE}”`)
+  })
+
+  it('names one alternate straight after the preferred date', () => {
+    expect(line({ alternates: [ALT1] })).toBe(
+      `started this enquiry — Main, ${label} (or ${dateLabel(ALT1)})`,
+    )
+  })
+
+  it('names both alternates, before "date TBC"', () => {
+    expect(line({ alternates: [ALT1, ALT2], dateTbc: true })).toBe(
+      `started this enquiry — Main, ${label} (or ${dateLabel(ALT1)} or ${dateLabel(ALT2)}), date TBC`,
+    )
+  })
+
+  it('puts the alternates after the preferred date for an outside account too', () => {
+    expect(line({ external: true, organisationName: 'Kōura Records', alternates: [ALT1] })).toBe(
+      `sent this enquiry for Kōura Records — Main, preferred date ${label} (or ${dateLabel(ALT1)})`,
+    )
   })
 })
 
@@ -1003,17 +1132,14 @@ describe('the form field names', () => {
       doors: 'doors',
       barClose: 'barClose',
       allOut: 'allOut',
-      note: 'note',
-      actName: 'actName',
-      actStatus: 'actStatus',
-      actLow: 'actLow',
-      actHigh: 'actHigh',
-      ownerId: 'ownerId',
+      endDate: 'endDate',
       model: 'model',
-      bringing: 'bringing',
-      organisationId: 'organisationId',
-      promoterName: 'promoterName',
-      split: 'split',
+      std: 'std',
+      door: 'door',
+      mixSub: 'mixSub',
+      mixStd: 'mixStd',
+      mixSup: 'mixSup',
+      mixDoor: 'mixDoor',
       attQuiet: 'attQuiet',
       attLikely: 'attLikely',
       attGreat: 'attGreat',
@@ -1023,6 +1149,18 @@ describe('the form field names', () => {
       sound: 'sound',
       crew: 'crew',
       tok: 'tok',
+      actName: 'actName',
+      actStatus: 'actStatus',
+      actLow: 'actLow',
+      actHigh: 'actHigh',
+      note: 'note',
+      alt1: 'alt1',
+      alt2: 'alt2',
+      ownerId: 'ownerId',
+      bringing: 'bringing',
+      organisationId: 'organisationId',
+      promoterName: 'promoterName',
+      split: 'split',
       brief: 'brief',
       hold: 'hold',
     })
@@ -1039,9 +1177,26 @@ describe('readEnquiryForm', () => {
     fd.set(FIELD.spaceId, 'space_main')
     fd.set(FIELD.kind, 'live')
     fd.set(FIELD.format, 'Live music')
-    fd.set(FIELD.doors, '8:00pm')
-    fd.set(FIELD.barClose, '1:00am')
-    fd.set(FIELD.allOut, '2:00am')
+    fd.set(FIELD.doors, '20:00')
+    fd.set(FIELD.barClose, '01:00')
+    fd.set(FIELD.allOut, '02:00')
+    fd.set(FIELD.endDate, '2026-10-04')
+    fd.set(FIELD.model, 'curator')
+    fd.set(FIELD.std, '25')
+    fd.set(FIELD.door, '30')
+    fd.set(FIELD.mixSub, '20')
+    fd.set(FIELD.mixStd, '40')
+    fd.set(FIELD.mixSup, '15')
+    fd.set(FIELD.mixDoor, '25')
+    fd.set(FIELD.attQuiet, '88')
+    fd.set(FIELD.attLikely, '136')
+    fd.set(FIELD.attGreat, '198')
+    fd.set(FIELD.barHead, '20')
+    fd.set(FIELD.gear, '200')
+    fd.set(FIELD.adv, '100')
+    fd.set(FIELD.sound, 'inhouse')
+    fd.set(FIELD.crew, '6')
+    fd.set(FIELD.tok, '2')
     fd.set(FIELD.note, 'They want the back bar open.')
     const acts: RawAct[] = [
       { name: 'Hiwa', status: 'confirmed', low: '400', high: '900' },
@@ -1053,21 +1208,13 @@ describe('readEnquiryForm', () => {
       fd.append(FIELD.actLow, a.low)
       fd.append(FIELD.actHigh, a.high)
     }
+    fd.set(FIELD.alt1, '2026-10-10')
+    fd.set(FIELD.alt2, '2026-10-17')
     fd.set(FIELD.ownerId, 'person_ana')
-    fd.set(FIELD.model, 'curator')
     fd.set(FIELD.bringing, 'organisation')
     fd.set(FIELD.organisationId, 'org_koura')
     fd.set(FIELD.promoterName, 'Kōura Records')
     fd.set(FIELD.split, '62')
-    fd.set(FIELD.attQuiet, '88')
-    fd.set(FIELD.attLikely, '136')
-    fd.set(FIELD.attGreat, '198')
-    fd.set(FIELD.barHead, '20')
-    fd.set(FIELD.gear, '200')
-    fd.set(FIELD.adv, '100')
-    fd.set(FIELD.sound, 'inhouse')
-    fd.set(FIELD.crew, '6')
-    fd.set(FIELD.tok, '2')
     fd.set(FIELD.brief, 'Loud, warm, local.')
     fd.set(FIELD.hold, 'on')
     return fd
@@ -1081,20 +1228,17 @@ describe('readEnquiryForm', () => {
       spaceId: 'space_main',
       kind: 'live',
       format: 'Live music',
-      doors: '8:00pm',
-      barClose: '1:00am',
-      allOut: '2:00am',
-      acts: [
-        { name: 'Hiwa', status: 'confirmed', low: '400', high: '900' },
-        { name: 'Tautoko', status: 'pencilled', low: '250', high: '500' },
-      ],
-      note: 'They want the back bar open.',
-      ownerId: 'person_ana',
+      doors: '20:00',
+      barClose: '01:00',
+      allOut: '02:00',
+      endDate: '2026-10-04',
       model: 'curator',
-      bringing: 'organisation',
-      organisationId: 'org_koura',
-      promoterName: 'Kōura Records',
-      split: '62',
+      std: '25',
+      door: '30',
+      mixSub: '20',
+      mixStd: '40',
+      mixSup: '15',
+      mixDoor: '25',
       attQuiet: '88',
       attLikely: '136',
       attGreat: '198',
@@ -1104,6 +1248,18 @@ describe('readEnquiryForm', () => {
       sound: 'inhouse',
       crew: '6',
       tok: '2',
+      acts: [
+        { name: 'Hiwa', status: 'confirmed', low: '400', high: '900' },
+        { name: 'Tautoko', status: 'pencilled', low: '250', high: '500' },
+      ],
+      note: 'They want the back bar open.',
+      alt1: '2026-10-10',
+      alt2: '2026-10-17',
+      ownerId: 'person_ana',
+      bringing: 'organisation',
+      organisationId: 'org_koura',
+      promoterName: 'Kōura Records',
+      split: '62',
       brief: 'Loud, warm, local.',
       hold: true,
     })
@@ -1151,14 +1307,14 @@ describe('readEnquiryForm', () => {
       doors: '',
       barClose: '',
       allOut: '',
-      acts: [],
-      note: '',
-      ownerId: '',
+      endDate: '',
       model: '',
-      bringing: '',
-      organisationId: '',
-      promoterName: '',
-      split: '',
+      std: '',
+      door: '',
+      mixSub: '',
+      mixStd: '',
+      mixSup: '',
+      mixDoor: '',
       attQuiet: '',
       attLikely: '',
       attGreat: '',
@@ -1168,6 +1324,15 @@ describe('readEnquiryForm', () => {
       sound: '',
       crew: '',
       tok: '',
+      acts: [],
+      note: '',
+      alt1: '',
+      alt2: '',
+      ownerId: '',
+      bringing: '',
+      organisationId: '',
+      promoterName: '',
+      split: '',
       brief: '',
       hold: false,
     })

@@ -40,21 +40,40 @@ see different subsets of this.
 ### How an event starts
 
 "New enquiry" on the Pipeline opens one form, at `/events/new`, for anybody who
-can open Pipeline. The venue's people fill in the whole booking: the night, who
-is bringing it, who owns it, the acts and their fee ranges, the split, and the
-figures the projection runs off. They can hold the room in the same step.
+can open Pipeline. Whoever fills it in models the night as they go: the deal,
+the ticket price and who buys which tier, three honest guesses at who turns up,
+what it costs before anyone is paid, and a fee floor and ceiling for each act.
+A panel beside the form works out what that night does, live: the income, the
+night's share of the week's costs, what our crew and their people are paid, what
+is left to share, how many through the door breaks even, and a plain verdict on
+the likely night. It is worked by `financeVals`, the same function the event
+record reads, from the same figures. They differ in one place: the panel counts
+the standard crew for that kind of night as if it were rostered, because that
+is what the night costs when it runs, and the event record counts crew only as
+shifts are assigned. A new event has no shifts yet, so its record reads a higher
+surplus than the form did until the night is rostered. The onus is on the
+enquirer to make the night add up.
 
-An outside promoter fills in the night they would like, the room, the kind of
-night, who is playing and a note. Everything else about their enquiry is decided
-on the server, whatever the request says. It belongs to their own organisation,
-its date is a preference until a coordinator locks it, and it carries no owner,
-no figures and no hold on the room. It waits under "Needs you" on Home,
-unclaimed, until somebody at the venue takes it on as its owner from the event
-record.
+A night starts and ends when it does. Doors, bar close and everyone out are any
+time of day, and the night has an end date of its own, so a gig that runs past
+midnight and a festival over a weekend are both sayable. It has to end after it
+starts, and the bar closes after the doors open and no later than the end.
 
-The rules are in `src/lib/intake.ts`. A night is stored as UTC midnight of its
-calendar date (`src/lib/night.ts`), because the hold ladder matches nights
-exactly and the app runs in two timezones.
+The venue's people also say who is bringing it, who owns it and what the split
+is, and can hold the room in the same step. An outside promoter's figures are
+stored as their proposal, for a coordinator to correct on the event record
+rather than retype. Some things stay the venue's whatever their request says:
+the enquiry belongs to their own organisation, its date is a preference until a
+coordinator locks it, every act arrives as enquired, the split is the house
+60/40 until one is settled with them, and it carries no owner and no hold on the
+room. It waits under "Needs you" on Home, unclaimed, until somebody at the venue
+takes it on as its owner.
+
+The rules are in `src/lib/intake.ts`, `src/lib/terms.ts` and
+`src/lib/run-times.ts`, and the live model in `src/lib/enquiry-model.ts`. A
+night is stored as UTC midnight of its calendar date (`src/lib/night.ts`),
+because the hold ladder matches nights exactly and the app runs in two
+timezones.
 
 ### How an event moves
 

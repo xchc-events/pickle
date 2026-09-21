@@ -12,6 +12,7 @@ import {
   type Gate,
   type LicenceState,
 } from '@/lib/event-record'
+import { nightFromInput } from '@/lib/night'
 import { bookingStep, nextBooking, type BookingStatus } from '@/lib/parts'
 import { said, type Said } from '@/lib/toast'
 import { dateLabel, money } from '@/lib/format'
@@ -19,6 +20,7 @@ import { challengeHold, confirmHold, placeHold, releaseHold } from '@/lib/holds-
 import { affectedLine, type AffectedHold } from '@/lib/holds'
 import type { SessionUser } from '@/lib/session'
 import { cleanDoor } from '@/lib/actuals'
+import { clockFromInput, endNightFor, runProblems, type RunTimes } from '@/lib/run-times'
 import {
   actLockedBecause,
   actNameProblem,
@@ -675,7 +677,30 @@ export async function setLicence(eventId: string, state: LicenceState): Promise<
   )
 }
 
-/** Set a run time. Stored as the venue says it — "8:00pm", "1:00am". */
+/**
+ * Whichever run-time rule is broken. `runProblems` can flag more than one
+ * field at once (an end date past the fortnight AND a bar close chasing a
+ * moved everyone-out); this is the fixed order they are surfaced in — the
+ * date range first, then the night's own shape. `doors` never carries a
+ * message of its own.
+ */
+function firstRunProblem(r: RunTimes): string | null {
+  const problems = runProblems(r)
+  return problems.endDate ?? problems.allOut ?? problems.barClose ?? null
+}
+
+/**
+ * Set a run time. Stored as the venue says it — "8:00pm", "1:00am" — from
+ * whatever an `<input type="time">` sends ("20:15"), so the licence gate, the
+ * roster and the till window can keep reading the label they always have.
+ *
+ * The end date is nobody's to type unless they choose to (`setEndDate`
+ * below). Until then it just follows doors and everyone-out: while the
+ * stored value is still exactly what `endNightFor` would have inferred from
+ * the OLD times (or nothing was ever stored), a change here carries it
+ * forward with the new ones. The moment somebody picks a different night by
+ * hand, it stops following and this leaves it alone.
+ */
 export async function setRunTime(
   eventId: string,
   field: 'doors' | 'barClose' | 'allOut',
@@ -686,17 +711,101 @@ export async function setRunTime(
   if (!verdict.ok) return said(verdict.why, 'stop')
   const id = await requireEvent(user, eventId)
 
-  await db.event.update({ where: { id }, data: { [field]: value || null } })
+  const clock = clockFromInput(value)
+  if (value !== '' && clock === null) return said('That is not a time.', 'warn')
+
+  const row = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: { date: true, doors: true, barClose: true, allOut: true, endDate: true },
+  })
+
+  const next: RunTimes = {
+    date: row.date,
+    doors: field === 'doors' ? clock : row.doors,
+    barClose: field === 'barClose' ? clock : row.barClose,
+    allOut: field === 'allOut' ? clock : row.allOut,
+    endDate: row.endDate,
+  }
+
+  let endDateChanged = false
+  if (field === 'doors' || field === 'allOut') {
+    const oldInferred = endNightFor(row.date, row.doors, row.allOut)
+    const wasInferred =
+      row.endDate === null ||
+      (oldInferred !== null && row.endDate.getTime() === oldInferred.getTime())
+    if (wasInferred) {
+      next.endDate = endNightFor(next.date, next.doors, next.allOut)
+      endDateChanged = true
+    }
+  }
+
+  const problem = firstRunProblem(next)
+  if (problem) return said(problem, 'warn')
+
+  await db.event.update({
+    where: { id },
+    data: endDateChanged ? { [field]: clock, endDate: next.endDate } : { [field]: clock },
+  })
 
   const label = field === 'barClose' ? 'bar close' : field === 'allOut' ? 'everyone out' : 'doors'
-  await record(id, user, `set ${label} to ${value}`)
+  const Label = `${label[0]!.toUpperCase()}${label.slice(1)}`
+  await record(id, user, clock === null ? `cleared ${label}` : `set ${label} to ${clock}`)
 
   refresh()
   return said(
-    field === 'barClose'
-      ? 'Bar close set — the licence gate and every shift read off it.'
-      : `${label[0]!.toUpperCase()}${label.slice(1)} set.`,
+    clock === null
+      ? `${Label} cleared.`
+      : field === 'barClose'
+        ? 'Bar close set — the licence gate and every shift read off it.'
+        : `${Label} set.`,
   )
+}
+
+/**
+ * Set the night an event ends, or clear it back to what doors and
+ * everyone-out infer (`endNightFor`) — the same rule `setRunTime` uses to
+ * carry the date forward for itself, until a choice is made here.
+ */
+export async function setEndDate(eventId: string, value: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  let night: Date | null = null
+  if (value !== '') {
+    night = nightFromInput(value)
+    if (night === null) return said('Pick the night it ends.', 'warn')
+  }
+
+  const row = await db.event.findUniqueOrThrow({
+    where: { id },
+    select: { date: true, doors: true, barClose: true, allOut: true },
+  })
+
+  const resolved = night ?? endNightFor(row.date, row.doors, row.allOut)
+
+  const problem = firstRunProblem({
+    date: row.date,
+    doors: row.doors,
+    barClose: row.barClose,
+    allOut: row.allOut,
+    endDate: resolved,
+  })
+  if (problem) return said(problem, 'warn')
+
+  await db.event.update({ where: { id }, data: { endDate: resolved } })
+
+  if (resolved === null) {
+    await record(id, user, 'cleared the night it ends')
+    refresh()
+    return said('Not decided yet — set doors and everyone out, or pick a night.', 'warn')
+  }
+
+  await record(id, user, `set the night it ends to ${dateLabel(resolved)}`)
+
+  refresh()
+  return said(`Ends ${dateLabel(resolved)} — the room is taken until then.`, 'good')
 }
 
 /**

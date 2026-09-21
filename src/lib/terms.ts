@@ -34,6 +34,12 @@ export const SPLIT_PRESETS = [
   { percent: 100, label: 'All to them' },
 ] as const
 
+/** The venue's standing offer to an outside account, before a coordinator settles another. */
+export const HOUSE_SPLIT_PERCENT: number = SPLIT_PRESETS[0].percent
+
+/** The prototype's starting ticket mix — subsidised, standard, supporter, door — as percentages. */
+export const HOUSE_MIX = [20, 40, 15, 25] as const
+
 /** Every status an act on the bill can hold. */
 export const BILL_STATUSES = [
   { value: 'enquired', label: 'Enquired' },
@@ -61,6 +67,30 @@ export function feeProblem(low: number, high: number): string | null {
 export function splitProblem(percent: number): string | null {
   if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
     return 'The split is a percentage from 0 to 100.'
+  }
+  return null
+}
+
+/** A ticket price — standard or door. */
+export function priceProblem(n: number): string | null {
+  if (!Number.isFinite(n) || n < 0 || n > 1000) {
+    return 'A ticket price is a dollar figure, zero or more.'
+  }
+  return null
+}
+
+/**
+ * The four-way ticket mix — subsidised, standard, supporter, door, in the
+ * order `finance.ts` reads — as whole percentages that account for everybody
+ * who buys a ticket.
+ */
+export function mixProblem(mix: readonly number[]): string | null {
+  const isWhole = (n: number) => Number.isFinite(n) && n >= 0 && Number.isInteger(n)
+  if (mix.length !== 4 || !mix.every(isWhole)) {
+    return 'The mix is four whole percentages.'
+  }
+  if (mix.reduce((n, x) => n + x, 0) !== 100) {
+    return 'The mix has to add up to 100% — everybody who comes buys one of the four.'
   }
   return null
 }

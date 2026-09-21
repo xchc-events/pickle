@@ -147,6 +147,8 @@ export interface EventRecord {
   doors: string | null
   barClose: string | null
   allOut: string | null
+  /** A night (UTC midnight — src/lib/night.ts), or null before either time is known. */
+  endDate: Date | null
 
   // --- money, all from financeVals ---
   std: number
@@ -239,6 +241,7 @@ export async function loadEventRecord(
       doors: true,
       barClose: true,
       allOut: true,
+      endDate: true,
       kind: true,
       format: true,
       promoter: true,
@@ -434,6 +437,7 @@ export async function loadEventRecord(
     doors: row.doors,
     barClose: row.barClose,
     allOut: row.allOut,
+    endDate: row.endDate,
 
     std: row.std,
     door: row.door,

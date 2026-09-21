@@ -11,13 +11,17 @@ import {
   feeProblem,
   type Figures,
   figuresLine,
+  HOUSE_MIX,
+  HOUSE_SPLIT_PERCENT,
   isBillStatus,
   isFigures,
   lockedBecause,
   MAX_CREW,
   MAX_TOKENS,
+  mixProblem,
   modelLockedBecause,
   modelSaid,
+  priceProblem,
   SPLIT_PRESETS,
   splitProblem,
   splitSaid,
@@ -96,6 +100,74 @@ describe('splitProblem', () => {
 
   it('refuses a split that is not a number', () => {
     expect(splitProblem(NaN)).toBe('The split is a percentage from 0 to 100.')
+  })
+})
+
+describe('priceProblem', () => {
+  it('is fine at zero', () => {
+    expect(priceProblem(0)).toBeNull()
+  })
+
+  it('is fine at an ordinary ticket price', () => {
+    expect(priceProblem(45)).toBeNull()
+  })
+
+  it('is fine exactly at $1,000', () => {
+    expect(priceProblem(1000)).toBeNull()
+  })
+
+  it('refuses a negative price', () => {
+    expect(priceProblem(-1)).toBe('A ticket price is a dollar figure, zero or more.')
+  })
+
+  it('refuses a price that is not a number', () => {
+    expect(priceProblem(NaN)).toBe('A ticket price is a dollar figure, zero or more.')
+  })
+
+  it('refuses an infinite price', () => {
+    expect(priceProblem(Infinity)).toBe('A ticket price is a dollar figure, zero or more.')
+  })
+
+  it('refuses a price over $1,000', () => {
+    expect(priceProblem(1000.01)).toBe('A ticket price is a dollar figure, zero or more.')
+  })
+})
+
+describe('mixProblem', () => {
+  const SHAPE = 'The mix is four whole percentages.'
+  const TOTAL = 'The mix has to add up to 100% — everybody who comes buys one of the four.'
+
+  it('is fine with four whole percentages that add up to 100', () => {
+    expect(mixProblem([20, 40, 15, 25])).toBeNull()
+    expect(mixProblem([100, 0, 0, 0])).toBeNull()
+  })
+
+  it('refuses anything but four figures', () => {
+    expect(mixProblem([20, 40, 40])).toBe(SHAPE)
+    expect(mixProblem([20, 40, 15, 15, 10])).toBe(SHAPE)
+    expect(mixProblem([])).toBe(SHAPE)
+  })
+
+  it('refuses a figure that is not finite', () => {
+    expect(mixProblem([NaN, 40, 15, 25])).toBe(SHAPE)
+    expect(mixProblem([Infinity, 40, 15, 25])).toBe(SHAPE)
+  })
+
+  it('refuses a negative share', () => {
+    // Sums to 100, but a negative share is still not a share of anything.
+    expect(mixProblem([-5, 45, 35, 25])).toBe(SHAPE)
+  })
+
+  it('refuses a fractional share', () => {
+    expect(mixProblem([20.5, 40, 14.5, 25])).toBe(SHAPE)
+  })
+
+  it('refuses a mix summing to 99', () => {
+    expect(mixProblem([20, 40, 15, 24])).toBe(TOTAL)
+  })
+
+  it('refuses a mix summing to 101', () => {
+    expect(mixProblem([20, 40, 15, 26])).toBe(TOTAL)
   })
 })
 
@@ -258,6 +330,19 @@ describe('SPLIT_PRESETS', () => {
       { percent: 50, label: 'Even split' },
       { percent: 100, label: 'All to them' },
     ])
+  })
+})
+
+describe('HOUSE_SPLIT_PERCENT', () => {
+  it('is the house standard split — SPLIT_PRESETS’ first preset', () => {
+    expect(HOUSE_SPLIT_PERCENT).toBe(60)
+    expect(HOUSE_SPLIT_PERCENT).toBe(SPLIT_PRESETS[0].percent)
+  })
+})
+
+describe('HOUSE_MIX', () => {
+  it('adds up to 100', () => {
+    expect(HOUSE_MIX.reduce((n: number, x: number) => n + x, 0)).toBe(100)
   })
 })
 

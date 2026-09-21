@@ -43,6 +43,7 @@ import { hashPassword } from '../src/lib/password'
 import { seedOnlyIfEmpty, seedPasswordFrom } from '../src/lib/seed-install'
 import { nightOfLocal } from '../src/lib/night'
 import { HOUSE_TASKS } from '../src/lib/intake'
+import { endNightFor } from '../src/lib/run-times'
 
 /**
  * The one bookable room.
@@ -638,6 +639,11 @@ async function main() {
     // hold the same room without either ladder seeing the other.
     const date = nightOfLocal(seedDate(today, e.days, e.dow))
     const lateBar = e.lateBar !== false
+    // The prototype's own run times. Without doors there is no service
+    // window, and without one a bar cannot be read off the till.
+    const doors = lateBar ? '8:00pm' : '7:00pm'
+    const barClose = lateBar ? '12:00am' : '11:00pm'
+    const allOut = lateBar ? '1:00am' : '11:30pm'
     const cap = capacityOf(MAIN_CAPACITY, e.format)
     const att: [number, number, number] = e.att ?? [
       Math.round(cap * 0.4),
@@ -679,11 +685,10 @@ async function main() {
         scen: 1,
         sold: e.sold ?? 0,
         barHead: e.barHead ?? 20,
-        // The prototype's own run times. Without doors there is no service
-        // window, and without one a bar cannot be read off the till.
-        doors: lateBar ? '8:00pm' : '7:00pm',
-        barClose: lateBar ? '12:00am' : '11:00pm',
-        allOut: lateBar ? '1:00am' : '11:30pm',
+        doors,
+        barClose,
+        allOut,
+        endDate: endNightFor(date, doors, allOut),
         gear: e.gear ?? 200,
         adv: e.adv ?? 100,
         sound: e.sound ?? 'inhouse',

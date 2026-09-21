@@ -93,13 +93,34 @@
   color: var(--color-neutral-400);
 }
 
-/* --- the form ----------------------------------------------------------- */
+/* --- the form -------------------------------------------------------------
+   A three-item grid — the sections, the live model panel, and the submit
+   footer — so `grid-template-areas` alone can move the panel from a sticky
+   side column (desktop) to a block pinned above the footer (phone), without
+   the panel ever leaving the <form> its submit button lives in. */
 
 .form {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas: 'sections' 'panel' 'footer';
+  gap: var(--space-8);
+}
+
+.sections {
+  grid-area: sections;
   display: flex;
   flex-direction: column;
   gap: var(--space-8);
-  max-width: 74ch;
+  min-width: 0;
+}
+
+@media (min-width: 600px) {
+  .form {
+    grid-template-columns: minmax(0, 74ch) minmax(260px, 340px);
+    column-gap: var(--space-8);
+    grid-template-areas: 'sections panel' 'footer panel';
+    align-items: start;
+  }
 }
 
 .grid {
@@ -222,7 +243,7 @@
 }
 
 .actRowSimple {
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 2fr 1fr 1fr auto;
 }
 
 @media (max-width: 1023px) {
@@ -304,6 +325,7 @@
 /* --- footer ---------------------------------------------------------------- */
 
 .footer {
+  grid-area: footer;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -327,4 +349,329 @@
 .submit:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* --- informational (non-error) hints ------------------------------------- */
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-neutral-600);
+}
+
+/* --- how we work together ------------------------------------------------- */
+
+.modelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modelOption {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.modelNote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-neutral-600);
+}
+
+/* --- tickets: mix -------------------------------------------------------- */
+
+.mixGroup {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.mixRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mixNote {
+  margin: 0;
+  font-size: 11px;
+}
+
+.mixGood {
+  color: var(--st-good);
+}
+
+.mixBad {
+  color: var(--st-stop);
+}
+
+.readout {
+  display: flex;
+  align-items: center;
+  color: var(--color-neutral-300);
+}
+
+/* --- who is bringing it: split -------------------------------------------- */
+
+.presetRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.presetBtn {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-300);
+  background: transparent;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.presetBtn:hover {
+  color: var(--color-accent-200);
+  border-color: var(--color-accent);
+}
+
+.houseLine {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-neutral-300);
+}
+
+/* --- the live model panel (ModelPanel.tsx) --------------------------------
+   Drawn twice and shown once: `.panelWide`, a plain block that sticks in the
+   side column from 600px up, and `.panelNarrow`, a native <details> whose
+   summary is the bar above the submit button on a phone. A single <details>
+   forced open by CSS does not work — see the note in ModelPanel.tsx. The side
+   column sticks at top: 0, the offset the sidebar and topbar use; nothing else
+   in this app's shell occupies the top of the viewport at that width. */
+
+.panel {
+  grid-area: panel;
+  min-width: 0;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: 13px 15px;
+}
+
+.panelWide {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .panel {
+    position: sticky;
+    top: 0;
+  }
+
+  .panelWide {
+    display: block;
+  }
+
+  .panelNarrow {
+    display: none;
+  }
+}
+
+.summaryBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--color-neutral-100);
+}
+
+.summaryBar::-webkit-details-marker {
+  display: none;
+}
+
+.summaryText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryFigure {
+  flex: none;
+  font-family: var(--font-heading);
+}
+
+.panelBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: 12px;
+}
+
+/* Nothing sits above the body in the side column, where there is no summary. */
+.panelWide .panelBody {
+  margin-top: 0;
+}
+
+.panelHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panelTitle {
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.panelSub {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-neutral-500);
+}
+
+.scenToggle {
+  display: flex;
+  gap: 6px;
+}
+
+.scenBtn {
+  flex: 1;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--color-neutral-400);
+  background: transparent;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.scenBtnActive {
+  color: var(--color-accent-100);
+  background: var(--color-accent-700);
+  border-color: var(--color-accent-600);
+}
+
+.verdict {
+  margin: 0;
+  padding: 10px 11px;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.verdictGood {
+  color: var(--st-good);
+  background: var(--st-good-dim);
+}
+
+.verdictWarn {
+  color: var(--st-warn);
+  background: var(--st-warn-dim);
+}
+
+.verdictStop {
+  color: var(--st-stop);
+  background: var(--st-stop-dim);
+}
+
+.pnl {
+  display: flex;
+  flex-direction: column;
+}
+
+.pnlRow {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.pnlRow:last-child {
+  border-bottom: 0;
+}
+
+.pnlStrong .pnlLine {
+  font-size: 13.5px;
+  color: var(--color-neutral-100);
+}
+
+.pnlLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--color-neutral-300);
+}
+
+.pnlLabel {
+  min-width: 0;
+}
+
+.pnlFigure {
+  flex: none;
+  font-family: var(--font-heading);
+  color: var(--color-neutral-100);
+}
+
+.pnlNote {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-neutral-600);
+}
+
+.toneGood {
+  color: var(--st-good);
+}
+
+.toneWarn {
+  color: var(--st-warn);
+}
+
+.toneStop {
+  color: var(--st-stop);
+}
+
+.crewDetails {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-neutral-500);
+}
+
+.crewDetails summary {
+  cursor: pointer;
+  color: var(--color-accent-2);
+}
+
+.crewList {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crewList li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }

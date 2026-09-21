@@ -172,9 +172,15 @@ const validStaffFields = (): FormFields => ({
   [FIELD.doors]: '',
   [FIELD.barClose]: '',
   [FIELD.allOut]: '',
-  [FIELD.note]: '',
+  [FIELD.endDate]: '',
   [FIELD.ownerId]: 'person_mere',
   [FIELD.model]: 'curator',
+  [FIELD.std]: '25',
+  [FIELD.door]: '30',
+  [FIELD.mixSub]: '20',
+  [FIELD.mixStd]: '40',
+  [FIELD.mixSup]: '15',
+  [FIELD.mixDoor]: '25',
   [FIELD.bringing]: 'venue',
   [FIELD.organisationId]: '',
   [FIELD.promoterName]: '',
@@ -204,6 +210,7 @@ const validOutsideFields = (): FormFields => ({
   [FIELD.doors]: '',
   [FIELD.barClose]: '',
   [FIELD.allOut]: '',
+  [FIELD.endDate]: '',
   [FIELD.note]: '',
 })
 
@@ -261,7 +268,7 @@ describe('who may start one', () => {
 })
 
 describe('the hostile POST', () => {
-  it('keeps an outside account to its own organisation and zeroes every figure it has no writer for', async () => {
+  it('keeps an outside account to its own organisation and its own split, but writes the figures it proposed', async () => {
     requireModule.mockResolvedValue({ user: awhina })
     const form = outsideForm(
       {
@@ -270,15 +277,22 @@ describe('the hostile POST', () => {
         [FIELD.bringing]: 'organisation',
         [FIELD.organisationId]: 'org_other',
         [FIELD.split]: '100',
-        [FIELD.attQuiet]: '999',
-        [FIELD.attLikely]: '999',
-        [FIELD.attGreat]: '999',
-        [FIELD.barHead]: '99999',
-        [FIELD.gear]: '99999',
-        [FIELD.adv]: '99999',
+        [FIELD.endDate]: FUTURE_INPUT,
+        [FIELD.std]: '35',
+        [FIELD.door]: '40',
+        [FIELD.mixSub]: '20',
+        [FIELD.mixStd]: '40',
+        [FIELD.mixSup]: '15',
+        [FIELD.mixDoor]: '25',
+        [FIELD.attQuiet]: '100',
+        [FIELD.attLikely]: '200',
+        [FIELD.attGreat]: '300',
+        [FIELD.barHead]: '30',
+        [FIELD.gear]: '500',
+        [FIELD.adv]: '300',
         [FIELD.sound]: 'wheke',
-        [FIELD.crew]: '50',
-        [FIELD.tok]: '20',
+        [FIELD.crew]: '8',
+        [FIELD.tok]: '3',
         [FIELD.brief]: 'Give us the full split',
         [FIELD.hold]: true,
       },
@@ -294,19 +308,27 @@ describe('the hostile POST', () => {
       promoter: 'Kōura Records',
       internal: false,
       ownerId: null,
-      model: 'CURATOR',
+      // Their proposal: the model, the prices, the mix, who they expect,
+      // what it costs them — none of this is theirs to hide from a
+      // coordinator correcting it afterwards.
+      model: 'DRY',
       dateTbc: true,
-      split: 0,
-      att: [0, 0, 0],
-      barHead: 0,
-      gear: 0,
-      adv: 0,
-      crew: 0,
-      tok: 0,
+      split: 0.6,
+      endDate: FUTURE,
+      std: 35,
+      door: 40,
+      mix: [0.2, 0.4, 0.15, 0.25],
+      att: [100, 200, 300],
+      barHead: 30,
+      gear: 500,
+      adv: 300,
+      sound: 'wheke',
+      crew: 8,
+      tok: 3,
       brief: null,
     })
     expect(data.artists.create).toEqual([
-      { name: 'House DJ', status: 'ENQUIRED', low: 0, high: 0, order: 0 },
+      { name: 'House DJ', status: 'ENQUIRED', low: 5000, high: 9000, order: 0 },
     ])
     expect(placeHold).not.toHaveBeenCalled()
     expect(payeeFindFirst).toHaveBeenCalledTimes(1)
@@ -330,10 +352,15 @@ describe('createEnquiry called directly, as a forged CleanEnquiry could reach it
       doors: null,
       barClose: null,
       allOut: null,
+      endDate: null,
+      model: 'curator',
+      std: 0,
+      door: 0,
+      mix: [0.2, 0.4, 0.15, 0.25],
       acts: [],
       note: null,
+      alternates: [],
       ownerId: 'person_mere',
-      model: 'curator',
       bringing: { by: 'organisation', organisationId: 'org_other' },
       split: 0,
       att: [0, 0, 0],
@@ -400,10 +427,20 @@ describe('loadIntakeOptions', () => {
 
 describe('staff happy path', () => {
   it('creates the acts in order, the house tasks, and the one activity line', async () => {
-    const form = staffForm({ [FIELD.note]: 'Keep it chill' }, [
-      { name: 'Sculled', status: 'pencilled', low: '500', high: '900' },
-      { name: 'Wet Lettuce', status: 'confirmed', low: '200', high: '400' },
-    ])
+    // Two alternates, so the same submit checks they reach the activity line.
+    const alt1 = new Date(FUTURE.getTime() + 7 * 86_400_000)
+    const alt2 = new Date(FUTURE.getTime() + 14 * 86_400_000)
+    const form = staffForm(
+      {
+        [FIELD.note]: 'Keep it chill',
+        [FIELD.alt1]: nightInput(alt1),
+        [FIELD.alt2]: nightInput(alt2),
+      },
+      [
+        { name: 'Sculled', status: 'pencilled', low: '500', high: '900' },
+        { name: 'Wet Lettuce', status: 'confirmed', low: '200', high: '400' },
+      ],
+    )
 
     const result = await startEnquiry(form)
 
@@ -419,6 +456,11 @@ describe('staff happy path', () => {
       model: 'CURATOR',
       dateTbc: false,
       split: 0.5,
+      // Blank doors/allOut mean nothing to auto-fill an end night from.
+      endDate: null,
+      std: 25,
+      door: 30,
+      mix: [0.2, 0.4, 0.15, 0.25],
       att: [40, 80, 120],
       barHead: 25,
       gear: 250,
@@ -444,6 +486,7 @@ describe('staff happy path', () => {
           date: FUTURE,
           dateTbc: false,
           note: 'Keep it chill',
+          alternates: [alt1, alt2],
         }),
       },
     ])
