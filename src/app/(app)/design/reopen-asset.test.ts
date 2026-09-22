@@ -14,12 +14,10 @@ vi.mock('server-only', () => ({}))
 // The mocked `requireModule` ignores which module was asked for — every
 // test here names its own `user` through `.mockResolvedValue`, never the
 // module key — so the wrapper below takes no arguments either.
-const requireModule = vi.fn(
-  async (): Promise<{ user: SessionUser; modules: string[] }> => ({
-    user: owner,
-    modules: ['design'],
-  }),
-)
+const requireModule = vi.fn(async (): Promise<{ user: SessionUser; modules: string[] }> => ({
+  user: owner,
+  modules: ['design'],
+}))
 vi.mock('@/lib/permissions', () => ({
   requireModule: () => requireModule(),
   requireEvent: vi.fn(async (_: unknown, id: string) => id),
