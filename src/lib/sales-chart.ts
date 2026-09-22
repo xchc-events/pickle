@@ -275,7 +275,8 @@ export function buildChart(input: ChartInput): ChartGeometry {
   const x = (day: Date) =>
     plot.x +
     scaleLinear(day.getTime(), { min: since.getTime(), max: domainEnd.getTime() }, plot.width)
-  const y = (count: number) => plot.y + plot.height - scaleLinear(count, { min: 0, max: maxCount }, plot.height)
+  const y = (count: number) =>
+    plot.y + plot.height - scaleLinear(count, { min: 0, max: maxCount }, plot.height)
 
   const lines: TierLine[] = TIER_KEYS.map((tier) => {
     const windowed = windowSeries(byTier[tier], since, input.today)
@@ -289,7 +290,10 @@ export function buildChart(input: ChartInput): ChartGeometry {
     return { tier, label: TIER_LABEL[tier], points, total }
   })
 
-  const xTicks: AxisTick[] = [{ x: x(since), label: dateLabel(since) }, { x: x(input.today), label: 'Today' }]
+  const xTicks: AxisTick[] = [
+    { x: x(since), label: dateLabel(since) },
+    { x: x(input.today), label: 'Today' },
+  ]
   if (input.doorAt.getTime() > input.today.getTime()) {
     xTicks.push({ x: x(input.doorAt), label: dateLabel(input.doorAt) })
   }
