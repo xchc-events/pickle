@@ -61,21 +61,40 @@ export interface RunTimes {
   barClose: string | null
   endDate: Date | null // a night
   allOut: string | null
+  /** The amount of time the room is blocked out for, beyond doors and
+   *  everyone-out. Optional so every existing caller that has not decided
+   *  either one yet reads as "not set", the same as leaving them out. */
+  packIn?: string | null
+  packOut?: string | null
 }
-export type RunField = 'doors' | 'barClose' | 'endDate' | 'allOut'
+export type RunField = 'doors' | 'barClose' | 'endDate' | 'allOut' | 'packIn' | 'packOut'
 
 /**
  * The end night when nobody typed one: the same night, or the next when
- * everyone is out at or before the hour the doors opened. Null unless both
- * times are known.
+ * everyone is out at or before the hour the doors opened — carried one night
+ * further still when a pack-out is set and its own clock reading falls at or
+ * before everyone-out's, the same way everyone-out can carry doors' night
+ * into the next. Null unless doors and everyone-out are both known; a
+ * pack-out with nothing to read it against changes nothing.
  */
-export function endNightFor(date: Date, doors: string | null, allOut: string | null): Date | null {
+export function endNightFor(
+  date: Date,
+  doors: string | null,
+  allOut: string | null,
+  packOut?: string | null,
+): Date | null {
   const doorsM = minutesOfDay(doors)
   const outM = minutesOfDay(allOut)
   if (doorsM === null || outM === null) return null
 
   const nextNight = outM <= doorsM
-  return nextNight ? new Date(date.getTime() + 86_400_000) : date
+  const night = nextNight ? new Date(date.getTime() + 86_400_000) : date
+
+  const packOutM = minutesOfDay(packOut)
+  if (packOutM === null) return night
+
+  const packOutCarries = packOutM < outM
+  return packOutCarries ? new Date(night.getTime() + 86_400_000) : night
 }
 
 /**
@@ -122,6 +141,29 @@ export function runProblems(r: RunTimes): Partial<Record<RunField, string>> {
           problems.barClose = 'The bar closes after the doors open and before everyone is out.'
         }
       }
+    }
+  }
+
+  // Pack-in is always on the start night, before the doors — nothing here
+  // ever runs the small hours, so no carry is needed the way barClose needs
+  // one.
+  const packInM = minutesOfDay(r.packIn)
+  if (doorsM !== null && packInM !== null && packInM > doorsM) {
+    problems.packIn = 'Pack-in has to be at or before the doors open.'
+  }
+
+  // Everyone-out's own night (`nights`) is the baseline — pack-out reads
+  // against doors from there, the same disambiguation doors gives every
+  // other small-hours reading, rather than against everyone-out itself: a
+  // pack-out compared to the very time it is meant to be after would always
+  // read as valid, whatever was typed, the same carry chosen to make it so.
+  const packOutM = minutesOfDay(r.packOut)
+  if (doorsM !== null && packOutM !== null && outM !== null && nights !== null) {
+    const packOutNights = nights + (packOutM > doorsM ? 0 : 1)
+    const packOutInstant = packOutNights * 1440 + packOutM
+    const end = nights * 1440 + outM
+    if (packOutInstant < end) {
+      problems.packOut = 'Pack-out has to be at or after everyone is out.'
     }
   }
 

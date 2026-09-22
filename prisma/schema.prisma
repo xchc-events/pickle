@@ -488,6 +488,14 @@ model Event {
   doors     String?
   barClose  String?
   allOut    String?
+  /// The amount of time the room is blocked out for, beyond doors and
+  /// everyone-out: when the crew starts setting up, and when they are
+  /// finished striking. Stored the same way — "3:00pm", "1:30am" — and
+  /// just as free-standing; there is no rule tying one event's pack-out to
+  /// another's pack-in. Connor, 23 Sep 2026: "We don't need a hard rule that
+  /// says an event has to be packed out before another has packed in."
+  packIn    String?
+  packOut   String?
   /// The night it ends, stored the way `date` is (see src/lib/night.ts).
   ///
   /// `date` was the whole of when an event happens, which made a festival

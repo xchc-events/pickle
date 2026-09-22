@@ -3,6 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs } from './format'
 import { dayPeriod, fitFor, shortfall, type FitTone } from './roster'
+import { minutesOfDay } from './run-times'
 import { PLANNED_HOUR_COST } from './finance'
 import type { SessionUser } from './session'
 
@@ -26,6 +27,71 @@ function weekAround(d: Date): { from: Date; to: Date } {
   const to = new Date(from)
   to.setDate(to.getDate() + 7)
   return { from, to }
+}
+
+/**
+ * Where a set-up or clean-up shift's call defaults to, once pack-in and
+ * pack-out are set — in the same unit `Shift.start` stores: hours offset
+ * from doors, negative before it. `fallback` is whatever `windowFor` in
+ * src/lib/roster.ts already gives the role, unchanged when there is no pack
+ * time to read, or for every other role, which this has no opinion on.
+ *
+ * Connor, 23 Sep 2026: "It would be good to have a beginning of the pack-in
+ * time and the end of the pack-out." Set-up starts at pack-in; clean-up
+ * *ends* at pack-out, so its start is worked back from pack-out by its own
+ * length.
+ */
+export function crewCallStart(
+  role: string,
+  hours: number,
+  fallback: number,
+  doors: string | null,
+  packIn: string | null,
+  packOut: string | null,
+): number {
+  const doorsM = minutesOfDay(doors)
+  if (doorsM === null) return fallback
+
+  if (role === 'Set-up crew') {
+    const packInM = minutesOfDay(packIn)
+    // Pack-in is at or before doors (src/lib/run-times.ts), always the same
+    // calendar day — no midnight to carry across, unlike pack-out below.
+    return packInM === null ? fallback : (packInM - doorsM) / 60
+  }
+
+  if (role === 'Clean-up crew') {
+    const packOutM = minutesOfDay(packOut)
+    if (packOutM === null) return fallback
+    // The first time that clock reading comes round again after doors open —
+    // the same carry `runProblems` reads pack-out's own validity by.
+    const fromDoors = packOutM > doorsM ? packOutM - doorsM : packOutM + 1440 - doorsM
+    return fromDoors / 60 - hours
+  }
+
+  return fallback
+}
+
+/**
+ * The five run times in order, labelled and printed exactly as the event
+ * stores them, for the roster page's event header. Whichever are not
+ * decided yet are left out rather than shown blank; empty when none are.
+ */
+export function fiveTimesLine(v: {
+  packIn: string | null
+  doors: string | null
+  barClose: string | null
+  allOut: string | null
+  packOut: string | null
+}): string {
+  return [
+    v.packIn ? `Pack-in ${v.packIn}` : null,
+    v.doors ? `Doors ${v.doors}` : null,
+    v.barClose ? `Bar close ${v.barClose}` : null,
+    v.allOut ? `Everyone out ${v.allOut}` : null,
+    v.packOut ? `Pack-out ${v.packOut}` : null,
+  ]
+    .filter((s): s is string => s !== null)
+    .join(' · ')
 }
 
 export interface Candidate {
@@ -74,6 +140,13 @@ export interface RosterEventView {
   callHours: string
   callCost: number
   shortfall: string | null
+  /** The five times in order, printed exactly as the event stores them —
+   *  never parsed or recomputed here. Null while a time is not decided. */
+  packIn: string | null
+  doors: string | null
+  barClose: string | null
+  allOut: string | null
+  packOut: string | null
 }
 
 export interface RosterLoad {
@@ -193,6 +266,11 @@ export async function loadRoster(
       callHours: hrs(callHours),
       callCost: callHours * PLANNED_HOUR_COST,
       shortfall: shortfall(shifts),
+      packIn: row.packIn,
+      doors: row.doors,
+      barClose: row.barClose,
+      allOut: row.allOut,
+      packOut: row.packOut,
     },
   }
 }
