@@ -103,6 +103,9 @@ a.tile:hover {
 .main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
 }
 
 /* --- needs you ----------------------------------------------------------- */
@@ -116,7 +119,7 @@ a.tile:hover {
 
 .need {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   padding: 11px 6px;
@@ -150,18 +153,8 @@ a.tile:hover {
   margin-top: 2px;
 }
 
-.unclaimed {
-  color: var(--color-neutral-600);
-}
-
 .needWhen {
   font-size: 11px;
-  white-space: nowrap;
-}
-
-.needCta {
-  font-size: 11.5px;
-  color: var(--color-accent);
   white-space: nowrap;
 }
 
@@ -170,16 +163,6 @@ a.tile:hover {
   font-size: 13px;
   color: var(--color-neutral-600);
   margin: 0;
-}
-
-.more {
-  font-size: 11.5px;
-  color: var(--color-neutral-600);
-  margin: 12px 6px 0;
-}
-
-.more a {
-  color: var(--color-accent);
 }
 
 /* --- aside --------------------------------------------------------------- */
@@ -213,6 +196,18 @@ a.tile:hover {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   padding: 15px 16px;
+}
+
+.nextList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nextEvent + .nextEvent {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-divider);
 }
 
 .nextName {
@@ -318,11 +313,6 @@ a.tile:hover {
   margin: 0 0 9px;
 }
 
-.hoursLink {
-  font-size: 11.5px;
-  color: var(--color-accent);
-}
-
 /* --- narrow -------------------------------------------------------------- */
 
 @media (max-width: 960px) {
@@ -332,18 +322,5 @@ a.tile:hover {
 
   .aside {
     width: 100%;
-  }
-}
-
-/* Phone width, as tokens.css has it. The header and body paddings narrow by
-   themselves there, through --page-gutter. */
-@media (max-width: 599px) {
-  /* The whole row is the link; the words "Open roster" can go. */
-  .need {
-    grid-template-columns: 20px minmax(0, 1fr) auto;
-  }
-
-  .needCta {
-    display: none;
   }
 }

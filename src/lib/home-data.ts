@@ -5,16 +5,19 @@ import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './fina
 import { PARTS_SELECT, partsInputFor } from './parts-input'
 import { halvesOf, takenOf } from './actuals'
 import { eventScope, modulesOpenByRole } from './scope'
+import { daysBetween } from './pipeline'
 import type { ModuleKey } from './constants'
 import type { LeadKey } from './event-record'
 import type { SessionUser } from './session'
 import {
   actorsOf,
   homeTiles,
+  inRevenueWindow,
   myHours,
   needsFor,
   nextNight,
   pickNext,
+  REVENUE_DAYS,
   type CountedNight,
   type HomeEvent,
   type MyHours,
@@ -40,7 +43,8 @@ export interface HomeLoad {
   /** Events not yet put to bed. */
   live: number
   tiles: Tile[]
-  next: NextNight | null
+  /** Up to the two soonest confirmed nights, soonest first. */
+  next: NextNight[]
   /**
    * The reader's hours, or 'unlinked' for an account with no person behind
    * it; null when the reader cannot open Hours.
@@ -94,18 +98,20 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
       select: { personId: true, role: true },
     }),
     db.modulePermission.findMany({ select: { role: true, module: true } }),
-    // The two most recent nights with both halves in.
+    // Nights inside the Revenue tile's actual window, both halves in. The
+    // extra two days' buffer on the cutoff covers the gap between this clock
+    // instant and the calendar-day boundary `daysBetween` checks below; the
+    // exact cut to REVENUE_DAYS happens there, not in this query.
     db.event.findMany({
       where: {
         AND: [
           eventScope(user),
-          { date: { lt: now } },
+          { date: { gte: new Date(now.getTime() - (REVENUE_DAYS + 2) * 86_400_000), lt: now } },
           { actual: { is: { ticketRev: { not: null }, barProfit: { not: null } } } },
         ],
       },
       select: { date: true, actual: true },
       orderBy: { date: 'desc' },
-      take: 2,
     }),
   ])
 
@@ -140,26 +146,51 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
 
   const counted: CountedNight[] = countedRows.flatMap((r) => {
     const taken = takenOf(halvesOf(r.actual))
-    return taken === null ? [] : [{ date: r.date, taken }]
+    return taken === null ? [] : [{ daysAgo: daysBetween(r.date, now), taken }]
   })
 
-  // The surplus is the event record's own figure, worked out exactly as the
-  // event record works it out — and only for a reader who can open it.
-  const nextEvent = pickNext(events)
-  let surplus: number | null = null
-  if (nextEvent && modules.includes('pipeline')) {
-    const row = rows.find((r) => r.id === nextEvent.id)
-    if (row) {
-      const orgShareHours = await orgShareFor(row.date)
-      surplus = financeVals(financeInputFor(row, scenarioOf(row.scen), orgShareHours)).surplus
-    }
+  // The Revenue tile's projected figure: financeVals' own income, summed over
+  // the same nights inRevenueWindow selects — worked out only for a reader
+  // who can open Finance, since nobody else's tile reads it.
+  let projected = 0
+  if (modules.includes('finance')) {
+    const toProject = events.flatMap((e) => {
+      if (!inRevenueWindow(e)) return []
+      const row = rows.find((r) => r.id === e.id)
+      return row ? [row] : []
+    })
+    const incomes = await Promise.all(
+      toProject.map(async (row) => {
+        const orgShareHours = await orgShareFor(row.date)
+        return financeVals(financeInputFor(row, scenarioOf(row.scen), orgShareHours)).income
+      }),
+    )
+    projected = incomes.reduce((n, x) => n + x, 0)
   }
+
+  // Up to the two soonest confirmed nights. Each one's surplus is the event
+  // record's own figure, worked out exactly as the event record works it
+  // out, and only for a reader who can open it — the same rule as when this
+  // only ever showed the one night.
+  const next = await Promise.all(
+    pickNext(events, 2).map(async (e) => {
+      let surplus: number | null = null
+      if (modules.includes('pipeline')) {
+        const row = rows.find((r) => r.id === e.id)
+        if (row) {
+          const orgShareHours = await orgShareFor(row.date)
+          surplus = financeVals(financeInputFor(row, scenarioOf(row.scen), orgShareHours)).surplus
+        }
+      }
+      return nextNight(e, viewer, surplus)
+    }),
+  )
 
   return {
     needs: needsFor(events, viewer, actors),
     live: events.length,
-    tiles: homeTiles(events, counted, viewer),
-    next: nextEvent ? nextNight(nextEvent, viewer, surplus) : null,
+    tiles: homeTiles(events, counted, projected, viewer),
+    next,
     hours: modules.includes('hours') ? await hoursOf(user.personId, now) : null,
   }
 }

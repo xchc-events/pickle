@@ -330,9 +330,32 @@ describe('design — its status', () => {
     expect(part(ev(), 'design')).toMatchObject({ status: 'signed off', tone: 'good', done: true })
   })
 
-  it('does not call a set signed off while a gate still fails', () => {
-    const e = ev({ leads: { ticketing: true, design: false, promo: true, tech: true } })
-    expect(part(e, 'design')).toMatchObject({ status: 'signed off', tone: 'plain', done: false })
+  it('says only the art is signed off while a gate still fails, and names what is open', () => {
+    // "How can it be signed off and one to clear?" (Connor, 22 Sep 2026). The
+    // pieces are done and the part is not, so the cell says which is which.
+    const noLead = ev({ leads: { ticketing: true, design: false, promo: true, tech: true } })
+    expect(part(noLead, 'design')).toMatchObject({
+      status: 'art signed off',
+      detail: 'no lead',
+      tone: 'plain',
+      done: false,
+    })
+
+    const noBios = ev({ artists: [act({ hasBio: false }), act({ hasPromo: false })] })
+    expect(part(noBios, 'design')).toMatchObject({
+      status: 'art signed off',
+      detail: '2 acts to chase',
+      done: false,
+    })
+    expect(part(ev({ artists: [act({ hasBio: false })] }), 'design').detail).toBe('1 act to chase')
+  })
+
+  it('counts what is open when more than one thing is', () => {
+    const e = ev({
+      leads: { ticketing: true, design: false, promo: true, tech: true },
+      artists: [act({ hasBio: false })],
+    })
+    expect(part(e, 'design')).toMatchObject({ status: 'art signed off', detail: '2 to clear' })
   })
 })
 

@@ -50,8 +50,10 @@ a subscription to Prism:
   transaction: assigning a shift writes the `HourEntry`. Prism tracks
   settlement; it does not cost your labour. Neither platform can tell you what a
   Tuesday actually cost in wages.
-- **Loaded-rate wage costing into the P&L.** `CFG.loaded` (33.66) is applied to
-  every hour, rostered or typed, and lands as line 7 of the settlement.
+- **Wage costing into the P&L, by who worked the hour.** Since 22 Sep 2026 an
+  employee's hour costs `CFG.loaded` (33.66: the $30 base plus on-costs) and a
+  contractor's `CFG.contractorRate` (35, no on-costs). Hours nobody is on yet
+  plan at 35. It lands as line 7 of the settlement.
 - **Cost-base share by day of week.** `COV` in `src/lib/finance.ts` — a Saturday
   carries 70% of the weekly base, a Monday 4%. No competitor models this;
   they show you gross margin per show and leave the fixed base to your
@@ -531,6 +533,12 @@ GST-inclusive equivalent is $4,189. The settlement itself is not affected:
 `countedVals` takes GST off the takings before they reach income. This moves a
 figure on a shipped screen, so it needs a decision on which basis to show, not
 a quiet fix. `takenOf` is the one place to change once that is decided.
+
+**Fixed 22 September 2026.** `takenOf` now takes GST off the ticket side
+before adding the bar profit — `ticketRev / CFG.gst + barProfit` — the same
+basis `financeVals` uses for `income`, decided building Home's revenue tile,
+where the actual and the projected figures have to agree. Long Player Sundays
+#9 now reads $3,643 everywhere it is shown, on the Pipeline and on Home.
 
 ---
 

@@ -8,18 +8,18 @@ import { SOON_DAYS } from './pipeline'
 import {
   actorsOf,
   GATE_ACTION,
-  NEEDS_SHOWN,
   greeting,
   homeRefusal,
   homeSub,
   homeTiles,
+  inRevenueWindow,
   landingFor,
   myHours,
   needsCount,
   needsFor,
   nextNight,
   pickNext,
-  shownNeeds,
+  splitNeeds,
   type Actors,
   type HomeEvent,
   type Need,
@@ -220,7 +220,6 @@ describe('Needs you — whose it is', () => {
       expect(needs[0]).toMatchObject({
         sub: '1 of 4 filled',
         href: '/roster?event=sb',
-        cta: 'Open roster',
         claim: null,
       })
     }
@@ -317,7 +316,6 @@ describe('Needs you — what counts as today', () => {
     expect(needs[0]).toMatchObject({
       sub: 'Changed since it went out',
       href: '/promo?event=sb',
-      cta: 'Push',
       tone: 'warn',
       when: '60d out',
     })
@@ -330,7 +328,6 @@ describe('Needs you — what counts as today', () => {
       title: 'Approve artwork — Static Bloom',
       sub: '2 pieces waiting for sign-off',
       href: '/design?event=sb',
-      cta: 'Open design',
     })
   })
 
@@ -400,7 +397,6 @@ describe('Needs you — the moves a person makes by hand', () => {
         title: 'Confirm the booking — Static Bloom',
         sub: 'Everything is clear — the booking can be confirmed.',
         href: '/events/sb',
-        cta: 'Open the event',
       },
     ])
 
@@ -549,6 +545,71 @@ describe('Needs you — order', () => {
   })
 })
 
+describe('Needs you — split from “nobody’s on it”', () => {
+  it('keeps a null claim — a queue addressed to anyone — in "Needs you"', () => {
+    // A roster gap is nobody's by name, and stays a queue anyone who can
+    // open Roster is asked about — it does not become "nobody's on it".
+    const shifts = [
+      { assigned: true, pencilled: false },
+      { assigned: false, pencilled: false },
+    ]
+    const e = night({}, { daysToDoor: 8, shifts })
+    const needs = needsFor([e], as(AK), actors)
+    expect(needs[0]!.claim).toBeNull()
+
+    const { yours, unclaimed } = splitNeeds(needs)
+    expect(yours).toEqual(needs)
+    expect(unclaimed).toEqual([])
+  })
+
+  it('moves an unclaimed need out of "Needs you" and into its own pile', () => {
+    // Connor: "if there's a super admin with zero of their own events, I
+    // don't see why it would be saying that these things need to be done by
+    // me." SL owns nothing here, and nobody who could act is named, so the
+    // licence chase is Finance's to notice, not SL's to be told is theirs.
+    const e = night({ ownerId: SP }, { ...LATE, licence: 'required' })
+    const needs = needsFor([e], as(SL), actors)
+    expect(needs[0]!.claim).toBe('unclaimed')
+
+    const { yours, unclaimed } = splitNeeds(needs)
+    expect(yours).toEqual([])
+    expect(unclaimed).toEqual(needs)
+  })
+
+  it('keeps the sort order within each half', () => {
+    const denied = night(
+      { id: 'a', name: 'Denied', ownerId: SP },
+      { ...LATE, licence: 'denied', daysToDoor: 40 },
+    )
+    const soon = night(
+      { id: 'b', name: 'Soon', ownerId: SP },
+      { ...LATE, licence: 'required', daysToDoor: 5 },
+    )
+    const needs = needsFor([denied, soon], as(SL), actors)
+    expect(needs.every((n) => n.claim === 'unclaimed')).toBe(true)
+    expect(needs.map((n) => n.title)).toEqual([
+      'Licence denied — Denied',
+      'Apply for the special licence — Soon',
+    ])
+
+    expect(splitNeeds(needs).unclaimed.map((n) => n.title)).toEqual(needs.map((n) => n.title))
+  })
+})
+
+describe('Needs you — no cap', () => {
+  it('keeps every need, however many there are', () => {
+    const many = Array.from({ length: 9 }, (_, i) =>
+      night(
+        { id: `e${i}`, name: `Night ${i}` },
+        { daysToDoor: i + 1, shifts: [{ assigned: false, pencilled: false }] },
+      ),
+    )
+    const needs = needsFor(many, as(MT), actors)
+    expect(needs).toHaveLength(9)
+    expect(splitNeeds(needs).yours).toHaveLength(9)
+  })
+})
+
 describe('Needs you — every gate', () => {
   it('has something to do on Home for every gate a part can hold', () => {
     const labels = new Set(
@@ -568,26 +629,9 @@ describe('Needs you — the heading', () => {
     expect(homeSub(0, 11)).toBe('11 events in the pipeline · nothing blocking')
   })
 
-  it('counts every open item, not only the ones shown', () => {
+  it('counts every open item', () => {
     expect(needsCount(0)).toBe('clear')
     expect(needsCount(9)).toBe('9 open')
-  })
-
-  it(`shows the first ${NEEDS_SHOWN} and says how many more there are`, () => {
-    const many = Array.from({ length: NEEDS_SHOWN + 3 }, (_, i) =>
-      night(
-        { id: `e${i}`, name: `Night ${i}` },
-        {
-          daysToDoor: i + 1,
-          shifts: [{ assigned: false, pencilled: false }],
-        },
-      ),
-    )
-    const all = needsFor(many, as(MT), actors)
-    const { shown, more } = shownNeeds(all)
-    expect(shown).toHaveLength(NEEDS_SHOWN)
-    expect(shown[0]!.title).toBe('Fill 1 shift — Night 0')
-    expect(more).toBe(3)
   })
 })
 
@@ -610,27 +654,46 @@ describe('the tiles', () => {
       { concluded: true, daysToDoor: -9, ticketsLive: true, sold: 99 },
     ),
   ]
+  // Two nights inside the 28-day actual window (3 and 10 days ago) and one
+  // well outside it (40 days ago), which must not reach the Revenue total.
   const counted = [
-    { date: new Date(2026, 8, 6), taken: 1500 },
-    { date: new Date(2026, 7, 1), taken: 9999 },
-    { date: new Date(2026, 8, 12), taken: 3000 },
+    { daysAgo: 3, taken: 1500 },
+    { daysAgo: 40, taken: 9999 },
+    { daysAgo: 10, taken: 3000 },
   ]
+  // home-data.ts's own figure, handed in ready-made — homeTiles only formats it.
+  const projected = 2200
 
-  it('reads the pipeline for anyone who can open it', () => {
-    const tiles = homeTiles(pipeline, counted, as(MT))
+  it('reads the pipeline for a viewer who can also open Finance, in order', () => {
+    const tiles = homeTiles(pipeline, counted, projected, as(MT))
     expect(tiles.map((t) => [t.label, t.value, t.sub])).toEqual([
-      ['In the pipeline', '3', '1 yours'],
+      ['In the pipeline', '3', '2 confirmed'],
+      ['Next 30 days', '3', '2 confirmed'],
       ['At risk', '1', 'flagged on the pipeline'],
-      ['On sale', '2', '52 tickets sold'],
-      ['Revenue, last 2 events', money(4500), 'tickets + bar profit, actual'],
+      ['Revenue', money(4500), `last 4 weeks · ${money(2200)} projected, next 4`],
     ])
     expect(tiles.map((t) => t.href)).toEqual([
       '/pipeline',
+      '/pipeline?status=soon',
       '/pipeline?status=risk',
-      '/ticketing',
       null,
     ])
-    expect(tiles.map((t) => t.tone)).toEqual(['plain', 'warn', 'plain', 'good'])
+    expect(tiles.map((t) => t.tone)).toEqual(['plain', 'plain', 'warn', 'good'])
+  })
+
+  it('shows Revenue as the fourth tile only for a viewer who can also open Finance', () => {
+    const finance = homeTiles(pipeline, counted, projected, as(MT))
+    expect(finance[3]).toMatchObject({ label: 'Revenue', value: money(4500), tone: 'good' })
+
+    // Design & comms can open the Pipeline but not Finance.
+    const noFinance = homeTiles(pipeline, counted, projected, as(TW))
+    expect(noFinance[3]).toMatchObject({
+      label: 'On sale',
+      value: '2',
+      sub: '52 tickets sold',
+      tone: 'plain',
+      href: '/ticketing',
+    })
   })
 
   it('stops counting a night as on sale once it has happened', () => {
@@ -638,7 +701,7 @@ describe('the tiles', () => {
       { id: 'e', ownerId: MT },
       { daysToDoor: -5, ticketsLive: true, sold: 164 },
     )
-    const tiles = homeTiles([...pipeline, settling], counted, as(MT))
+    const tiles = homeTiles([...pipeline, settling], counted, projected, as(TW))
     // Still in the pipeline until it is put to bed, but no longer selling.
     expect(tiles.find((t) => t.label === 'In the pipeline')?.value).toBe('4')
     expect(tiles.find((t) => t.label === 'On sale')).toMatchObject({
@@ -648,24 +711,45 @@ describe('the tiles', () => {
   })
 
   it('links On sale only for those who can open Ticketing', () => {
-    const tech = homeTiles(pipeline, counted, as(JR))
+    const tech = homeTiles(pipeline, counted, projected, as(JR))
     expect(tech.find((t) => t.label === 'On sale')?.href).toBeNull()
   })
 
-  it('reads nothing at risk as good news, and says so when no night is counted', () => {
-    const calm = homeTiles([night()], [], as(MT))
+  it('reads nothing at risk as good news, and reads no counted night as zero revenue', () => {
+    const calm = homeTiles([night()], [], 0, as(MT))
     expect(calm.find((t) => t.label === 'At risk')).toMatchObject({ value: '0', tone: 'good' })
-    expect(calm.find((t) => t.label.startsWith('Revenue'))).toMatchObject({
-      label: 'Revenue, last 2 events',
-      value: '—',
-      sub: 'no night counted yet',
-      tone: 'plain',
+    expect(calm.find((t) => t.label === 'Revenue')).toMatchObject({
+      value: money(0),
+      sub: `last 4 weeks · ${money(0)} projected, next 4`,
+      tone: 'good',
     })
   })
 
-  it('names one night as one night', () => {
-    const tiles = homeTiles([night()], [{ date: new Date(2026, 8, 6), taken: 1500 }], as(MT))
-    expect(tiles.at(-1)).toMatchObject({ label: 'Revenue, last event', value: money(1500) })
+  it('windows Next 30 days exactly as pipelineRows does — day 30 in, day 31 out', () => {
+    const settling = night({ id: 'settling' }, { daysToDoor: -2 })
+    const edge30 = night({ id: 'edge30' }, { daysToDoor: 30, booking: 'negotiating' })
+    const edge31 = night({ id: 'edge31' }, { daysToDoor: 31 })
+    const far = night({ id: 'far' }, { daysToDoor: 100, booking: 'negotiating' })
+
+    const tiles = homeTiles([settling, edge30, edge31, far], [], 0, as(MT))
+    // All four are live, two of them confirmed.
+    expect(tiles[0]).toMatchObject({ label: 'In the pipeline', value: '4', sub: '2 confirmed' })
+    // /pipeline?status=soon has no lower bound and includes day 30; day 31
+    // drops out. Of the two left, only one is confirmed.
+    expect(tiles[1]).toMatchObject({ label: 'Next 30 days', value: '2', sub: '1 confirmed' })
+  })
+
+  it('sums actual revenue over the last 28 days, ex GST — day 27 in, day 28 out', () => {
+    const revCounted = [
+      { daysAgo: 0, taken: 500 },
+      { daysAgo: 27, taken: 300 },
+      { daysAgo: 28, taken: 1_000_000 }, // a night 28 days ago: outside the window
+    ]
+    const tiles = homeTiles([], revCounted, 0, as(MT))
+    expect(tiles.find((t) => t.label === 'Revenue')).toMatchObject({
+      value: money(800),
+      sub: `last 4 weeks · ${money(0)} projected, next 4`,
+    })
   })
 
   it('reads the roster and the bar for a duty manager, who cannot open the pipeline', () => {
@@ -680,7 +764,7 @@ describe('the tiles', () => {
       night({ id: 'closed' }, { daysToDoor: -6, barClosed: true }),
     ]
 
-    const tiles = homeTiles(nights, counted, as(AK))
+    const tiles = homeTiles(nights, counted, 0, as(AK))
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href, t.tone])).toEqual([
       ['Shifts to fill', '5', 'across 2 nights', '/roster', 'warn'],
       ['Bars to close', '2', 'oldest 4 days ago', '/bar?event=past', 'warn'],
@@ -696,14 +780,14 @@ describe('the tiles', () => {
       { id: 'gone' },
       { booking: 'negotiating', daysToDoor: -2, shifts: [{ assigned: false, pencilled: false }] },
     )
-    expect(homeTiles([pencilled, gone], [], as(AK))[0]).toMatchObject({
+    expect(homeTiles([pencilled, gone], [], 0, as(AK))[0]).toMatchObject({
       label: 'Shifts to fill',
       value: '1',
       sub: 'across 1 night',
       tone: 'warn',
     })
 
-    const quiet = homeTiles([night()], [], as(AK))
+    const quiet = homeTiles([night()], [], 0, as(AK))
     expect(quiet.map((t) => [t.value, t.sub, t.tone])).toEqual([
       ['0', 'every shift filled', 'good'],
       ['0', 'every night closed', 'good'],
@@ -711,10 +795,38 @@ describe('the tiles', () => {
   })
 })
 
+describe('inRevenueWindow — which nights count toward projected revenue', () => {
+  it('wants a live, confirmed night with the door 0–27 days out', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 0 }))).toBe(true)
+    expect(inRevenueWindow(night({}, { daysToDoor: 27 }))).toBe(true)
+    expect(inRevenueWindow(night({}, { daysToDoor: 28 }))).toBe(false)
+    expect(inRevenueWindow(night({}, { daysToDoor: -1 }))).toBe(false)
+  })
+
+  it('excludes a night still being negotiated — not one to bank on', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, booking: 'negotiating' }))).toBe(false)
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, booking: 'enquiry' }))).toBe(false)
+  })
+
+  it('excludes a night already put to bed', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, concluded: true }))).toBe(false)
+  })
+
+  it('leaves out a night already fully counted — it is already in the actual figure', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 0, doorCounted: true, barClosed: true }))).toBe(
+      false,
+    )
+    // A half-counted night stays in — the other half is still a projection.
+    expect(inRevenueWindow(night({}, { daysToDoor: 0, doorCounted: true, barClosed: false }))).toBe(
+      true,
+    )
+  })
+})
+
 // ------------------------------------------------------ next through the door ---
 
-describe('Next through the door', () => {
-  it('is the soonest confirmed night still to come', () => {
+describe('Next upcoming events', () => {
+  it('is up to the two soonest confirmed nights still to come, soonest first', () => {
     const events = [
       night({ id: 'enquiry' }, { booking: 'enquiry', daysToDoor: 2 }),
       night({ id: 'past' }, { daysToDoor: -3 }),
@@ -722,8 +834,24 @@ describe('Next through the door', () => {
       night({ id: 'next' }, { daysToDoor: 5 }),
       night({ id: 'done' }, { concluded: true, daysToDoor: 1 }),
     ]
-    expect(pickNext(events)?.id).toBe('next')
-    expect(pickNext([events[0]!, events[1]!])).toBeNull()
+    expect(pickNext(events, 2).map((e) => e.id)).toEqual(['next', 'later'])
+  })
+
+  it('excludes an unconfirmed booking, a concluded event and a night that has passed', () => {
+    const unconfirmed = night({ id: 'a' }, { booking: 'negotiating', daysToDoor: 3 })
+    const concluded = night({ id: 'b' }, { concluded: true, daysToDoor: 3 })
+    const past = night({ id: 'c' }, { daysToDoor: -1 })
+    expect(pickNext([unconfirmed, concluded, past], 2)).toEqual([])
+  })
+
+  it('never returns more than asked for', () => {
+    const events = [
+      night({ id: 'a' }, { daysToDoor: 1 }),
+      night({ id: 'b' }, { daysToDoor: 2 }),
+      night({ id: 'c' }, { daysToDoor: 3 }),
+    ]
+    expect(pickNext(events, 2).map((e) => e.id)).toEqual(['a', 'b'])
+    expect(pickNext(events, 1).map((e) => e.id)).toEqual(['a'])
   })
 
   it('reads the night for someone who can open the event record, with its surplus', () => {
@@ -829,7 +957,7 @@ describe('Your hours this month', () => {
     expect(employee.cost).not.toBe(money(10 * CFG.loaded))
   })
 
-  it('tells the hours worked from the hours still to come', () => {
+  it('never repeats the worked total, and says only what is still ahead', () => {
     const mine = myHours({
       now,
       availability: null,
@@ -840,10 +968,14 @@ describe('Your hours this month', () => {
         { hours: 4.5, workedOn: at(8, 25, 19), rostered: true },
       ],
     })
-    expect(mine.split).toBe('8h worked · 4.5h still to come')
+    // The 8h already worked are inside the 12.5h total the card leads with, so
+    // this line never repeats them as "worked": it says only what is to come.
+    expect(mine.split).toBe('4.5h still to come')
+
     expect(myHours({ now, availability: null, employment: 'CONTRACTOR', entries: [] }).split).toBe(
       'nothing logged yet',
     )
+
     expect(
       myHours({
         now,
@@ -852,9 +984,20 @@ describe('Your hours this month', () => {
         entries: [{ hours: 3, workedOn: at(8, 29), rostered: true }],
       }).split,
     ).toBe('3h still to come')
+
+    // Everything logged is already worked, nothing still ahead: the total
+    // above already says it, so this line has nothing left to add.
+    expect(
+      myHours({
+        now,
+        availability: null,
+        employment: 'CONTRACTOR',
+        entries: [{ hours: 6, workedOn: at(8, 3), rostered: true }],
+      }).split,
+    ).toBe('')
   })
 
-  it('counts typed hours as worked, whatever day they are filed under', () => {
+  it('counts typed hours as worked, whatever day they are filed under, but never says so', () => {
     // Org-wide hours are filed under the 15th of their month, so that a
     // timezone cannot roll them into a neighbour. Typed on the 3rd, that is a
     // day still to come, but only a rostered shift is work not yet done.
@@ -868,10 +1011,11 @@ describe('Your hours this month', () => {
         { hours: 6, workedOn: at(8, 20), rostered: true },
       ],
     })
-    expect(mine.split).toBe('4h worked · 6h still to come')
+    expect(mine.total).toBe('10h')
+    expect(mine.split).toBe('6h still to come')
   })
 
-  it('measures them against what the person said they can do this month', () => {
+  it('measures them against what the person is available for this month', () => {
     // Eleven a week over September's thirty days is about 47 hours.
     const mine = myHours({
       now,
@@ -880,7 +1024,7 @@ describe('Your hours this month', () => {
       entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
     expect(mine.pct).toBe(25)
-    expect(mine.capLabel).toBe('of about 47h you can do this month')
+    expect(mine.capLabel).toBe('of the ~47h you’re available this month')
 
     // Volunteer hours are headroom on top, as the roster counts them.
     const keen = myHours({
@@ -889,7 +1033,7 @@ describe('Your hours this month', () => {
       employment: 'CONTRACTOR',
       entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
-    expect(keen.capLabel).toBe('of about 62h you can do this month')
+    expect(keen.capLabel).toBe('of the ~62h you’re available this month')
   })
 
   it('fills the bar and no further', () => {

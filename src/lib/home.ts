@@ -135,17 +135,6 @@ const opens = (modules: readonly ModuleKey[], g: Gate): boolean => {
 const fixHref = (screen: string, eventId: string): string =>
   screen === 'event' ? `/events/${eventId}` : `/${screen}?event=${eventId}`
 
-const CTA: Readonly<Record<string, string>> = {
-  event: 'Open the event',
-  design: 'Open design',
-  promo: 'Open promotion',
-  ticketing: 'Open ticketing',
-  tech: 'Open tech',
-  roster: 'Open roster',
-  bar: 'Open the bar',
-  hours: 'Log hours',
-}
-
 /**
  * What each gate asks somebody to do, in the words of a to-do list. Keyed by
  * the gate's label, which src/lib/parts.test.ts pins; home.test.ts fails if a
@@ -311,7 +300,6 @@ export interface Need {
   /** Days until it is due, negative once it is overdue. The list sorts by it. */
   due: number
   href: string
-  cta: string
   /**
    * 'yours' when it is the reader's by name, 'unclaimed' when it reached them
    * because nobody named could act on it, null where nobody is ever named.
@@ -330,7 +318,6 @@ interface Draft {
   title?: string
   /** Replaces the lead gate's reason, and the count of what else is open. */
   sub?: string
-  cta?: string
   icon?: string
 }
 
@@ -389,7 +376,6 @@ function draftsFor(e: HomeEvent, p: PartState): Draft[] {
             gates: toFront(failing, 'Nothing stale on a listing'),
             title: `${stale} ${plural(stale, 'listing', 'listings')} stale`,
             sub: 'Changed since it went out',
-            cta: 'Push',
             icon: 'ph-upload-simple',
           },
         ]
@@ -526,7 +512,6 @@ export function needsFor(events: HomeEvent[], viewer: Viewer, actors: Actors): N
           when: d.clock.when,
           due: d.clock.due,
           href: fixHref(head.screen, e.id),
-          cta: d.cta ?? CTA[head.screen] ?? 'Open',
           claim,
         })
       }
@@ -543,13 +528,26 @@ export function needsFor(events: HomeEvent[], viewer: Viewer, actors: Actors): N
   )
 }
 
-/** How many rows the list shows. The rest are counted, not dropped. */
-export const NEEDS_SHOWN = 6
+export interface SplitNeeds {
+  /** Named to the reader, or a queue addressed to anyone who can open the module. */
+  yours: Need[]
+  /** Reached this reader only because nobody named could act on it — everyone's to notice. */
+  unclaimed: Need[]
+}
 
-export function shownNeeds(needs: Need[]): { shown: Need[]; more: number } {
+/**
+ * "Needs you" from "nobody's on it". Connor: "if there's a super admin with
+ * zero of their own events, I don't see why it would be saying that these
+ * things need to be done by me" — a claim of `null` is still a queue
+ * addressed to anyone who can open the module (fill a shift, close a bar),
+ * and stays theirs to be asked about; only `'unclaimed'` — the fallback for
+ * an event's own business with nobody reachable to own it — moves out.
+ * Order within each half is kept as `needsFor` sorted it.
+ */
+export function splitNeeds(needs: Need[]): SplitNeeds {
   return {
-    shown: needs.slice(0, NEEDS_SHOWN),
-    more: Math.max(0, needs.length - NEEDS_SHOWN),
+    yours: needs.filter((n) => n.claim !== 'unclaimed'),
+    unclaimed: needs.filter((n) => n.claim === 'unclaimed'),
   }
 }
 
@@ -579,38 +577,121 @@ export interface Tile {
   href: string | null
 }
 
-/** A night with both halves counted, and what it took: tickets plus bar profit. */
+/**
+ * A night inside the Revenue tile's actual-revenue window, both halves
+ * counted. `taken` is ex-GST income — ticket sales ex GST plus bar profit,
+ * the same basis `financeVals` uses for `income` — see `takenOf` in
+ * src/lib/actuals.ts. A night with a half still missing never becomes one of
+ * these; home-data.ts leaves it out rather than passing a null.
+ */
 export interface CountedNight {
-  date: Date
+  /** Whole calendar days before now the door was. Never negative. */
+  daysAgo: number
   taken: number
 }
+
+/**
+ * How many days the Revenue tile's actual and projected halves each span:
+ * the last 4 weeks counted, the next 4 weeks modelled. One number, so the two
+ * halves of the tile cannot disagree about how wide "4 weeks" is.
+ */
+export const REVENUE_DAYS = 28
+
+/**
+ * Whether a night counts toward the Revenue tile's projected figure: live,
+ * booking confirmed — a night still being negotiated is not one to bank on —
+ * with its door inside the next four weeks, and not already fully counted.
+ * A night whose door and bar are both in is already in the actual figure;
+ * counting it here too would double it on its own day. A half-counted night
+ * stays in, since the other half is still a projection. home-data.ts sums
+ * `financeVals(...).income` over exactly the nights this returns true for,
+ * the same way it already works out the next night's surplus.
+ */
+export function inRevenueWindow(e: HomeEvent): boolean {
+  const days = e.input.daysToDoor
+  return (
+    !e.input.concluded &&
+    e.input.booking === 'confirmed' &&
+    days >= 0 &&
+    days < REVENUE_DAYS &&
+    !(e.input.doorCounted && e.input.barClosed)
+  )
+}
+
+/** How many of these nights have a confirmed booking, as a tile's sub-line. */
+const confirmedOf = (events: HomeEvent[]): string =>
+  `${events.filter((e) => e.input.booking === 'confirmed').length} confirmed`
 
 /**
  * The strip under the greeting. Each tile reads one module's records and is
  * shown only to someone who can open that module — the Pipeline's four first,
  * as the prototype had them; the roster's and the bar's for those who cannot
  * open the Pipeline.
+ *
+ * @param projected The next four weeks' modelled income over confirmed
+ *   nights — `financeVals(...).income` summed over `inRevenueWindow`, the way
+ *   home-data.ts already works out the next night's surplus. Read only by a
+ *   viewer who can also open Finance; pass 0 when nobody will read it.
  */
-export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: Viewer): Tile[] {
+export function homeTiles(
+  events: HomeEvent[],
+  counted: CountedNight[],
+  projected: number,
+  viewer: Viewer,
+): Tile[] {
   const can = (m: ModuleKey) => viewer.modules.includes(m)
   const live = events.filter((e) => !e.input.concluded)
   const tiles: Tile[] = []
 
   if (can('pipeline')) {
-    const mine = live.filter((e) => viewer.personId !== null && e.ownerId === viewer.personId)
     const flagged = live.filter((e) => e.riskNote !== null).length
-    // Gather.rsvp stays live after the night; the night is no longer selling.
-    const onSale = live.filter((e) => e.input.ticketsLive && e.input.daysToDoor >= 0)
-    const sold = onSale.reduce((n, e) => n + e.input.sold, 0)
-    const recent = [...counted].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 2)
+    // Counts exactly what /pipeline?status=soon lists — pipelineRows' own
+    // "Next 30 days" filter (see SOON_DAYS), day 30 and unconcluded nights
+    // whose door has already passed included, since that filter has no floor.
+    const soon = live.filter((e) => e.input.daysToDoor <= SOON_DAYS)
+
+    let fourth: Tile
+    if (can('finance')) {
+      // "Income, as settlements count it" (Connor, 22 Sep 2026): ticket sales
+      // ex GST plus bar profit, the same figure financeVals calls income — so
+      // the actual and the projected halves of this tile cannot disagree.
+      const actual = counted
+        .filter((c) => c.daysAgo >= 0 && c.daysAgo < REVENUE_DAYS)
+        .reduce((n, c) => n + c.taken, 0)
+      fourth = {
+        label: 'Revenue',
+        value: money(actual),
+        sub: `last 4 weeks · ${money(projected)} projected, next 4`,
+        tone: 'good',
+        href: null,
+      }
+    } else {
+      // Gather.rsvp stays live after the night; the night is no longer selling.
+      const onSale = live.filter((e) => e.input.ticketsLive && e.input.daysToDoor >= 0)
+      const sold = onSale.reduce((n, e) => n + e.input.sold, 0)
+      fourth = {
+        label: 'On sale',
+        value: String(onSale.length),
+        sub: `${sold} ${plural(sold, 'ticket', 'tickets')} sold`,
+        tone: 'plain',
+        href: can('ticketing') ? '/ticketing' : null,
+      }
+    }
 
     tiles.push(
       {
         label: 'In the pipeline',
         value: String(live.length),
-        sub: `${mine.length} yours`,
+        sub: confirmedOf(live),
         tone: 'plain',
         href: '/pipeline',
+      },
+      {
+        label: 'Next 30 days',
+        value: String(soon.length),
+        sub: confirmedOf(soon),
+        tone: 'plain',
+        href: '/pipeline?status=soon',
       },
       {
         // The Pipeline's own "At risk": a coordinator's flag, in their words.
@@ -620,28 +701,7 @@ export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: 
         tone: flagged > 0 ? 'warn' : 'good',
         href: '/pipeline?status=risk',
       },
-      {
-        label: 'On sale',
-        value: String(onSale.length),
-        sub: `${sold} ${plural(sold, 'ticket', 'tickets')} sold`,
-        tone: 'plain',
-        href: can('ticketing') ? '/ticketing' : null,
-      },
-      recent.length === 0
-        ? {
-            label: 'Revenue, last 2 events',
-            value: '—',
-            sub: 'no night counted yet',
-            tone: 'plain',
-            href: null,
-          }
-        : {
-            label: recent.length === 1 ? 'Revenue, last event' : 'Revenue, last 2 events',
-            value: money(recent.reduce((n, c) => n + c.taken, 0)),
-            sub: 'tickets + bar profit, actual',
-            tone: 'good',
-            href: null,
-          },
+      fourth,
     )
   }
 
@@ -691,14 +751,14 @@ export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: 
   return tiles.slice(0, 4)
 }
 
-// ------------------------------------------------- next through the door ---
+// -------------------------------------------------- next upcoming events ---
 
-/** The soonest night still to come that is actually happening. */
-export function pickNext(events: HomeEvent[]): HomeEvent | null {
+/** The soonest nights still to come that are actually happening, soonest first. */
+export function pickNext(events: HomeEvent[], count: number): HomeEvent[] {
   const ahead = events.filter(
     (e) => !e.input.concluded && e.input.booking === 'confirmed' && e.input.daysToDoor >= 0,
   )
-  return ahead.sort((a, b) => a.input.daysToDoor - b.input.daysToDoor)[0] ?? null
+  return ahead.sort((a, b) => a.input.daysToDoor - b.input.daysToDoor).slice(0, count)
 }
 
 export interface NextNight {
@@ -783,9 +843,9 @@ export interface MyHours {
   cost: string
   /** "$35/h" — the reader's own rate, for the figure beside `cost`. */
   rate: string
-  /** "8h worked · 4.5h still to come". */
+  /** "4.5h still to come" when some is ahead, "nothing logged yet" for zero, else "". */
   split: string
-  /** 0–100 against what they can do this month, or null with nothing to measure against. */
+  /** 0–100 against what they're available for this month, or null with nothing to measure against. */
   pct: number | null
   capLabel: string | null
 }
@@ -817,24 +877,23 @@ export function myHours({ now, availability, entries, employment }: MyHoursInput
     ? ((availability.weekly + availability.volunteer) * daysInMonth) / 7
     : 0
 
-  const split = [
-    worked > 0 ? `${hrs(worked)} worked` : null,
-    ahead > 0 ? `${hrs(ahead)} still to come` : null,
-  ]
-    .filter((s) => s !== null)
-    .join(' · ')
+  // The total is already the headline figure above; this line only ever adds
+  // to it — what's still ahead — or says there is nothing logged yet. A
+  // month that is all worked and nothing ahead has nothing left to add.
+  const split = ahead > 0 ? `${hrs(ahead)} still to come` : total > 0 ? '' : 'nothing logged yet'
 
   const rate = payRate(employment)
 
   return {
     total: hrs(total),
-    // The reader's own pay, not what the hour costs the venue — Home shows
-    // somebody what they are owed, and the two only agree for an employee.
+    // The reader's own pay, not what the hour costs the venue: Home shows
+    // somebody what they are owed. The two agree only for a contractor, whose
+    // $35 carries no on-costs; an employee's $30 costs the venue $33.66.
     cost: money(total * rate),
     rate: `${money(rate)}/h`,
-    split: split || 'nothing logged yet',
+    split,
     pct: ceiling > 0 ? Math.min(100, Math.round((total / ceiling) * 100)) : null,
-    capLabel: ceiling > 0 ? `of about ${Math.round(ceiling)}h you can do this month` : null,
+    capLabel: ceiling > 0 ? `of the ~${Math.round(ceiling)}h you’re available this month` : null,
   }
 }
 
@@ -844,7 +903,7 @@ export function myHours({ now, availability, entries, employment }: MyHoursInput
  * Whether this user may open Home.
  *
  * Home is the venue's own to-do list: whose licence is late, whose shifts are
- * open, what the last two nights took. An outside promoter's equivalent is
+ * open, what the last four weeks took. An outside promoter's equivalent is
  * Sign-offs, so an outside account is refused outright, whatever the
  * permission matrix says — the same call as Bar.
  */

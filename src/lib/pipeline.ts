@@ -181,6 +181,11 @@ export interface PartHead {
   nick: string | null
   /** Live events where this part is something to do and is not finished. */
   toGo: number
+  /**
+   * The count as the head prints it. A booking still to finish is one not yet
+   * confirmed, and saying so beats "4 to go" (Connor, 22 Sep 2026).
+   */
+  count: string
 }
 
 /**
@@ -191,15 +196,19 @@ export interface PartHead {
  */
 export function partHeads(all: PipelineEvent[]): PartHead[] {
   const live = all.filter((e) => !e.concluded)
-  return PARTS.map((def) => ({
-    key: def.key,
-    label: def.label,
-    nick: def.nick,
-    toGo: live.filter((e) => {
+  return PARTS.map((def) => {
+    const toGo = live.filter((e) => {
       const p = e.parts.find((x) => x.key === def.key)
       return p !== undefined && p.applies && !p.done
-    }).length,
-  }))
+    }).length
+    return {
+      key: def.key,
+      label: def.label,
+      nick: def.nick,
+      toGo,
+      count: def.key === 'booking' ? `${toGo} unconfirmed` : `${toGo} to go`,
+    }
+  })
 }
 
 // --------------------------------------------------------------- metrics ---
