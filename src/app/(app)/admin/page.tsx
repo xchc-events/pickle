@@ -13,6 +13,7 @@ import {
   setActive,
   setEmployment,
   setOrganisation,
+  setPhone,
   setRole,
 } from './actions'
 import styles from './admin.module.css'
@@ -72,6 +73,7 @@ export default async function AdminPage() {
               linkPerson={linkPerson.bind(null, u.id)}
               setOrganisation={setOrganisation.bind(null, u.id)}
               setEmployment={setEmployment.bind(null, u.id)}
+              setPhone={setPhone.bind(null, u.id)}
               sendInvite={sendInvite.bind(null, u.id)}
               endSessions={endSessionsFor.bind(null, u.id)}
             />

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadDesign } from '@/lib/design-data'
+import { isConfigured } from '@/lib/r2'
 import type { AssetCard } from '@/lib/design'
 import { SectionHeading } from '@/components/SectionHeading'
 import { Avatar } from '@/components/Avatar'
@@ -45,7 +46,11 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
   const { user } = await requireModule('design')
 
   const sp = await searchParams
-  const { queue, event, leadOptions, rules } = await loadDesign(user, one(sp.event))
+  const { queue, event, leadOptions, rules, storageReady } = await loadDesign(
+    user,
+    one(sp.event),
+    isConfigured(),
+  )
 
   return (
     <div>
@@ -57,6 +62,14 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
           </p>
         </div>
       </header>
+
+      {!storageReady ? (
+        <p className={styles.notReady}>
+          <i className="ph ph-warning" aria-hidden="true" />
+          File storage is not configured on this install, so nothing can be uploaded yet. Everything
+          else on this page works. Set the R2 keys in <code>.env</code> — see the README.
+        </p>
+      ) : null}
 
       <div className={styles.queue}>
         {queue.map((q) => (
@@ -104,9 +117,27 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                     ? `${event.leadName} owns every asset on this event — sign-offs, re-cuts and the hours below all land on them.`
                     : 'Nobody leads design on this event. Its design cannot be signed off until someone does.'}
                 </p>
+                {event.leadEmail || event.leadPhone ? (
+                  <p className={styles.leadContact}>
+                    {event.leadEmail ? <span>{event.leadEmail}</span> : null}
+                    {event.leadPhone ? <span>{event.leadPhone}</span> : null}
+                  </p>
+                ) : null}
               </div>
 
               <SectionHeading>The brief</SectionHeading>
+
+              {event.missingBios.length ? (
+                <ul className={styles.chase}>
+                  {event.missingBios.map((m) => (
+                    <li key={m.name} className={styles.chaseItem}>
+                      <span className={styles.chaseName}>{m.name}</span>
+                      <span className={styles.chaseWhat}>missing {m.missing}</span>
+                      {m.chaseNote ? <span className={styles.chaseNote}>{m.chaseNote}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
 
               <div className={styles.brief}>
                 <div className={styles.briefHead}>
@@ -175,10 +206,20 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                   style={{ width: `${event.hours.pct}%` }}
                 />
               </div>
-              <p className={styles.hoursNote}>
-                Run the timer from the event record. Overruns land in the event&rsquo;s cost, not in
-                nobody&rsquo;s.
-              </p>
+              {event.hours.by.length ? (
+                <ul className={styles.hoursBy}>
+                  {event.hours.by.map((b) => (
+                    <li key={b.name} className={styles.hoursByRow}>
+                      <span>{b.name}</span>
+                      <span className="tabular">{b.hoursLabel}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={styles.hoursNote}>
+                  Nobody has logged marketing hours on this event yet.
+                </p>
+              )}
             </aside>
           </div>
 
@@ -200,7 +241,12 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                 </div>
                 <div className={t.key === 'lead' ? styles.oneUp : styles.cards}>
                   {cards.map((a) => (
-                    <AssetTile key={a.key} eventId={event.id} asset={a} />
+                    <AssetTile
+                      key={a.key}
+                      eventId={event.id}
+                      asset={a}
+                      storageReady={storageReady}
+                    />
                   ))}
                 </div>
               </section>
@@ -243,7 +289,15 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
   )
 }
 
-function AssetTile({ eventId, asset }: { eventId: string; asset: AssetCard }) {
+function AssetTile({
+  eventId,
+  asset,
+  storageReady,
+}: {
+  eventId: string
+  asset: AssetCard
+  storageReady: boolean
+}) {
   return (
     <article className={`${styles.card} ${asset.state === 'review' ? styles.cardReview : ''}`}>
       <div className={`${styles.thumb} ${asset.state === 'review' ? styles.thumbReview : ''}`}>
@@ -274,14 +328,16 @@ function AssetTile({ eventId, asset }: { eventId: string; asset: AssetCard }) {
             </div>
           ) : null}
 
-          <FileUpload
-            label={asset.file ? 'Replace the file' : 'Add the file'}
-            // Bound rather than wrapped in an arrow: a closure made in a
-            // server component cannot cross into a client one, and only a
-            // server action (or a bind of one) can be passed across.
-            begin={beginArtworkUpload.bind(null, eventId, asset.key)}
-            finish={finishArtworkUpload.bind(null, eventId)}
-          />
+          {storageReady ? (
+            <FileUpload
+              label={asset.file ? 'Replace the file' : 'Add the file'}
+              // Bound rather than wrapped in an arrow: a closure made in a
+              // server component cannot cross into a client one, and only a
+              // server action (or a bind of one) can be passed across.
+              begin={beginArtworkUpload.bind(null, eventId, asset.key)}
+              finish={finishArtworkUpload.bind(null, eventId)}
+            />
+          ) : null}
         </div>
 
         {asset.needsPromoterSignOff ? (

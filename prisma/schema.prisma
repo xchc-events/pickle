@@ -533,23 +533,24 @@ model Event {
   depositRaisedAt DateTime?
   invoiceRaisedAt DateTime?
 
-  artists   EventArtist[]
-  shifts    Shift[]
-  tasks     Task[]
-  addons    Addon[]
-  activity  Activity[]
-  hours     HourEntry[]
-  review    FinanceReview?
-  actual    Actual?
-  leads     EventLead[]
-  assets    Asset[]
-  channels  ChannelPush[]
-  beats     Beat[]
-  files     StoredFile[]
-  grants    AccessGrant[]
-  holds     Hold[]
-  barBudget BarBudget?
-  barSales  BarSale[]
+  artists     EventArtist[]
+  shifts      Shift[]
+  tasks       Task[]
+  addons      Addon[]
+  activity    Activity[]
+  hours       HourEntry[]
+  review      FinanceReview?
+  actual      Actual?
+  leads       EventLead[]
+  assets      Asset[]
+  channels    ChannelPush[]
+  beats       Beat[]
+  files       StoredFile[]
+  grants      AccessGrant[]
+  holds       Hold[]
+  barBudget   BarBudget?
+  barSales    BarSale[]
+  ticketSales TicketSaleDay[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -917,6 +918,30 @@ model BarSale {
   costKnown     Boolean
 
   @@index([eventId])
+}
+
+// ------------------------------------------------------------- tickets ---
+
+/// One tier's ticket sales on one day, read from Gather.rsvp.
+///
+/// The sales graph on Ticketing draws a cumulative curve per tier, which
+/// needs sales broken out by day rather than kept as one running total:
+/// `sold` here is that day's tickets for that tier, not a total. `Event.sold`
+/// stays the current total pulled onto the event record; this table is its
+/// history, and the seed writes both from the same figures so they cannot
+/// disagree. `salesHistory` in src/lib/gather.ts is the only reader, standing
+/// in for the real "orders" read (docs/gather-rsvp-api.md, section 3.2) that
+/// replaces it once a real client exists.
+model TicketSaleDay {
+  id      String   @id @default(cuid())
+  eventId String
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  day     DateTime
+  /// sub | std | sup | door — MixKey in src/lib/ticketing.ts.
+  tier    String
+  sold    Int
+
+  @@unique([eventId, day, tier])
 }
 
 // ---------------------------------------------------------------- payees ---
