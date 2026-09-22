@@ -90,8 +90,10 @@ describe('projection', () => {
   })
 
   it('shows what a concluded event actually took', () => {
-    expect(projection(ev({ concluded: true, actualTotal: 4035, surplus: -1 }))).toEqual({
-      text: 'took $4,035',
+    // actualTotal already comes off takenOf ex GST (PG-20, fixed 22 Sep
+    // 2026); this is money() formatting it, not re-deriving it.
+    expect(projection(ev({ concluded: true, actualTotal: 3643, surplus: -1 }))).toEqual({
+      text: 'took $3,643',
       tone: 'good',
     })
   })

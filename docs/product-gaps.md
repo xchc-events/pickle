@@ -532,6 +532,12 @@ GST-inclusive equivalent is $4,189. The settlement itself is not affected:
 figure on a shipped screen, so it needs a decision on which basis to show, not
 a quiet fix. `takenOf` is the one place to change once that is decided.
 
+**Fixed 22 September 2026.** `takenOf` now takes GST off the ticket side
+before adding the bar profit — `ticketRev / CFG.gst + barProfit` — the same
+basis `financeVals` uses for `income`, decided building Home's revenue tile,
+where the actual and the projected figures have to agree. Long Player Sundays
+#9 now reads $3,643 everywhere it is shown, on the Pipeline and on Home.
+
 ---
 
 ## Not ours, deliberately

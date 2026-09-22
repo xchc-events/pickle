@@ -578,38 +578,121 @@ export interface Tile {
   href: string | null
 }
 
-/** A night with both halves counted, and what it took: tickets plus bar profit. */
+/**
+ * A night inside the Revenue tile's actual-revenue window, both halves
+ * counted. `taken` is ex-GST income — ticket sales ex GST plus bar profit,
+ * the same basis `financeVals` uses for `income` — see `takenOf` in
+ * src/lib/actuals.ts. A night with a half still missing never becomes one of
+ * these; home-data.ts leaves it out rather than passing a null.
+ */
 export interface CountedNight {
-  date: Date
+  /** Whole calendar days before now the door was. Never negative. */
+  daysAgo: number
   taken: number
 }
+
+/**
+ * How many days the Revenue tile's actual and projected halves each span:
+ * the last 4 weeks counted, the next 4 weeks modelled. One number, so the two
+ * halves of the tile cannot disagree about how wide "4 weeks" is.
+ */
+export const REVENUE_DAYS = 28
+
+/**
+ * Whether a night counts toward the Revenue tile's projected figure: live,
+ * booking confirmed — a night still being negotiated is not one to bank on —
+ * with its door inside the next four weeks, and not already fully counted.
+ * A night whose door and bar are both in is already in the actual figure;
+ * counting it here too would double it on its own day. A half-counted night
+ * stays in, since the other half is still a projection. home-data.ts sums
+ * `financeVals(...).income` over exactly the nights this returns true for,
+ * the same way it already works out the next night's surplus.
+ */
+export function inRevenueWindow(e: HomeEvent): boolean {
+  const days = e.input.daysToDoor
+  return (
+    !e.input.concluded &&
+    e.input.booking === 'confirmed' &&
+    days >= 0 &&
+    days < REVENUE_DAYS &&
+    !(e.input.doorCounted && e.input.barClosed)
+  )
+}
+
+/** How many of these nights have a confirmed booking, as a tile's sub-line. */
+const confirmedOf = (events: HomeEvent[]): string =>
+  `${events.filter((e) => e.input.booking === 'confirmed').length} confirmed`
 
 /**
  * The strip under the greeting. Each tile reads one module's records and is
  * shown only to someone who can open that module — the Pipeline's four first,
  * as the prototype had them; the roster's and the bar's for those who cannot
  * open the Pipeline.
+ *
+ * @param projected The next four weeks' modelled income over confirmed
+ *   nights — `financeVals(...).income` summed over `inRevenueWindow`, the way
+ *   home-data.ts already works out the next night's surplus. Read only by a
+ *   viewer who can also open Finance; pass 0 when nobody will read it.
  */
-export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: Viewer): Tile[] {
+export function homeTiles(
+  events: HomeEvent[],
+  counted: CountedNight[],
+  projected: number,
+  viewer: Viewer,
+): Tile[] {
   const can = (m: ModuleKey) => viewer.modules.includes(m)
   const live = events.filter((e) => !e.input.concluded)
   const tiles: Tile[] = []
 
   if (can('pipeline')) {
-    const mine = live.filter((e) => viewer.personId !== null && e.ownerId === viewer.personId)
     const flagged = live.filter((e) => e.riskNote !== null).length
-    // Gather.rsvp stays live after the night; the night is no longer selling.
-    const onSale = live.filter((e) => e.input.ticketsLive && e.input.daysToDoor >= 0)
-    const sold = onSale.reduce((n, e) => n + e.input.sold, 0)
-    const recent = [...counted].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 2)
+    // Counts exactly what /pipeline?status=soon lists — pipelineRows' own
+    // "Next 30 days" filter (see SOON_DAYS), day 30 and unconcluded nights
+    // whose door has already passed included, since that filter has no floor.
+    const soon = live.filter((e) => e.input.daysToDoor <= SOON_DAYS)
+
+    let fourth: Tile
+    if (can('finance')) {
+      // "Income, as settlements count it" (Connor, 22 Sep 2026): ticket sales
+      // ex GST plus bar profit, the same figure financeVals calls income — so
+      // the actual and the projected halves of this tile cannot disagree.
+      const actual = counted
+        .filter((c) => c.daysAgo >= 0 && c.daysAgo < REVENUE_DAYS)
+        .reduce((n, c) => n + c.taken, 0)
+      fourth = {
+        label: 'Revenue',
+        value: money(actual),
+        sub: `last 4 weeks · ${money(projected)} projected, next 4`,
+        tone: 'good',
+        href: null,
+      }
+    } else {
+      // Gather.rsvp stays live after the night; the night is no longer selling.
+      const onSale = live.filter((e) => e.input.ticketsLive && e.input.daysToDoor >= 0)
+      const sold = onSale.reduce((n, e) => n + e.input.sold, 0)
+      fourth = {
+        label: 'On sale',
+        value: String(onSale.length),
+        sub: `${sold} ${plural(sold, 'ticket', 'tickets')} sold`,
+        tone: 'plain',
+        href: can('ticketing') ? '/ticketing' : null,
+      }
+    }
 
     tiles.push(
       {
         label: 'In the pipeline',
         value: String(live.length),
-        sub: `${mine.length} yours`,
+        sub: confirmedOf(live),
         tone: 'plain',
         href: '/pipeline',
+      },
+      {
+        label: 'Next 30 days',
+        value: String(soon.length),
+        sub: confirmedOf(soon),
+        tone: 'plain',
+        href: '/pipeline?status=soon',
       },
       {
         // The Pipeline's own "At risk": a coordinator's flag, in their words.
@@ -619,28 +702,7 @@ export function homeTiles(events: HomeEvent[], counted: CountedNight[], viewer: 
         tone: flagged > 0 ? 'warn' : 'good',
         href: '/pipeline?status=risk',
       },
-      {
-        label: 'On sale',
-        value: String(onSale.length),
-        sub: `${sold} ${plural(sold, 'ticket', 'tickets')} sold`,
-        tone: 'plain',
-        href: can('ticketing') ? '/ticketing' : null,
-      },
-      recent.length === 0
-        ? {
-            label: 'Revenue, last 2 events',
-            value: '—',
-            sub: 'no night counted yet',
-            tone: 'plain',
-            href: null,
-          }
-        : {
-            label: recent.length === 1 ? 'Revenue, last event' : 'Revenue, last 2 events',
-            value: money(recent.reduce((n, c) => n + c.taken, 0)),
-            sub: 'tickets + bar profit, actual',
-            tone: 'good',
-            href: null,
-          },
+      fourth,
     )
   }
 

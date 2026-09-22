@@ -85,8 +85,11 @@ describe('isReconciled', () => {
 })
 
 describe('takenOf', () => {
-  it('adds the ticket takings and the bar profit, as the prototype’s post-event total does', () => {
-    expect(takenOf(halvesOf(row()))).toBe(3009 + 1026)
+  it('takes GST off the ticket side before adding the bar profit — PG-20', () => {
+    // Long Player Sundays #9's own figures (docs/product-gaps.md, PG-20):
+    // reads $4,035 on the old two-basis sum, $3,643 ex GST throughout — the
+    // same basis financeVals uses for income.
+    expect(takenOf(halvesOf(row()))).toBeCloseTo(3009 / CFG.gst + 1026, 6)
   })
 
   it('is nothing until both halves are in — half a night is not what it took', () => {
