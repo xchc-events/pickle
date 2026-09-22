@@ -80,22 +80,28 @@ export function UserRow({
       </select>
 
       {user.role === 'PROMOTER' ? (
-        /* Several accounts may point at one organisation — that is how a
-           label with three promoters is set up. Nothing stops two rows
-           choosing the same one. */
-        <select
-          className={styles.select}
-          value={user.organisationId ?? ''}
-          disabled={pending}
-          onChange={(e) => run(() => setOrganisation(e.target.value))}
-        >
-          <option value="">— no organisation —</option>
-          {organisations.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.name}
-            </option>
-          ))}
-        </select>
+        <>
+          {/* Several accounts may point at one organisation — that is how a
+              label with three promoters is set up. Nothing stops two rows
+              choosing the same one. */}
+          <select
+            className={styles.select}
+            value={user.organisationId ?? ''}
+            disabled={pending}
+            onChange={(e) => run(() => setOrganisation(e.target.value))}
+          >
+            <option value="">— no organisation —</option>
+            {organisations.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+
+          {/* An outside account is not paid through the roster. Its pay
+              column stays empty, so the columns line up down the list. */}
+          <span aria-hidden="true" />
+        </>
       ) : (
         <>
           <select
