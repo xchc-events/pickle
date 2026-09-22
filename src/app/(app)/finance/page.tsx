@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { requireModule, modulesFor } from '@/lib/permissions'
-import { loadFinance } from '@/lib/finance-data'
+import { loadFinance, loadLabour } from '@/lib/finance-data'
 import { settlementFor } from '@/lib/settlement-data'
 import { canReveal } from '@/lib/payments'
 import { money } from '@/lib/format'
@@ -11,7 +11,7 @@ import { Review } from './Review'
 import { Milestones } from './Milestones'
 import { Reveal } from './Reveal'
 import { PayeeActions } from './PayeeActions'
-import { chaseDetails, forget, markPaid, reveal, revokeAllLinks } from './actions'
+import { chaseDetails, forget, markPaid, reveal, revokeAllLinks, setScenario } from './actions'
 import styles from './finance.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -19,6 +19,9 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 /** How a half of the night got its figures — the authority behind them. */
 const sourceWords = (source: 'MANUAL' | 'POS' | null) =>
   source === 'POS' ? ', read off Epos Now' : source === 'MANUAL' ? ', entered by hand' : ''
+
+/** Index into `Event.scen` — same order the deleted Ticketing action used. */
+const SCENARIOS = ['quiet', 'likely', 'great'] as const
 
 /**
  * Finance — the paying-people half.
@@ -55,6 +58,11 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
   // The sheet is the reason the payables list exists, so it is loaded with it
   // rather than behind a tab. Null only when no event is selected.
   const settlement = event ? await settlementFor(event.id) : null
+
+  // Org-wide, not this event's — the same "all events in the pipeline"
+  // figure Pipeline used to show. Only worth loading once there is a body to
+  // put it in.
+  const labour = event ? await loadLabour(user) : []
 
   return (
     <div>
@@ -127,6 +135,31 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
                 Settlement
               </SectionHeading>
 
+              <div className={styles.scenario}>
+                <span className={styles.scenarioLabel}>How the night might go</span>
+                <div className={styles.scenarioChips}>
+                  {SCENARIOS.map((label, i) => (
+                    <div
+                      key={label}
+                      className={`${styles.scenarioChip} ${event.scen === i ? styles.scenarioOn : ''}`}
+                    >
+                      <span className={styles.scenarioName}>{label}</span>
+                      {event.scen === i ? (
+                        <span className={styles.scenarioCurrent}>current</span>
+                      ) : (
+                        <ActionButton
+                          className={styles.scenarioUse}
+                          action={setScenario.bind(null, event.id, i)}
+                          title={`Use the ${label} case`}
+                        >
+                          Use this
+                        </ActionButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <SettlementSheet lines={settlement.lines} />
 
               {(settlement.door?.by || settlement.bar?.by) && (
@@ -143,6 +176,24 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
               )}
             </>
           )}
+
+          <div className={styles.labour}>
+            <SectionHeading note="Rostered shifts plus hours entered against tasks, all events in the pipeline">
+              Where the labour goes
+            </SectionHeading>
+            <div className={styles.labourRows}>
+              {labour.map((l) => (
+                <div key={l.label} className={styles.labourRow}>
+                  <span className={styles.labourLabel}>{l.label}</span>
+                  <span className={styles.bar}>
+                    <span className={styles.barFill} style={{ width: `${l.widthPct}%` }} />
+                  </span>
+                  <span className={`${styles.labourValue} tabular`}>{l.value}</span>
+                  <span className={`${styles.labourCost} tabular`}>{l.cost}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <SectionHeading note="details are entered by the act, never re-typed here">
             Who gets paid

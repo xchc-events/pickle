@@ -3,7 +3,6 @@ import { requireModule } from '@/lib/permissions'
 import { loadPipeline } from '@/lib/pipeline-data'
 import { mayStartEnquiry } from '@/lib/intake'
 import {
-  labourSplit,
   metaLine,
   partHeads,
   partTitle,
@@ -14,7 +13,6 @@ import {
   type StatusFilter,
 } from '@/lib/pipeline'
 import { days as dayLabel } from '@/lib/format'
-import { SectionHeading } from '@/components/SectionHeading'
 import { NewEnquiry } from '@/components/NewEnquiry'
 import styles from './pipeline.module.css'
 
@@ -56,7 +54,6 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
   const all = await loadPipeline(user)
   const rows = pipelineRows(all, { status, sort, meInitials: user.initials })
   const heads = partHeads(all)
-  const labour = labourSplit(all)
 
   const href = (next: Partial<{ status: string; sort: string }>) => {
     const q = new URLSearchParams({ status, sort, ...next })
@@ -192,24 +189,6 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                 Every part is worked out from its own records. Hover a cell for what holds it up.
               </span>
             </p>
-          </div>
-        </div>
-
-        <div className={styles.labour}>
-          <SectionHeading note="Rostered shifts plus hours entered against tasks, all events in the pipeline">
-            Where the labour goes
-          </SectionHeading>
-          <div className={styles.labourRows}>
-            {labour.map((l) => (
-              <div key={l.label} className={styles.labourRow}>
-                <span className={styles.labourLabel}>{l.label}</span>
-                <span className={styles.bar}>
-                  <span className={styles.barFill} style={{ width: `${l.widthPct}%` }} />
-                </span>
-                <span className={`${styles.labourValue} tabular`}>{l.value}</span>
-                <span className={`${styles.labourCost} tabular`}>{l.cost}</span>
-              </div>
-            ))}
           </div>
         </div>
       </div>
