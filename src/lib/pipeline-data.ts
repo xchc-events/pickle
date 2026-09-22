@@ -1,12 +1,13 @@
 import 'server-only'
 import { db } from './db'
-import { financeVals, type FinanceEvent, type Scenario } from './finance'
+import { financeVals } from './finance'
+import { FINANCE_SELECT, financeInputFor, scenarioOf } from './finance-input'
 import type { PipelineEvent } from './pipeline'
 import { initialsOf } from './format'
 import { eventScope } from './scope'
 import { halvesOf, takenOf } from './actuals'
 import { partsFor } from './parts'
-import { partsInputFor } from './parts-input'
+import { PARTS_SELECT, partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
 
 /**
@@ -20,25 +21,39 @@ import type { SessionUser } from './session'
 
 const monthKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}`
 
+// Both FINANCE_SELECT and PARTS_SELECT want artists, shifts and tasks, and a
+// spread keeps only the last one — so they are written out whole here, with
+// every column either one reads, the same pattern HOME_SELECT in
+// home-data.ts uses. `person.employment` is what `financeInputFor` blends
+// the wage cost from.
+const PIPELINE_SELECT = {
+  ...PARTS_SELECT,
+  ...FINANCE_SELECT,
+  id: true,
+  name: true,
+  riskNote: true,
+  riskKind: true,
+  internal: true,
+  actual: true,
+  owner: { select: { name: true, initials: true } },
+  artists: {
+    select: {
+      low: true,
+      high: true,
+      status: true,
+      payee: { select: { files: { select: { kind: true } } } },
+    },
+  },
+  shifts: {
+    select: { hours: true, personId: true, state: true, person: { select: { employment: true } } },
+  },
+  tasks: { select: { est: true, actual: true, name: true } },
+} as const
+
 export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> {
   const events = await db.event.findMany({
     where: eventScope(user),
-    include: {
-      space: true,
-      owner: true,
-      // Payee files count towards an act's bios, pics and riders.
-      artists: { include: { payee: { select: { files: { select: { kind: true } } } } } },
-      shifts: true,
-      tasks: true,
-      addons: true,
-      actual: true,
-      leads: { select: { role: true } },
-      assets: { select: { key: true, state: true, promoterSigned: true } },
-      channels: { select: { channel: true, live: true, stale: true } },
-      beats: { select: { done: true } },
-      files: { select: { kind: true, assetId: true, current: true, scan: true } },
-      hours: { select: { id: true } },
-    },
+    select: PIPELINE_SELECT,
     orderBy: { date: 'asc' },
   })
 
@@ -72,35 +87,9 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
     const k = monthKey(e.date)
     const orgShareHours = (orgByMonth.get(k) ?? 0) / (eventsByMonth.get(k) || 1)
 
-    const fin: FinanceEvent = {
-      dow: e.date.getDay(),
-      std: e.std,
-      door: e.door,
-      mix: e.mix as [number, number, number, number],
-      att: e.att as [number, number, number],
-      scen: e.scen as Scenario,
-      barHead: e.barHead,
-      gear: e.gear,
-      adv: e.adv,
-      sound: e.sound,
-      crew: e.crew,
-      tok: e.tok,
-      split: e.split,
-      artists: e.artists.map((a) => ({
-        status: a.status.toLowerCase() as 'enquired' | 'pencilled' | 'confirmed' | 'declined',
-        low: a.low,
-        high: a.high,
-      })),
-      shifts: e.shifts.map((s) => ({ hours: s.hours, assigned: s.personId !== null })),
-      tasks: e.tasks.map((t) => ({ est: t.est, actual: t.actual })),
-      addons: e.addons.map((a) => ({
-        kind: a.kind.toLowerCase() as 'gear' | 'labour',
-        cost: a.cost ?? undefined,
-        hours: a.hours ?? undefined,
-      })),
-      orgShareHours,
-    }
-    const v = financeVals(fin)
+    // The same assembly, and the same blended wage cost, every other screen
+    // that prices a night uses — see src/lib/finance-input.ts.
+    const v = financeVals(financeInputFor(e, scenarioOf(e.scen), orgShareHours))
 
     const ext = externals.find((u) => u.promoter && (e.promoter ?? '').includes(u.promoter))
 

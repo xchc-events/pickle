@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs, money } from './format'
+import { PLANNED_HOUR_COST } from './finance'
 import { apportion, costOf, monthKey, monthLabel } from './hours'
 import type { Prisma } from '@/generated/prisma/client'
 import type { SessionUser } from './session'
@@ -101,7 +102,7 @@ export async function loadHours(
 
   const people = await db.person.findMany({
     where: { active: true },
-    select: { id: true, name: true, initials: true },
+    select: { id: true, name: true, initials: true, employment: true },
     orderBy: { name: 'asc' },
   })
 
@@ -152,7 +153,7 @@ export async function loadHours(
   const mine: HourLine[] = mineRows.map((e) => ({
     id: e.id,
     hoursLabel: hrs(e.hours),
-    cost: money(costOf(e.hours)),
+    cost: money(costOf(e.hours, chosen?.employment)),
     role: e.role ?? 'Work',
     note: e.note,
     where: e.event ? e.event.name : `org-wide · ${monthLabel(monthKey(e.workedOn))}`,
@@ -266,12 +267,14 @@ export async function loadHours(
       : null,
     mine,
     mineTotal: hrs(mineHours),
-    mineCost: money(costOf(mineHours)),
+    mineCost: money(costOf(mineHours, chosen?.employment)),
     tiles: [
       {
         label: 'Logged, all sources',
         value: hrs(loggedTotal),
-        sub: `${money(costOf(loggedTotal))} loaded`,
+        // A mix of everybody's hours — planned at the contractor rate rather
+        // than broken out person by person for one combined figure.
+        sub: `${money(costOf(loggedTotal))} at $${PLANNED_HOUR_COST}/hr planned`,
       },
       {
         label: 'Org-wide, not event work',
@@ -301,7 +304,7 @@ export async function loadHours(
           name: p?.name ?? 'Somebody who has left',
           initials: p?.initials ?? '—',
           hoursLabel: hrs(hours),
-          cost: money(costOf(hours)),
+          cost: money(costOf(hours, p?.employment)),
           width: Math.min(100, Math.round((hours / peak) * 100)),
           isMe: r.personId === chosenId,
         }

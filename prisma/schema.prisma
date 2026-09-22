@@ -44,6 +44,9 @@ model Person {
   initials String  @unique
   email    String? @unique
   active   Boolean @default(true)
+  /// Employee or contractor — decides which standard rate their hours cost
+  /// the venue and pay them. See src/lib/finance.ts.
+  employment Employment @default(CONTRACTOR)
 
   user         User?
   ownedEvents  Event[]       @relation("EventOwner")
@@ -68,6 +71,13 @@ enum Role {
   ADMIN
   /// External coordinator — outside the venue. Sees only their own events.
   PROMOTER
+}
+
+/// Employee or contractor. See the standard rates on `CFG` in
+/// src/lib/finance.ts — 22 Sep 2026 pay policy.
+enum Employment {
+  EMPLOYEE
+  CONTRACTOR
 }
 
 /// An account. Permissions are enforced server-side off `role`; the sidebar

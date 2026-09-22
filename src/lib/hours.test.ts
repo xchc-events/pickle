@@ -11,7 +11,7 @@ import {
   splitOf,
   startingEvent,
 } from './hours'
-import { CFG } from './finance'
+import { CFG, PLANNED_HOUR_COST } from './finance'
 
 /**
  * Hours.
@@ -54,17 +54,28 @@ describe('the roles', () => {
 })
 
 describe('costOf', () => {
-  it('uses the loaded rate, never the base one', () => {
-    expect(costOf(1)).toBe(CFG.loaded)
+  it('with nobody named, plans the hour as a contractor hour, never the base rate', () => {
+    expect(costOf(1)).toBe(PLANNED_HOUR_COST)
     expect(costOf(1)).not.toBe(CFG.rate)
   })
 
-  it('is zero for no hours', () => {
+  it('costs a named employee at the loaded rate', () => {
+    expect(costOf(1, 'EMPLOYEE')).toBe(CFG.loaded)
+  })
+
+  it('costs a named contractor at the flat contractor rate', () => {
+    expect(costOf(1, 'CONTRACTOR')).toBe(CFG.contractorRate)
+    expect(costOf(1, 'CONTRACTOR')).toBe(costOf(1))
+  })
+
+  it('is zero for no hours, whoever it is', () => {
     expect(costOf(0)).toBe(0)
+    expect(costOf(0, 'EMPLOYEE')).toBe(0)
   })
 
   it('scales', () => {
-    expect(costOf(10)).toBeCloseTo(336.6, 5)
+    expect(costOf(10)).toBeCloseTo(350, 5)
+    expect(costOf(10, 'EMPLOYEE')).toBeCloseTo(336.6, 5)
   })
 })
 
@@ -164,8 +175,8 @@ describe('effectOf — where the money lands', () => {
     })
     expect(e.text).toContain('Static Bloom')
     expect(e.text).toContain('design & comms')
-    // 4h at the loaded rate is $134.64, shown rounded.
-    expect(e.text).toMatch(/\$135/)
+    // Nobody is named here, so it plans at the contractor rate: 4h × $35 = $140.
+    expect(e.text).toMatch(/\$140/)
     expect(e.text).toMatch(/surplus/i)
   })
 
@@ -179,8 +190,8 @@ describe('effectOf — where the money lands', () => {
     })
     expect(e.text).toContain('3 events')
     expect(e.text).toContain('Aug 2026')
-    // $202 total, $67 each.
-    expect(e.text).toMatch(/\$67/)
+    // $210 total (6h × $35 planned), $70 each.
+    expect(e.text).toMatch(/\$70/)
   })
 
   it('says one event without pluralising', () => {

@@ -15,6 +15,7 @@ import {
 import { PARTS, type PartKey, type PartState } from './parts'
 import { eventScope } from './scope'
 import { initialsOf, money } from './format'
+import { PLANNED_HOUR_COST } from './finance'
 
 /**
  * Eight finished parts, with whichever ones a test cares about overridden.
@@ -323,10 +324,10 @@ describe('labourSplit', () => {
     ])
   })
 
-  it('costs hours at the loaded rate, not the base rate', () => {
-    // 10h at $33.66 loaded = $337, not 10 × $30.
+  it('costs hours at the planned contractor rate, not the base rate', () => {
+    // 10h at $35 planned = $350, not 10 × $30.
     const rows = labourSplit([ev({ taskHours: [{ team: 'Admin', hours: 10 }] })])
-    expect(rows.find((r) => r.label === 'Admin')!.cost).toBe('$337')
+    expect(rows.find((r) => r.label === 'Admin')!.cost).toBe(`$${10 * PLANNED_HOUR_COST}`)
   })
 
   it('scales bar widths against the largest team', () => {
@@ -365,14 +366,15 @@ describe('pipelineMetrics', () => {
     expect(m[2].placeholder).toBeUndefined()
   })
 
-  it('totals labour hours across live events at the loaded rate', () => {
+  it('totals labour hours across live events at the planned contractor rate', () => {
     const m = pipelineMetrics([
       ev({ hours: 10 }),
       ev({ hours: 5 }),
       ev({ hours: 99, concluded: true }),
     ])
     expect(m[2].value).toBe('15h')
-    expect(m[2].sub).toBe('$505')
+    // 15h × $35 planned.
+    expect(m[2].sub).toBe('$525')
   })
 })
 

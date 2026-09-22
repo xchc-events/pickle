@@ -181,7 +181,9 @@ function HoursDetail({ hours }: { hours: Exclude<HomeLoad['hours'], 'unlinked' |
     <>
       <div className={styles.hoursFigure}>
         <span className={`${styles.hoursValue} tabular`}>{hours.total}</span>
-        <span className={styles.hoursCost}>{hours.cost} at loaded rate</span>
+        <span className={styles.hoursCost}>
+          {hours.cost} at {hours.rate}
+        </span>
       </div>
       {hours.pct !== null ? (
         <div

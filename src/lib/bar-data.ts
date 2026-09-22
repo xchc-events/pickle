@@ -61,9 +61,11 @@ const BAR_SELECT = {
   sold: true,
   space: { select: { name: true, capacity: true, seatedCapacity: true } },
   // Overrides FINANCE_SELECT's narrower shifts select, so it has to keep
-  // `personId` — that is what `financeInputFor` reads to decide whether a shift
-  // carries wage cost.
-  shifts: { select: { role: true, hours: true, personId: true } },
+  // `personId` and `person.employment` — what `financeInputFor` reads to
+  // decide whether a shift carries wage cost, and at whose rate.
+  shifts: {
+    select: { role: true, hours: true, personId: true, person: { select: { employment: true } } },
+  },
   actual: {
     select: {
       tickets: true,

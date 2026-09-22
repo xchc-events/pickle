@@ -179,8 +179,11 @@ being confirmed, was dropped in favour of this.
   the smallest DJ night's crew ($960) costs more than a night under $1,000 has
   left after its day's share. Only small workshops, Sunday to Thursday, could
   ever be autonomous.
-- Whether $30 an hour includes the 12.2% on-costs ($33.66, the rate Pickle's
-  P&L uses).
+- ~~Whether $30 an hour includes the 12.2% on-costs.~~ Answered 22 Sep 2026:
+  $30 is an employee's base pay, before on-costs, and costs the venue $33.66.
+  Contractors, who are everyone else, are paid $35 flat. Pickle now costs each
+  hour by who works it and plans unassigned hours at $35, so check 3's crew
+  figures above run about a sixth higher than the $30 they assume.
 
 **Update Review**
 

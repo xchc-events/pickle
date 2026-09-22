@@ -6,8 +6,10 @@ import { requireModule } from '@/lib/permissions'
 import { endSessions, recordAuthEvent } from '@/lib/auth-data'
 import { emailLink, type LinkOutcome } from '@/lib/auth-links'
 import { mayChangeRole, maySetActive, normaliseEmail } from '@/lib/auth-rules'
+import { payRate } from '@/lib/finance'
+import { money } from '@/lib/format'
 import { said, type Said } from '@/lib/toast'
-import type { Role } from '@/generated/prisma/client'
+import type { Employment, Role } from '@/generated/prisma/client'
 
 /**
  * Admin's mutations — who has access to this product.
@@ -230,6 +232,40 @@ export async function setRole(userId: string, role: Role): Promise<Said> {
   return said(
     `${target.name ?? target.email} is now ${role.toLowerCase()}. What they can see changed with it — the sidebar and every URL.`,
   )
+}
+
+/**
+ * Set a person's pay rate: employee or contractor.
+ *
+ * Set on the `Person`, not the `User` — the same record the roster and
+ * Hours already read, so a change here is the one place it has to happen.
+ * Administrator-only, like every other change of what somebody is paid.
+ */
+export async function setEmployment(userId: string, employment: Employment): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.role !== 'ADMIN') return said('Only an administrator can set pay rates.', 'stop')
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, personId: true, name: true, email: true },
+  })
+  if (!target) return said('No such account.', 'stop')
+  if (target.role === 'PROMOTER') {
+    return said('An external promoter is not paid through the roster.', 'stop')
+  }
+  if (!target.personId) {
+    return said(
+      'Link this account to a person first — pay rate is set on the person record.',
+      'stop',
+    )
+  }
+
+  await db.person.update({ where: { id: target.personId }, data: { employment } })
+
+  refresh()
+  const who = target.name ?? target.email
+  const noun = employment === 'EMPLOYEE' ? 'an employee' : 'a contractor'
+  return said(`${who} is now paid as ${noun} — ${money(payRate(employment))}/hr.`)
 }
 
 export async function setActive(userId: string, active: boolean): Promise<Said> {

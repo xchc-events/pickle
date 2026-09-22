@@ -1,6 +1,7 @@
 import { BUILT_MODULES, MODULES, type ModuleKey } from './constants'
 import { dateLabel, days, hrs, money } from './format'
-import { costOf, monthKey } from './hours'
+import { payRate, type Employment } from './finance'
+import { monthKey } from './hours'
 import type { Gate, LeadKey } from './event-record'
 import {
   PARTS,
@@ -832,12 +833,16 @@ export interface MyHoursInput {
   availability: { weekly: number; volunteer: number } | null
   /** `rostered` is an hour a shift wrote, the only kind that can be still to come. */
   entries: { hours: number; workedOn: Date; rostered: boolean }[]
+  /** The reader's own employment — decides what their hour pays them. */
+  employment: Employment
 }
 
 export interface MyHours {
   total: string
-  /** At the loaded rate, as every hour is costed. */
+  /** What this month's hours pay the reader, at their own rate. */
   cost: string
+  /** "$35/h" — the reader's own rate, for the figure beside `cost`. */
+  rate: string
   /** "4.5h still to come" when some is ahead, "nothing logged yet" for zero, else "". */
   split: string
   /** 0–100 against what they're available for this month, or null with nothing to measure against. */
@@ -855,7 +860,7 @@ export interface MyHours {
  * day it is filed under. Org-wide hours are filed under the 15th of their
  * month, and would otherwise read as still to come until the 15th.
  */
-export function myHours({ now, availability, entries }: MyHoursInput): MyHours {
+export function myHours({ now, availability, entries, employment }: MyHoursInput): MyHours {
   const month = monthKey(now)
   const mine = entries.filter((x) => monthKey(x.workedOn) === month)
   const sum = (rows: typeof mine) => rows.reduce((n, x) => n + x.hours, 0)
@@ -877,9 +882,15 @@ export function myHours({ now, availability, entries }: MyHoursInput): MyHours {
   // month that is all worked and nothing ahead has nothing left to add.
   const split = ahead > 0 ? `${hrs(ahead)} still to come` : total > 0 ? '' : 'nothing logged yet'
 
+  const rate = payRate(employment)
+
   return {
     total: hrs(total),
-    cost: money(costOf(total)),
+    // The reader's own pay, not what the hour costs the venue: Home shows
+    // somebody what they are owed. The two agree only for a contractor, whose
+    // $35 carries no on-costs; an employee's $30 costs the venue $33.66.
+    cost: money(total * rate),
+    rate: `${money(rate)}/h`,
     split,
     pct: ceiling > 0 ? Math.min(100, Math.round((total / ceiling) * 100)) : null,
     capLabel: ceiling > 0 ? `of the ~${Math.round(ceiling)}h you’re available this month` : null,
@@ -892,7 +903,7 @@ export function myHours({ now, availability, entries }: MyHoursInput): MyHours {
  * Whether this user may open Home.
  *
  * Home is the venue's own to-do list: whose licence is late, whose shifts are
- * open, what the last two nights took. An outside promoter's equivalent is
+ * open, what the last four weeks took. An outside promoter's equivalent is
  * Sign-offs, so an outside account is refused outright, whatever the
  * permission matrix says — the same call as Bar.
  */

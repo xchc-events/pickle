@@ -1,4 +1,4 @@
-import { CFG, type FinanceVals } from './finance'
+import { CFG, PLANNED_HOUR_COST, type FinanceVals } from './finance'
 import { timeMinutes } from './event-record'
 import { money } from './format'
 import type { BarClose } from './actuals'
@@ -148,7 +148,7 @@ export interface BarBudgetFigures {
   stockCostPct: number
   /** Planned bar hours — duty manager and bar staff. */
   labourHours: number
-  /** The loaded rate those hours were costed at. */
+  /** The rate those planned hours were costed at — see `PLANNED_HOUR_COST`. */
   loadedRate: number
 }
 
@@ -171,7 +171,7 @@ export function barBudgetFrom(input: {
     margin: input.vals.barMarg,
     stockCostPct: CFG.stockCost,
     labourHours: input.labourHours,
-    loadedRate: CFG.loaded,
+    loadedRate: PLANNED_HOUR_COST,
   }
 }
 
@@ -227,7 +227,7 @@ export function nightFromActual(input: {
   const take = input.bar.barTake
   const takeEx = take / CFG.gst
   const margin = input.bar.barProfit
-  const labour = input.labourHours * CFG.loaded
+  const labour = input.labourHours * PLANNED_HOUR_COST
   return {
     heads: input.heads,
     take,

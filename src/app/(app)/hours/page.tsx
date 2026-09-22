@@ -146,7 +146,7 @@ export default async function HoursPage({ searchParams }: PageProps<'/hours'>) {
                 <th>Off site</th>
                 <th>Org share</th>
                 <th>Total</th>
-                <th>Loaded</th>
+                <th>Cost</th>
               </tr>
             </thead>
             <tbody>

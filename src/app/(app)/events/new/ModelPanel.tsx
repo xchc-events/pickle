@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CFG } from '@/lib/finance'
+import { PLANNED_HOUR_COST } from '@/lib/finance'
 import { modelOf, verdictOf, type ModelInputs } from '@/lib/enquiry-model'
 import { headsLine } from '@/lib/event-record'
 import { hrs, money } from '@/lib/format'
@@ -133,7 +133,8 @@ export function ModelPanel({ inputs, external }: { inputs: ModelInputs; external
             <span className={cls(styles.pnlFigure, 'tabular')}>{money(t.ourPeople)}</span>
           </div>
           <p className={styles.pnlNote}>
-            {hrs(shown.crewHours)} on site + {hrs(shown.taskHours)} off site at ${CFG.loaded}/hr
+            {hrs(shown.crewHours)} on site + {hrs(shown.taskHours)} off site, planned at $
+            {PLANNED_HOUR_COST}/hr
           </p>
           <details className={styles.crewDetails}>
             <summary>Roster ({shown.crew.length})</summary>

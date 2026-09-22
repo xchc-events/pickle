@@ -103,7 +103,7 @@ In production: replace with real auth; keep the idea that role determines the vi
 
 ### Home
 
-Greeting + subline. Four-cell metric strip. Two columns: **"Needs you"** action queue, every row a single link (icon, title, sub, age in a status colour) — a **"Nobody's on these"** list of its own below it, shown only when it has anything in it — and a 296px aside with **"Next upcoming events"** (up to the two soonest confirmed nights: name, when, days-out counter at 27px accent, one-line status, primary button) and **"Your hours this month"** (figure, loaded cost, progress bar, primary button to log time).
+Greeting + subline. Four-cell metric strip. Two columns: **"Needs you"** action queue, every row a single link (icon, title, sub, age in a status colour) — a **"Nobody's on these"** list of its own below it, shown only when it has anything in it — and a 296px aside with **"Next upcoming events"** (up to the two soonest confirmed nights: name, when, days-out counter at 27px accent, one-line status, primary button) and **"Your hours this month"** (figure, the reader's own pay at their rate, progress bar, primary button to log time).
 
 > **Built 17 Sep 2026, on the parts rather than the stages.** "Needs you" is the failing gates of each event's parts (see the note under Pipeline), each put in front of the person it waits on. The event's own business — the booking, the licence, counting the door, putting the night to bed — goes to its owner. A department's part goes to its lead. Shift gaps and closing the bar go to anyone who can open Roster or Bar, as the prototype had it. Where nobody named could act (no owner, an owner who never signs in, a lead whose role cannot open the screen), it goes to everyone who can open the part's module, and for the event's own business that is Finance. A reader only ever sees gates on screens they can open.
 >
@@ -199,7 +199,7 @@ The most specified screen. Event chip rail across the top (each chip: name, date
 4. − Cost base share — _day_ carries _n_% (rent, power, insurance, software)
 5. − Gear, hire & promotion (incl. Wheke Sound on the sliding scale where applicable)
 6. − Comps & crew tokens (at stock cost, not till price)
-7. − Crew wages, loaded — _n_ hours, _n_ people, from rostered shifts and logged tasks
+7. − Crew wages — _n_ hours, _n_ people, from rostered shifts and logged tasks, each at the rate of the person on it (since 22 Sep 2026: see the note under the formulas)
 8. − Org-wide labour, share of _month_ — apportioned across the events in that month
 9. − Artist & promoter floors — _n_ names on the bill
 10. − Surplus share out — _n_% of the surplus to their people
@@ -313,6 +313,8 @@ perHead      = avg/gst + barHead/gst*barMargin
 breakeven    = ceil(fixed / perHead)
 fullPay      = ceil((fixed + (ceil-floor)/max(split,0.05)) / perHead)
 ```
+
+> **Pay policy, 22 Sep 2026 (Connor).** "Our standard payout for contractors (everyone who is not an employee) is $35. Our standard pay rate for employees is $30/hr." A person is an employee or a contractor (`Person.employment`, set in Admin). Contractors carry no on-costs, so `contractorRate: 35` is both what they are paid and what their hour costs. `loaded` (33.66) is now an employee's cost only. `ourPeople` prices each assigned shift at its person's `hourCost`, and task and labour add-on hours at `PLANNED_HOUR_COST` (35). The blend is worked out once, in `financeInputFor`, so every screen and the settlement agree. `orgCost` plans at 35. See `src/lib/finance.ts` and `src/lib/finance-input.ts`. This has not yet been checked against a real settlement.
 
 Wheke Sound sliding-scale fee: `t = clamp((income - 3000) / 5000, 0, 1); fee = round((300 + 300*t) / 25) * 25`.
 

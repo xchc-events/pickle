@@ -6,7 +6,7 @@ import { modulesOpenByRole } from './scope'
 import { ago, initialsOf } from './format'
 import { sessionState } from './auth-rules'
 import { userProblems } from './auth-rules'
-import type { Role } from '@/generated/prisma/client'
+import type { Employment, Role } from '@/generated/prisma/client'
 
 /**
  * Loads Admin.
@@ -33,6 +33,8 @@ export interface AdminUser {
   active: boolean
   personId: string | null
   personName: string | null
+  /** Null when there is no linked person to set a pay rate on. */
+  employment: Employment | null
   initials: string
   /** Ways this account is set up wrongly. Not errors, but worth saying. */
   problems: string[]
@@ -65,7 +67,7 @@ export async function loadAdmin(): Promise<AdminLoad> {
   const rows = await db.user.findMany({
     orderBy: [{ active: 'desc' }, { role: 'asc' }, { email: 'asc' }],
     include: {
-      person: { select: { id: true, name: true, initials: true } },
+      person: { select: { id: true, name: true, initials: true, employment: true } },
       organisation: { select: { id: true, name: true } },
       sessions: {
         where: { expires: { gt: now } },
@@ -97,6 +99,7 @@ export async function loadAdmin(): Promise<AdminLoad> {
       active: u.active,
       personId: u.personId,
       personName: u.person?.name ?? null,
+      employment: u.person?.employment ?? null,
       initials: u.person?.initials ?? initialsOf(u.name ?? u.email),
       problems: userProblems({
         role: u.role,

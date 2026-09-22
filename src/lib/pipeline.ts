@@ -15,7 +15,7 @@
  */
 
 import { hrs, money, days as dayLabel } from './format'
-import { CFG } from './finance'
+import { PLANNED_HOUR_COST } from './finance'
 import { gatesDoneLabel } from './event-record'
 import { PARTS, type BookingStatus, type PartKey, type PartState } from './parts'
 
@@ -253,9 +253,9 @@ export function pipelineMetrics(all: PipelineEvent[]): Metric[] {
     },
     {
       label: 'Labour booked to events this month',
-      note: `Every rostered shift plus every hour entered against a task, at $${CFG.loaded} loaded`,
+      note: `Every rostered shift plus every hour entered against a task, planned at $${PLANNED_HOUR_COST}/hr`,
       value: hrs(hours),
-      sub: money(hours * CFG.loaded),
+      sub: money(hours * PLANNED_HOUR_COST),
       tone: 'plain',
     },
     {
@@ -278,8 +278,9 @@ export interface LabourRow {
 
 /**
  * Where the labour goes: off-site task hours by team, plus every assigned
- * on-site shift pooled as one line. Hours are costed at the loaded rate,
- * never the base rate.
+ * on-site shift pooled as one line. This view has no idea who is on each
+ * shift, so every hour is planned at the contractor rate, never the base
+ * rate.
  */
 export function labourSplit(all: PipelineEvent[]): LabourRow[] {
   const live = all.filter((e) => !e.concluded)
@@ -296,7 +297,7 @@ export function labourSplit(all: PipelineEvent[]): LabourRow[] {
     .map(([label, value]) => ({
       label,
       value: hrs(value),
-      cost: money(value * CFG.loaded),
+      cost: money(value * PLANNED_HOUR_COST),
       widthPct: Math.round((value / max) * 100),
     }))
 }

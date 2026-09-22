@@ -21,6 +21,7 @@ const db = {
     update: vi.fn(),
     count: vi.fn(),
   },
+  person: { update: vi.fn() },
   session: { deleteMany: vi.fn() },
   authToken: { deleteMany: vi.fn() },
   $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
@@ -48,7 +49,7 @@ const mere = {
 
 beforeEach(() => {
   permissions.requireModule.mockReset().mockResolvedValue({ user: sione, modules: ['admin'] })
-  for (const table of [db.user, db.session, db.authToken]) {
+  for (const table of [db.user, db.person, db.session, db.authToken]) {
     for (const fn of Object.values(table)) fn.mockReset()
   }
   // Cleared rather than reset: it keeps running the operations it is given.
@@ -250,5 +251,57 @@ describe('setActive', () => {
       expect(db.session.deleteMany).not.toHaveBeenCalled()
       expect(db.authToken.deleteMany).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('setEmployment', () => {
+  beforeEach(() => {
+    db.user.findUnique.mockResolvedValue({ ...mere, role: 'COORDINATOR', personId: 'person_mere' })
+  })
+
+  it('sets the linked person’s pay rate, Connor’s 22 Sep 2026 policy', async () => {
+    const said = await actions.setEmployment('u_mere', 'EMPLOYEE')
+
+    expect(db.person.update).toHaveBeenCalledWith({
+      where: { id: 'person_mere' },
+      data: { employment: 'EMPLOYEE' },
+    })
+    expect(said.kind).toBe('good')
+    expect(said.text).toMatch(/employee/i)
+    expect(said.text).toMatch(/\$30/)
+  })
+
+  it('says the contractor rate when moving somebody the other way', async () => {
+    const said = await actions.setEmployment('u_mere', 'CONTRACTOR')
+    expect(said.text).toMatch(/contractor/i)
+    expect(said.text).toMatch(/\$35/)
+  })
+
+  it('is for administrators only', async () => {
+    permissions.requireModule.mockResolvedValue({ user: { ...sione, role: 'COORDINATOR' } })
+    const said = await actions.setEmployment('u_mere', 'EMPLOYEE')
+    expect(said.kind).toBe('stop')
+    expect(db.person.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an account with no linked person — there is nothing to set the rate on', async () => {
+    db.user.findUnique.mockResolvedValue({ ...mere, role: 'COORDINATOR', personId: null })
+    const said = await actions.setEmployment('u_mere', 'EMPLOYEE')
+    expect(said.kind).toBe('stop')
+    expect(db.person.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an external promoter — pay is a staff concept', async () => {
+    db.user.findUnique.mockResolvedValue({ ...mere, role: 'PROMOTER', personId: null })
+    const said = await actions.setEmployment('u_mere', 'EMPLOYEE')
+    expect(said.kind).toBe('stop')
+    expect(db.person.update).not.toHaveBeenCalled()
+  })
+
+  it('says when the account does not exist', async () => {
+    db.user.findUnique.mockResolvedValue(null)
+    const said = await actions.setEmployment('u_ghost', 'EMPLOYEE')
+    expect(said.kind).toBe('stop')
+    expect(db.person.update).not.toHaveBeenCalled()
   })
 })

@@ -144,9 +144,9 @@ export function settlementLines(v: FinanceVals, ctx: SettlementContext): Settlem
     ),
     less(
       'wages',
-      'Crew wages, loaded',
+      'Crew wages',
       v.ourPeople,
-      `${hrs(v.hours)} across ${ctx.people} ${ctx.people === 1 ? 'person' : 'people'} at ${money(CFG.loaded)} loaded`,
+      `${hrs(v.hours)} across ${ctx.people} ${ctx.people === 1 ? 'person' : 'people'} at each person’s rate`,
     ),
     less(
       'org',

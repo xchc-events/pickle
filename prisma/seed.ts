@@ -590,7 +590,14 @@ async function main() {
   const personByInitials = new Map<string, string>()
   for (const p of PEOPLE) {
     const row = await db.person.create({
-      data: { name: p.n, initials: p.i },
+      data: {
+        name: p.n,
+        initials: p.i,
+        // Connor's 22 Sep 2026 pay policy: Mere Tapu, the seeded duty
+        // manager, is the one fictional employee on the books, so both
+        // rates show locally. Everyone else defaults to CONTRACTOR.
+        employment: p.i === 'MT' ? 'EMPLOYEE' : 'CONTRACTOR',
+      },
     })
     personByInitials.set(p.i, row.id)
     await db.availability.create({
