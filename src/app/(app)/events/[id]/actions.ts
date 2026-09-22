@@ -687,24 +687,28 @@ export async function setLicence(eventId: string, state: LicenceState): Promise<
  */
 function firstRunProblem(r: RunTimes): string | null {
   const problems = runProblems(r)
-  return problems.endDate ?? problems.allOut ?? problems.barClose ?? null
+  return (
+    problems.endDate ?? problems.allOut ?? problems.packOut ?? problems.barClose ?? problems.packIn ?? null
+  )
 }
 
 /**
  * Set a run time. Stored as the venue says it — "8:00pm", "1:00am" — from
  * whatever an `<input type="time">` sends ("20:15"), so the licence gate, the
  * roster and the till window can keep reading the label they always have.
+ * Pack-in and pack-out are set the same way — the amount of time the room is
+ * blocked out for, beyond doors and everyone-out.
  *
  * The end date is nobody's to type unless they choose to (`setEndDate`
- * below). Until then it just follows doors and everyone-out: while the
- * stored value is still exactly what `endNightFor` would have inferred from
- * the OLD times (or nothing was ever stored), a change here carries it
+ * below). Until then it just follows doors, everyone-out and pack-out: while
+ * the stored value is still exactly what `endNightFor` would have inferred
+ * from the OLD times (or nothing was ever stored), a change here carries it
  * forward with the new ones. The moment somebody picks a different night by
  * hand, it stops following and this leaves it alone.
  */
 export async function setRunTime(
   eventId: string,
-  field: 'doors' | 'barClose' | 'allOut',
+  field: 'doors' | 'barClose' | 'allOut' | 'packIn' | 'packOut',
   value: string,
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
@@ -717,7 +721,15 @@ export async function setRunTime(
 
   const row = await db.event.findUniqueOrThrow({
     where: { id },
-    select: { date: true, doors: true, barClose: true, allOut: true, endDate: true },
+    select: {
+      date: true,
+      doors: true,
+      barClose: true,
+      allOut: true,
+      endDate: true,
+      packIn: true,
+      packOut: true,
+    },
   })
 
   const next: RunTimes = {
@@ -726,16 +738,18 @@ export async function setRunTime(
     barClose: field === 'barClose' ? clock : row.barClose,
     allOut: field === 'allOut' ? clock : row.allOut,
     endDate: row.endDate,
+    packIn: field === 'packIn' ? clock : row.packIn,
+    packOut: field === 'packOut' ? clock : row.packOut,
   }
 
   let endDateChanged = false
-  if (field === 'doors' || field === 'allOut') {
-    const oldInferred = endNightFor(row.date, row.doors, row.allOut)
+  if (field === 'doors' || field === 'allOut' || field === 'packOut') {
+    const oldInferred = endNightFor(row.date, row.doors, row.allOut, row.packOut)
     const wasInferred =
       row.endDate === null ||
       (oldInferred !== null && row.endDate.getTime() === oldInferred.getTime())
     if (wasInferred) {
-      next.endDate = endNightFor(next.date, next.doors, next.allOut)
+      next.endDate = endNightFor(next.date, next.doors, next.allOut, next.packOut)
       endDateChanged = true
     }
   }
@@ -748,7 +762,16 @@ export async function setRunTime(
     data: endDateChanged ? { [field]: clock, endDate: next.endDate } : { [field]: clock },
   })
 
-  const label = field === 'barClose' ? 'bar close' : field === 'allOut' ? 'everyone out' : 'doors'
+  const label =
+    field === 'barClose'
+      ? 'bar close'
+      : field === 'allOut'
+        ? 'everyone out'
+        : field === 'packIn'
+          ? 'pack-in'
+          : field === 'packOut'
+            ? 'pack-out'
+            : 'doors'
   const Label = `${label[0]!.toUpperCase()}${label.slice(1)}`
   await record(id, user, clock === null ? `cleared ${label}` : `set ${label} to ${clock}`)
 
@@ -763,8 +786,8 @@ export async function setRunTime(
 }
 
 /**
- * Set the night an event ends, or clear it back to what doors and
- * everyone-out infer (`endNightFor`) — the same rule `setRunTime` uses to
+ * Set the night an event ends, or clear it back to what doors, everyone-out
+ * and pack-out infer (`endNightFor`) — the same rule `setRunTime` uses to
  * carry the date forward for itself, until a choice is made here.
  */
 export async function setEndDate(eventId: string, value: string): Promise<Said> {
@@ -781,15 +804,17 @@ export async function setEndDate(eventId: string, value: string): Promise<Said> 
 
   const row = await db.event.findUniqueOrThrow({
     where: { id },
-    select: { date: true, doors: true, barClose: true, allOut: true },
+    select: { date: true, doors: true, barClose: true, allOut: true, packIn: true, packOut: true },
   })
 
-  const resolved = night ?? endNightFor(row.date, row.doors, row.allOut)
+  const resolved = night ?? endNightFor(row.date, row.doors, row.allOut, row.packOut)
 
   const problem = firstRunProblem({
     date: row.date,
     doors: row.doors,
     barClose: row.barClose,
+    packIn: row.packIn,
+    packOut: row.packOut,
     allOut: row.allOut,
     endDate: resolved,
   })

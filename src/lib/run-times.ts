@@ -152,13 +152,14 @@ export function runProblems(r: RunTimes): Partial<Record<RunField, string>> {
     problems.packIn = 'Pack-in has to be at or before the doors open.'
   }
 
-  // Pinned against doors, the same way barClose is just above, rather than
-  // against everyone-out: a pack-out compared to the very time it is meant
-  // to be after would always read as valid, whatever was typed, the same
-  // carry chosen to make it so.
+  // Everyone-out's own night (`nights`) is the baseline — pack-out reads
+  // against doors from there, the same disambiguation doors gives every
+  // other small-hours reading, rather than against everyone-out itself: a
+  // pack-out compared to the very time it is meant to be after would always
+  // read as valid, whatever was typed, the same carry chosen to make it so.
   const packOutM = minutesOfDay(r.packOut)
   if (doorsM !== null && packOutM !== null && outM !== null && nights !== null) {
-    const packOutNights = packOutM > doorsM ? 0 : 1
+    const packOutNights = nights + (packOutM > doorsM ? 0 : 1)
     const packOutInstant = packOutNights * 1440 + packOutM
     const end = nights * 1440 + outM
     if (packOutInstant < end) {

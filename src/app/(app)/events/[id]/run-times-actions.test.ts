@@ -36,6 +36,8 @@ let row: {
   barClose: string | null
   allOut: string | null
   endDate: Date | null
+  packIn: string | null
+  packOut: string | null
 }
 
 const findUniqueOrThrow = vi.fn(async () => row)
@@ -113,12 +115,28 @@ beforeEach(() => {
   vi.clearAllMocks()
   requireModule.mockResolvedValue({ user: coordinator, modules: ['pipeline'] })
   requireEvent.mockResolvedValue(EVENT)
-  row = { date: NIGHT, doors: '8:00pm', barClose: '11:30pm', allOut: '11:00pm', endDate: NIGHT }
+  row = {
+    date: NIGHT,
+    doors: '8:00pm',
+    barClose: '11:30pm',
+    allOut: '11:00pm',
+    endDate: NIGHT,
+    packIn: null,
+    packOut: null,
+  }
 })
 
 describe('setRunTime', () => {
   it('stores the clock label, not the raw input value', async () => {
-    row = { date: NIGHT, doors: '8:00pm', barClose: null, allOut: '11:30pm', endDate: NIGHT }
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:30pm',
+      endDate: NIGHT,
+      packIn: null,
+      packOut: null,
+    }
 
     await expect(setRunTime(EVENT, 'barClose', '23:15')).resolves.toEqual({
       kind: 'good',
@@ -127,7 +145,15 @@ describe('setRunTime', () => {
 
     expect(findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: EVENT },
-      select: { date: true, doors: true, barClose: true, allOut: true, endDate: true },
+      select: {
+        date: true,
+        doors: true,
+        barClose: true,
+        allOut: true,
+        endDate: true,
+        packIn: true,
+        packOut: true,
+      },
     })
     expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { barClose: '11:15pm' } })
     expect(record).toHaveBeenCalledWith(EVENT, coordinator, 'set bar close to 11:15pm')
@@ -156,7 +182,15 @@ describe('setRunTime', () => {
   })
 
   it('refuses a change that fails runProblems and writes nothing', async () => {
-    row = { date: NIGHT, doors: '8:00pm', barClose: null, allOut: '11:30pm', endDate: NIGHT }
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:30pm',
+      endDate: NIGHT,
+      packIn: null,
+      packOut: null,
+    }
 
     // A bar close typed the same as doors — refused at the minute it opens.
     await expect(setRunTime(EVENT, 'barClose', '20:00')).resolves.toEqual({
@@ -187,7 +221,15 @@ describe('setRunTime', () => {
   it('leaves a hand-picked end date alone', async () => {
     // Same starting doors/everyone-out as above, but the end date was chosen
     // by hand to a night later than those times alone would ever infer.
-    row = { date: NIGHT, doors: '8:00pm', barClose: null, allOut: '11:00pm', endDate: CHOSEN_NIGHT }
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:00pm',
+      endDate: CHOSEN_NIGHT,
+      packIn: null,
+      packOut: null,
+    }
 
     await expect(setRunTime(EVENT, 'allOut', '00:30')).resolves.toEqual({
       kind: 'good',
@@ -195,6 +237,95 @@ describe('setRunTime', () => {
     })
 
     expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { allOut: '12:30am' } })
+  })
+
+  it('stores pack-in and pack-out the same way as any other field', async () => {
+    // A clean bar close — the default fixture's 11:30pm bar close only ever
+    // gets exercised alongside an allOut change in the tests above; against
+    // this test's untouched allOut of 11:00pm it would fail on its own,
+    // which is not what this test is about.
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:00pm',
+      endDate: NIGHT,
+      packIn: null,
+      packOut: null,
+    }
+
+    await expect(setRunTime(EVENT, 'packIn', '15:00')).resolves.toEqual({
+      kind: 'good',
+      text: 'Pack-in set.',
+    })
+
+    expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { packIn: '3:00pm' } })
+    expect(record).toHaveBeenCalledWith(EVENT, coordinator, 'set pack-in to 3:00pm')
+  })
+
+  it('refuses a pack-in set after doors and writes nothing', async () => {
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:00pm',
+      endDate: NIGHT,
+      packIn: null,
+      packOut: null,
+    }
+
+    await expect(setRunTime(EVENT, 'packIn', '21:00')).resolves.toEqual({
+      kind: 'warn',
+      text: 'Pack-in has to be at or before the doors open.',
+    })
+
+    expect(update).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+
+  it('refuses a pack-out set before everyone out and writes nothing', async () => {
+    await expect(setRunTime(EVENT, 'packOut', '22:30')).resolves.toEqual({
+      kind: 'warn',
+      text: 'Pack-out has to be at or after everyone is out.',
+    })
+
+    expect(update).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+
+  it('carries the end date forward when pack-out runs past its own midnight, on an inferred end date', async () => {
+    // Doors 8pm, everyone out 11pm, both the same night, endDate never
+    // hand-picked. A pack-out that reads before everyone-out's own clock
+    // time is the next calendar night again, carrying the end date with it.
+    await expect(setRunTime(EVENT, 'packOut', '00:30')).resolves.toEqual({
+      kind: 'good',
+      text: 'Pack-out set.',
+    })
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: EVENT },
+      data: { packOut: '12:30am', endDate: NEXT_NIGHT },
+    })
+    expect(record).toHaveBeenCalledWith(EVENT, coordinator, 'set pack-out to 12:30am')
+  })
+
+  it('leaves a hand-picked end date alone when pack-out changes', async () => {
+    row = {
+      date: NIGHT,
+      doors: '8:00pm',
+      barClose: null,
+      allOut: '11:00pm',
+      endDate: CHOSEN_NIGHT,
+      packIn: null,
+      packOut: null,
+    }
+
+    await expect(setRunTime(EVENT, 'packOut', '00:30')).resolves.toEqual({
+      kind: 'good',
+      text: 'Pack-out set.',
+    })
+
+    expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { packOut: '12:30am' } })
   })
 
   it('refuses an outside promoter before anything is read or written', async () => {
@@ -229,7 +360,7 @@ describe('setEndDate', () => {
 
     expect(findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: EVENT },
-      select: { date: true, doors: true, barClose: true, allOut: true },
+      select: { date: true, doors: true, barClose: true, allOut: true, packIn: true, packOut: true },
     })
     expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { endDate: NEXT_NIGHT } })
     expect(record).toHaveBeenCalledWith(
@@ -247,6 +378,8 @@ describe('setEndDate', () => {
       barClose: '11:30pm',
       allOut: '1:00am',
       endDate: CHOSEN_NIGHT,
+      packIn: null,
+      packOut: null,
     }
 
     await expect(setEndDate(EVENT, '')).resolves.toEqual({
