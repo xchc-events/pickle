@@ -20,6 +20,12 @@ import type { SessionUser } from '@/lib/session'
  * outside organisation brought.
  */
 
+// actions.ts now imports @/lib/grants-data (for issueArtistLink, moved here
+// from Tech 23 Sep 2026), which imports 'server-only'. The real package
+// throws outside a server-component build, so every test file that imports
+// actions.ts for real needs this — see artist-link-actions.test.ts.
+vi.mock('server-only', () => ({}))
+
 const requireModule = vi.fn()
 const requireEvent = vi.fn()
 

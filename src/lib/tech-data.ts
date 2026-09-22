@@ -3,8 +3,6 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel } from './format'
 import { filesForEvent, type FileRow } from './files-data'
-import { maskAccount } from './payments'
-import { grantStatus } from './grants'
 import type { SessionUser } from './session'
 
 /**
@@ -29,11 +27,6 @@ export const TECH_SET = [
     why: 'Where people stand. Decides the monitor count and the cable run.',
   },
   {
-    kind: 'RIDER_HOSPITALITY',
-    name: 'Hospitality rider',
-    why: 'Green room and catering. Not the crew’s job, but it arrives with the rest.',
-  },
-  {
     kind: 'TECH_SPEC',
     name: 'Venue spec sent',
     why: 'What XCHC sends them. Proof the act knew the room before they arrived.',
@@ -51,19 +44,6 @@ export interface TechQueueRow {
   note: string
 }
 
-export interface TechArtist {
-  id: string
-  name: string
-  status: string
-  /** Null when the act has never been linked to a payee record. */
-  payeeId: string | null
-  payeeName: string | null
-  account: string
-  detailsOnFile: boolean
-  /** An open link already sent to them, if there is one. */
-  openGrant: boolean
-}
-
 export interface TechEvent {
   id: string
   name: string
@@ -72,7 +52,6 @@ export interface TechEvent {
   format: string
   files: FileRow[]
   missing: { kind: string; name: string; why: string }[]
-  artists: TechArtist[]
 }
 
 export interface TechLoad {
@@ -139,25 +118,10 @@ export async function loadTech(
     where: { id: chosen },
     include: {
       space: { select: { name: true } },
-      artists: {
-        orderBy: { order: 'asc' },
-        include: {
-          payee: {
-            select: {
-              id: true,
-              name: true,
-              bankTail: true,
-              bankEnc: true,
-              grants: { select: { expires: true, usedAt: true, revokedAt: true } },
-            },
-          },
-        },
-      },
     },
   })
 
   const files = await filesForEvent(chosen)
-  const now = new Date()
 
   return {
     queue,
@@ -173,16 +137,6 @@ export async function loadTech(
         kind: s.kind,
         name: s.name,
         why: s.why,
-      })),
-      artists: row.artists.map((a) => ({
-        id: a.id,
-        name: a.name,
-        status: a.status.toLowerCase(),
-        payeeId: a.payee?.id ?? null,
-        payeeName: a.payee?.name ?? null,
-        account: maskAccount(a.payee?.bankTail ?? null),
-        detailsOnFile: a.payee?.bankEnc != null,
-        openGrant: (a.payee?.grants ?? []).some((g) => grantStatus(g, now) === 'open'),
       })),
     },
   }
