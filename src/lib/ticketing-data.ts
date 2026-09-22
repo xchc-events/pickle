@@ -1,10 +1,11 @@
 import 'server-only'
 import { db } from './db'
 import { eventScope } from './scope'
-import { dateLabel, money } from './format'
-import { financeVals, type Scenario } from './finance'
+import { dateLabel, money, timeLabel } from './format'
+import { financeVals } from './finance'
 import { financeInputFor, orgShareFor, scenarioOf } from './finance-input'
 import { capacityOf, mixProblem, normaliseMix, paceOf, sellThrough, tierTable } from './ticketing'
+import { readSales } from './gather'
 import { bookingStep, type BookingStatus } from './parts'
 import type { SessionUser } from './session'
 
@@ -53,8 +54,9 @@ export interface TicketEvent {
   std: number
   door: number
   mix: number[]
-  scen: Scenario
   sold: number
+  /** "Tue 22 Sep, 4:10 pm" — when Gather.rsvp last confirmed `sold`. */
+  soldAsOf: string
   capacity: number
 
   tiers: TicketTier[]
@@ -74,8 +76,12 @@ export interface TicketEvent {
   paceTone: 'good' | 'warn' | 'stop' | 'plain'
   paceNote: string
 
-  /** The three attendance scenarios, and which is in use. */
-  scenarios: { key: Scenario; label: string; att: number; revenue: string; on: boolean }[]
+  /**
+   * Ticket revenue so far: `sold` at the average ticket price. GST inclusive
+   * — the same basis as the prices on the event record — which is *not* what
+   * the settlement counts; `financeVals.ticketsEx` divides by GST once for
+   * that. Shown for "how much has this made", not reconciled against the P&L.
+   */
   revenue: string
 }
 
@@ -83,8 +89,6 @@ export interface TicketingLoad {
   queue: TicketQueueRow[]
   event: TicketEvent | null
 }
-
-const SCENARIO_LABELS = ['Quiet', 'Likely', 'Great'] as const
 
 const EVENT_INCLUDE = {
   space: { select: { name: true, capacity: true, seatedCapacity: true } },
@@ -155,7 +159,9 @@ export async function loadTicketing(
   const capacity = capacityOf(row.space, row.format)
 
   const table = tierTable(row.std, row.door, normaliseMix(row.mix))
-  const pace = paceOf({ sold: row.sold, breakeven: vals.breakeven })
+  // The one place this page reads how many have sold — see src/lib/gather.ts.
+  const sales = readSales(row)
+  const pace = paceOf({ sold: sales.sold, breakeven: vals.breakeven })
 
   return {
     queue,
@@ -172,8 +178,8 @@ export async function loadTicketing(
       std: row.std,
       door: row.door,
       mix: row.mix,
-      scen,
-      sold: row.sold,
+      sold: sales.sold,
+      soldAsOf: `${dateLabel(sales.readAt)}, ${timeLabel(sales.readAt)}`,
       capacity,
 
       tiers: table.map((t) => ({
@@ -186,7 +192,7 @@ export async function loadTicketing(
       mixProblem: mixProblem(row.mix),
       average: money(vals.avg),
 
-      sellThroughPct: sellThrough(row.sold, capacity),
+      sellThroughPct: sellThrough(sales.sold, capacity),
       breakeven: vals.breakeven,
       breakevenPct: sellThrough(vals.breakeven, capacity),
       fullPay: vals.fullPay,
@@ -198,17 +204,7 @@ export async function loadTicketing(
       paceTone: pace.tone,
       paceNote: pace.note,
 
-      scenarios: ([0, 1, 2] as Scenario[]).map((s) => {
-        const att = row.att[s] ?? 0
-        return {
-          key: s,
-          label: SCENARIO_LABELS[s],
-          att,
-          revenue: money(att * vals.avg),
-          on: s === scen,
-        }
-      }),
-      revenue: money(row.sold * vals.avg),
+      revenue: money(sales.sold * vals.avg),
     },
   }
 }
