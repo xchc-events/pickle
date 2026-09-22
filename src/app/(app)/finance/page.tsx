@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { requireModule, modulesFor } from '@/lib/permissions'
-import { loadFinance } from '@/lib/finance-data'
+import { loadFinance, loadLabour } from '@/lib/finance-data'
 import { settlementFor } from '@/lib/settlement-data'
 import { canReveal } from '@/lib/payments'
 import { money } from '@/lib/format'
@@ -55,6 +55,11 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
   // The sheet is the reason the payables list exists, so it is loaded with it
   // rather than behind a tab. Null only when no event is selected.
   const settlement = event ? await settlementFor(event.id) : null
+
+  // Org-wide, not this event's — the same "all events in the pipeline"
+  // figure Pipeline used to show. Only worth loading once there is a body to
+  // put it in.
+  const labour = event ? await loadLabour(user) : []
 
   return (
     <div>
@@ -143,6 +148,24 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
               )}
             </>
           )}
+
+          <div className={styles.labour}>
+            <SectionHeading note="Rostered shifts plus hours entered against tasks, all events in the pipeline">
+              Where the labour goes
+            </SectionHeading>
+            <div className={styles.labourRows}>
+              {labour.map((l) => (
+                <div key={l.label} className={styles.labourRow}>
+                  <span className={styles.labourLabel}>{l.label}</span>
+                  <span className={styles.bar}>
+                    <span className={styles.barFill} style={{ width: `${l.widthPct}%` }} />
+                  </span>
+                  <span className={`${styles.labourValue} tabular`}>{l.value}</span>
+                  <span className={`${styles.labourCost} tabular`}>{l.cost}</span>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <SectionHeading note="details are entered by the act, never re-typed here">
             Who gets paid
