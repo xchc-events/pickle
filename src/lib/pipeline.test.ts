@@ -90,8 +90,10 @@ describe('projection', () => {
   })
 
   it('shows what a concluded event actually took', () => {
-    expect(projection(ev({ concluded: true, actualTotal: 4035, surplus: -1 }))).toEqual({
-      text: 'took $4,035',
+    // actualTotal already comes off takenOf ex GST (PG-20, fixed 22 Sep
+    // 2026); this is money() formatting it, not re-deriving it.
+    expect(projection(ev({ concluded: true, actualTotal: 3643, surplus: -1 }))).toEqual({
+      text: 'took $3,643',
       tone: 'good',
     })
   })
@@ -283,6 +285,18 @@ describe('partHeads', () => {
     // A licence the bar close does not need is not a licence still to get.
     const heads = partHeads([ev({ parts: parts({ licence: { done: false, applies: false } }) })])
     expect(heads.find((h) => h.key === 'licence')!.toGo).toBe(0)
+  })
+
+  it('calls the bookings still to confirm unconfirmed, and every other part to go', () => {
+    // "Four to go" on Booking read as nothing; Connor called them "four
+    // unconfirmed" (22 Sep 2026). The other columns keep their count.
+    const heads = partHeads([
+      ev({ parts: parts({ booking: { done: false }, design: { done: false } }) }),
+      ev({ parts: parts({ booking: { done: false } }) }),
+    ])
+    expect(heads.find((h) => h.key === 'booking')!.count).toBe('2 unconfirmed')
+    expect(heads.find((h) => h.key === 'design')!.count).toBe('1 to go')
+    expect(heads.find((h) => h.key === 'roster')!.count).toBe('0 to go')
   })
 
   it('carries the stage nickname a part inherited, for the column head', () => {

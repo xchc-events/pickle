@@ -383,15 +383,25 @@ function design(e: PartsEvent): PartState {
   const approved = ASSET_SET.filter((a) => state(a.key) === 'approved').length
   const inReview = ASSET_SET.some((a) => state(a.key) === 'review')
 
+  // With every piece approved, only these two gates can still hold the part.
+  // "Signed off · 1 to clear" read as a contradiction (Connor, 22 Sep 2026),
+  // so the cell says the art is signed off and names what is open instead.
+  const open = [
+    e.leads.design ? null : 'no lead',
+    missingBios > 0 ? `${missingBios} ${plural(missingBios, 'act', 'acts')} to chase` : null,
+  ].filter((s) => s !== null)
+
   const shown: Pick<PartState, 'status' | 'detail' | 'tone'> =
     approved === total && e.hasPortal && unsigned > 0
       ? { status: 'with promoter', detail: `${unsigned} to sign`, tone: 'warn' }
       : approved === total
-        ? {
-            status: 'signed off',
-            detail: clear ? null : `${failing(checks)} to clear`,
-            tone: clear ? 'good' : 'plain',
-          }
+        ? clear
+          ? { status: 'signed off', detail: null, tone: 'good' }
+          : {
+              status: 'art signed off',
+              detail: open.length === 1 ? open[0] : `${failing(checks)} to clear`,
+              tone: 'plain',
+            }
         : approved > 0 || inReview
           ? {
               status: `${approved} of ${total}`,

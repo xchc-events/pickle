@@ -12,6 +12,7 @@ import {
   homeRefusal,
   homeSub,
   homeTiles,
+  inRevenueWindow,
   landingFor,
   myHours,
   needsCount,
@@ -653,27 +654,46 @@ describe('the tiles', () => {
       { concluded: true, daysToDoor: -9, ticketsLive: true, sold: 99 },
     ),
   ]
+  // Two nights inside the 28-day actual window (3 and 10 days ago) and one
+  // well outside it (40 days ago), which must not reach the Revenue total.
   const counted = [
-    { date: new Date(2026, 8, 6), taken: 1500 },
-    { date: new Date(2026, 7, 1), taken: 9999 },
-    { date: new Date(2026, 8, 12), taken: 3000 },
+    { daysAgo: 3, taken: 1500 },
+    { daysAgo: 40, taken: 9999 },
+    { daysAgo: 10, taken: 3000 },
   ]
+  // home-data.ts's own figure, handed in ready-made — homeTiles only formats it.
+  const projected = 2200
 
-  it('reads the pipeline for anyone who can open it', () => {
-    const tiles = homeTiles(pipeline, counted, as(MT))
+  it('reads the pipeline for a viewer who can also open Finance, in order', () => {
+    const tiles = homeTiles(pipeline, counted, projected, as(MT))
     expect(tiles.map((t) => [t.label, t.value, t.sub])).toEqual([
-      ['In the pipeline', '3', '1 yours'],
+      ['In the pipeline', '3', '2 confirmed'],
+      ['Next 30 days', '3', '2 confirmed'],
       ['At risk', '1', 'flagged on the pipeline'],
-      ['On sale', '2', '52 tickets sold'],
-      ['Revenue, last 2 events', money(4500), 'tickets + bar profit, actual'],
+      ['Revenue', money(4500), `last 4 weeks · ${money(2200)} projected, next 4`],
     ])
     expect(tiles.map((t) => t.href)).toEqual([
       '/pipeline',
+      '/pipeline?status=soon',
       '/pipeline?status=risk',
-      '/ticketing',
       null,
     ])
-    expect(tiles.map((t) => t.tone)).toEqual(['plain', 'warn', 'plain', 'good'])
+    expect(tiles.map((t) => t.tone)).toEqual(['plain', 'plain', 'warn', 'good'])
+  })
+
+  it('shows Revenue as the fourth tile only for a viewer who can also open Finance', () => {
+    const finance = homeTiles(pipeline, counted, projected, as(MT))
+    expect(finance[3]).toMatchObject({ label: 'Revenue', value: money(4500), tone: 'good' })
+
+    // Design & comms can open the Pipeline but not Finance.
+    const noFinance = homeTiles(pipeline, counted, projected, as(TW))
+    expect(noFinance[3]).toMatchObject({
+      label: 'On sale',
+      value: '2',
+      sub: '52 tickets sold',
+      tone: 'plain',
+      href: '/ticketing',
+    })
   })
 
   it('stops counting a night as on sale once it has happened', () => {
@@ -681,7 +701,7 @@ describe('the tiles', () => {
       { id: 'e', ownerId: MT },
       { daysToDoor: -5, ticketsLive: true, sold: 164 },
     )
-    const tiles = homeTiles([...pipeline, settling], counted, as(MT))
+    const tiles = homeTiles([...pipeline, settling], counted, projected, as(TW))
     // Still in the pipeline until it is put to bed, but no longer selling.
     expect(tiles.find((t) => t.label === 'In the pipeline')?.value).toBe('4')
     expect(tiles.find((t) => t.label === 'On sale')).toMatchObject({
@@ -691,24 +711,45 @@ describe('the tiles', () => {
   })
 
   it('links On sale only for those who can open Ticketing', () => {
-    const tech = homeTiles(pipeline, counted, as(JR))
+    const tech = homeTiles(pipeline, counted, projected, as(JR))
     expect(tech.find((t) => t.label === 'On sale')?.href).toBeNull()
   })
 
-  it('reads nothing at risk as good news, and says so when no night is counted', () => {
-    const calm = homeTiles([night()], [], as(MT))
+  it('reads nothing at risk as good news, and reads no counted night as zero revenue', () => {
+    const calm = homeTiles([night()], [], 0, as(MT))
     expect(calm.find((t) => t.label === 'At risk')).toMatchObject({ value: '0', tone: 'good' })
-    expect(calm.find((t) => t.label.startsWith('Revenue'))).toMatchObject({
-      label: 'Revenue, last 2 events',
-      value: '—',
-      sub: 'no night counted yet',
-      tone: 'plain',
+    expect(calm.find((t) => t.label === 'Revenue')).toMatchObject({
+      value: money(0),
+      sub: `last 4 weeks · ${money(0)} projected, next 4`,
+      tone: 'good',
     })
   })
 
-  it('names one night as one night', () => {
-    const tiles = homeTiles([night()], [{ date: new Date(2026, 8, 6), taken: 1500 }], as(MT))
-    expect(tiles.at(-1)).toMatchObject({ label: 'Revenue, last event', value: money(1500) })
+  it('windows Next 30 days exactly as pipelineRows does — day 30 in, day 31 out', () => {
+    const settling = night({ id: 'settling' }, { daysToDoor: -2 })
+    const edge30 = night({ id: 'edge30' }, { daysToDoor: 30, booking: 'negotiating' })
+    const edge31 = night({ id: 'edge31' }, { daysToDoor: 31 })
+    const far = night({ id: 'far' }, { daysToDoor: 100, booking: 'negotiating' })
+
+    const tiles = homeTiles([settling, edge30, edge31, far], [], 0, as(MT))
+    // All four are live, two of them confirmed.
+    expect(tiles[0]).toMatchObject({ label: 'In the pipeline', value: '4', sub: '2 confirmed' })
+    // /pipeline?status=soon has no lower bound and includes day 30; day 31
+    // drops out. Of the two left, only one is confirmed.
+    expect(tiles[1]).toMatchObject({ label: 'Next 30 days', value: '2', sub: '1 confirmed' })
+  })
+
+  it('sums actual revenue over the last 28 days, ex GST — day 27 in, day 28 out', () => {
+    const revCounted = [
+      { daysAgo: 0, taken: 500 },
+      { daysAgo: 27, taken: 300 },
+      { daysAgo: 28, taken: 1_000_000 }, // a night 28 days ago: outside the window
+    ]
+    const tiles = homeTiles([], revCounted, 0, as(MT))
+    expect(tiles.find((t) => t.label === 'Revenue')).toMatchObject({
+      value: money(800),
+      sub: `last 4 weeks · ${money(0)} projected, next 4`,
+    })
   })
 
   it('reads the roster and the bar for a duty manager, who cannot open the pipeline', () => {
@@ -723,7 +764,7 @@ describe('the tiles', () => {
       night({ id: 'closed' }, { daysToDoor: -6, barClosed: true }),
     ]
 
-    const tiles = homeTiles(nights, counted, as(AK))
+    const tiles = homeTiles(nights, counted, 0, as(AK))
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href, t.tone])).toEqual([
       ['Shifts to fill', '5', 'across 2 nights', '/roster', 'warn'],
       ['Bars to close', '2', 'oldest 4 days ago', '/bar?event=past', 'warn'],
@@ -739,18 +780,46 @@ describe('the tiles', () => {
       { id: 'gone' },
       { booking: 'negotiating', daysToDoor: -2, shifts: [{ assigned: false, pencilled: false }] },
     )
-    expect(homeTiles([pencilled, gone], [], as(AK))[0]).toMatchObject({
+    expect(homeTiles([pencilled, gone], [], 0, as(AK))[0]).toMatchObject({
       label: 'Shifts to fill',
       value: '1',
       sub: 'across 1 night',
       tone: 'warn',
     })
 
-    const quiet = homeTiles([night()], [], as(AK))
+    const quiet = homeTiles([night()], [], 0, as(AK))
     expect(quiet.map((t) => [t.value, t.sub, t.tone])).toEqual([
       ['0', 'every shift filled', 'good'],
       ['0', 'every night closed', 'good'],
     ])
+  })
+})
+
+describe('inRevenueWindow — which nights count toward projected revenue', () => {
+  it('wants a live, confirmed night with the door 0–27 days out', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 0 }))).toBe(true)
+    expect(inRevenueWindow(night({}, { daysToDoor: 27 }))).toBe(true)
+    expect(inRevenueWindow(night({}, { daysToDoor: 28 }))).toBe(false)
+    expect(inRevenueWindow(night({}, { daysToDoor: -1 }))).toBe(false)
+  })
+
+  it('excludes a night still being negotiated — not one to bank on', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, booking: 'negotiating' }))).toBe(false)
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, booking: 'enquiry' }))).toBe(false)
+  })
+
+  it('excludes a night already put to bed', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 10, concluded: true }))).toBe(false)
+  })
+
+  it('leaves out a night already fully counted — it is already in the actual figure', () => {
+    expect(inRevenueWindow(night({}, { daysToDoor: 0, doorCounted: true, barClosed: true }))).toBe(
+      false,
+    )
+    // A half-counted night stays in — the other half is still a projection.
+    expect(inRevenueWindow(night({}, { daysToDoor: 0, doorCounted: true, barClosed: false }))).toBe(
+      true,
+    )
   })
 })
 

@@ -113,7 +113,7 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                   >
                     {h.label}
                     <br />
-                    <span className={styles.headCount}>{h.toGo} to go</span>
+                    <span className={styles.headCount}>{h.count}</span>
                   </span>
                 ))}
               </div>
