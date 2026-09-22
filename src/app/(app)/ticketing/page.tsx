@@ -2,9 +2,8 @@ import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadTicketing } from '@/lib/ticketing-data'
 import { SectionHeading } from '@/components/SectionHeading'
-import { ActionButton } from '@/components/ActionButton'
-import { PriceForm, MixForm, SoldForm } from './Forms'
-import { setMix, setPrices, setScenario, setSold } from './actions'
+import { TiersTable } from './Forms'
+import { setTiers } from './actions'
 import styles from './ticketing.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -30,8 +29,7 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
         <div>
           <h1 className={styles.title}>Ticketing</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Gate</span> · every tier derives from one number ·
-            Gather.rsvp is the source of truth
+            every tier derives from one number · Gather.rsvp is the source of truth
           </p>
         </div>
       </header>
@@ -78,7 +76,22 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
             </span>
           </div>
 
-          <SectionHeading note={`${event.capacity} in the room`}>The room</SectionHeading>
+          <SectionHeading note={`${event.capacity} in the room`}>Ticket sales</SectionHeading>
+
+          {/* "A big, really obvious thing of the revenue that's been
+              generated." The figure is `event.revenue` from ticketing-data,
+              which is sold × the average ticket price — GST inclusive, same
+              as the prices on the event record, not the ex-GST figure the
+              settlement counts. */}
+          <div className={styles.revenue}>
+            <span className={styles.revenueFigure}>{event.revenue}</span>
+            <span className={styles.revenueSold}>
+              {event.sold} sold of {event.capacity}
+            </span>
+            <p className={styles.revenueCaveat}>
+              GST inclusive — the settlement counts revenue ex GST.
+            </p>
+          </div>
 
           {/* Sold, breakeven and full-pay against one capacity. The markers
               are what make this a judgement rather than a number. */}
@@ -109,7 +122,8 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
 
             <div className={styles.roomLegend}>
               <span>
-                <b className={styles.sold}>{event.sold}</b> sold · {event.revenue}
+                <b className={styles.sold}>{event.sold}</b> sold · read from Gather.rsvp · as of{' '}
+                {event.soldAsOf}
               </span>
               <span>
                 <b>{event.breakeven}</b> to break even
@@ -118,6 +132,10 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
                 <b>{event.fullPay}</b> to pay everyone in full
               </span>
             </div>
+            <p className={styles.soldNote}>
+              Never typed by hand here — Gather.rsvp is the source of truth for how many have
+              sold.
+            </p>
 
             {/* Two different facts, so two sentences. The pace is about where
                 sales look like landing; the shortfall is about today. Running
@@ -140,63 +158,12 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
 
           <SectionHeading note={`average ${event.average}`}>Tiers and the mix</SectionHeading>
 
-          {event.mixProblem ? (
-            <p className={styles.mixWarn}>
-              <i className="ph ph-warning" aria-hidden="true" />
-              {event.mixProblem}
-            </p>
-          ) : null}
-
-          <ul className={styles.tiers}>
-            {event.tiers.map((t) => (
-              <li key={t.key} className={styles.tier}>
-                <span className={styles.tierLabel}>{t.label}</span>
-                <span className={`${styles.tierPrice} tabular`}>{t.price}</span>
-                <span className={styles.tierShare}>{t.share} of the room</span>
-                <span className={`${styles.tierContributes} tabular`}>
-                  {t.contributes} of the average
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          <div className={styles.forms}>
-            <PriceForm std={event.std} door={event.door} save={setPrices.bind(null, event.id)} />
-            <MixForm mix={event.mix} save={setMix.bind(null, event.id)} />
-            <SoldForm sold={event.sold} save={setSold.bind(null, event.id)} />
-          </div>
-
-          <SectionHeading note="the projection reads whichever is on">
-            How the night might go
-          </SectionHeading>
-
-          <ul className={styles.scenarios}>
-            {event.scenarios.map((s) => (
-              <li key={s.key} className={`${styles.scenario} ${s.on ? styles.scenarioOn : ''}`}>
-                <div className={styles.scenarioMain}>
-                  <span className={styles.scenarioLabel}>{s.label}</span>
-                  <span className={styles.scenarioAtt}>{s.att} through the door</span>
-                </div>
-                <span className={`${styles.scenarioRevenue} tabular`}>{s.revenue}</span>
-                {s.on ? (
-                  <span className={styles.scenarioOnTag}>in use</span>
-                ) : (
-                  <ActionButton
-                    className={styles.scenarioPick}
-                    action={setScenario.bind(null, event.id, s.key)}
-                    title={`Read the ${s.label.toLowerCase()} case`}
-                  >
-                    Use this
-                  </ActionButton>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          <p className={styles.footnote}>
-            The scenario is not a Ticketing setting — Finance reads the same field, so switching it
-            here moves the settlement projection there. That is the point: one record of an event.
-          </p>
+          <TiersTable
+            std={event.std}
+            door={event.door}
+            mix={event.mix}
+            save={setTiers.bind(null, event.id)}
+          />
         </div>
       )}
     </div>

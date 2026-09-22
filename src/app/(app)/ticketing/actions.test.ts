@@ -115,7 +115,7 @@ describe('setTiers', () => {
       expect.stringMatching(/mix.*15\/50\/20\/15.*20\/45\/20\/15/),
     )
     expect(mocks.refresh).toHaveBeenCalled()
-    expect(result.tone === 'stop' || result.tone === 'warn').toBe(false)
+    expect(result.kind).toBe('good')
   })
 
   it('logs only the price when the mix has not changed', async () => {

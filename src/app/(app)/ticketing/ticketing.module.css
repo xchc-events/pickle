@@ -22,10 +22,6 @@
   margin: 0;
 }
 
-.kicker {
-  color: var(--color-neutral-600);
-}
-
 .good {
   color: var(--st-good);
 }
@@ -138,12 +134,36 @@
   color: var(--st-warn);
 }
 
-.footnote {
+/* --- the revenue headline ------------------------------------------------
+   "A big, really obvious thing of the revenue that's been generated." Size
+   is what carries the emphasis here, not colour or weight. */
+
+.revenue {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.revenueFigure {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 40px;
+  letter-spacing: -0.02em;
+  color: var(--color-neutral-100);
+}
+
+.revenueSold {
+  font-size: 13px;
+  color: var(--color-neutral-500);
+}
+
+.revenueCaveat {
+  flex-basis: 100%;
   margin: 0;
-  font-size: 11.5px;
-  line-height: 1.55;
+  font-size: 11px;
   color: var(--color-neutral-600);
-  max-width: 68ch;
 }
 
 /* --- the room ----------------------------------------------------------- */
@@ -213,6 +233,13 @@
   color: var(--color-accent-200) !important;
 }
 
+.soldNote {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+}
+
 .pace {
   margin: 0;
   font-size: 12.5px;
@@ -276,51 +303,51 @@
   color: var(--color-neutral-100);
 }
 
-.tierShare,
-.tierContributes {
+.tierShare {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   color: var(--color-neutral-600);
   font-size: 11.5px;
 }
 
 .tierContributes {
+  color: var(--color-neutral-600);
+  font-size: 11.5px;
   text-align: right;
 }
 
-/* --- the forms ---------------------------------------------------------- */
+/* --- the tiers table's inputs and save row ------------------------------- */
 
-.forms {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
-}
-
-.form {
+.tiersForm {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 12px;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
+  gap: 8px;
 }
 
-.formTitle {
-  font-family: var(--font-heading);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-neutral-500);
-}
-
-.field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.label {
+.shareInput {
+  width: 46px;
+  font: inherit;
   font-size: 12px;
-  color: var(--color-neutral-400);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+}
+
+.shareInput:focus {
+  outline: none;
+  border-color: var(--color-accent-500);
+}
+
+.tiersFoot {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 2px 12px;
 }
 
 .input {
@@ -367,83 +394,4 @@
   font-size: 10.5px;
   line-height: 1.5;
   color: var(--color-neutral-600);
-}
-
-/* --- scenarios ---------------------------------------------------------- */
-
-.scenarios {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.scenario {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 14px;
-  padding: 9px 12px;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-  border-left: 2px solid transparent;
-}
-
-.scenarioOn {
-  border-left-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
-}
-
-.scenarioMain {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-  min-width: 0;
-}
-
-.scenarioLabel {
-  font-size: 13px;
-  color: var(--color-neutral-100);
-}
-
-.scenarioAtt {
-  font-size: 11.5px;
-  color: var(--color-neutral-600);
-}
-
-.scenarioRevenue {
-  font-size: 12.5px;
-  color: var(--color-neutral-200);
-  white-space: nowrap;
-}
-
-.scenarioOnTag {
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-accent-300);
-  white-space: nowrap;
-}
-
-.scenarioPick {
-  font: inherit;
-  font-size: 11px;
-  color: var(--color-neutral-400);
-  background: none;
-  border: 1px solid var(--color-neutral-800);
-  border-radius: var(--radius-sm);
-  padding: 4px 9px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.scenarioPick:hover:not(:disabled) {
-  color: var(--color-neutral-200);
-  border-color: var(--color-neutral-700);
-}
-
-.scenarioPick:disabled {
-  opacity: 0.5;
 }
