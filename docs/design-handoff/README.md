@@ -161,9 +161,13 @@ Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup 
 
 > **Corrected 2 Sep 2026.** This line previously read "supporter/standard/subsidised", which contradicts the prototype it describes: `TIER_KEYS` is `[sub, std, sup, door]` and `avgTicket` pairs `mix[0]` with `tiers().sub`. Read the wrong way round it prices a supporter at 80% of standard rather than 120%, and the mix feeds the average ticket price straight into the P&L. The prototype code is authoritative and is unchanged; only this sentence was wrong.
 
+> **Changed 23 Sep 2026.** From Connor's walkthrough. "I don't call it 'the room'. That's dumb" — the first section is now **Ticket sales**, not "The room" (the capacity note is unchanged). "You definitely want to be able to see a big, really obvious thing of the revenue that's been generated" — a headline revenue figure sits at the top of that section, sold shown against capacity beside it and labelled GST inclusive, since that is what it is, not the ex-GST figure the settlement counts. "It needs to be clearer that if I change these numbers, that is going to change this data" — the Prices and Mix forms are folded into the tiers table itself: standard and door are typed, subsidised and supporter are derived and redraw live, and one Save sets both through a new `setTiers` action. "I don't want to be able to manually change how many tickets are sold ... that should be data that's pulled from Gather. We don't want it typed by hand at all" — the Sold form and `setSold` are gone; `src/lib/gather.ts` is a stub source for `sold` until the real Gather.rsvp API exists, shaped so the real client is a drop-in. "This shouldn't be where you're changing the financial projection ... the ticketing page is just for setting up the ticket sales" — the scenario picker ("How the night might go") and `setScenario` have left Ticketing for Finance.
+
 ### Design
 
 Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each with format spec and a rationale line. Hero = two vertical video cuts (9:16); lead = the 1920×1005 event cover; support = story, A2 poster, listing copy. `CONTENT_RULES` render as a short doctrine panel: vertical video first (twice), video beats a still, almost no words on an image, real over polished, one idea per asset.
+
+> **Changed 23 Sep 2026.** Connor: "Just 'design and communications' is fine" — the page title is now "Design & communications" (the sidebar still says "Design").
 
 ### Promotion
 
