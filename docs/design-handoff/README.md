@@ -177,9 +177,17 @@ Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each
 
 > **Changed 23 Sep 2026.** Connor: "Just 'design and communications' is fine" — the page title is now "Design & communications" (the sidebar still says "Design").
 
+> **Changed 23 Sep 2026 — the checklist says who to chase.** "Why is it saying six acts to chase, and then when we come through here it doesn't look like there's anything left to do? That doesn't make much sense at all." (Connor). Design now lists, under the brief, every live act still missing a press shot or a bio, each with what is missing — the same `hasPromo`/`hasBio` per act that the Pipeline cell counts, through `missingBiosList` in `design.ts`, so the two screens cannot disagree. The Pipeline cell's own wording changed to "N acts' bios and pics to chase" to match.
+
+> **Changed 23 Sep 2026 — the hours card reads what was actually logged.** "Run the timer from the event record, overruns land in the event's cost, not in nobody's — that's useless. But marketing hours used, yeah. It would also be good to see who has done that work." (Connor). The card now sums `HourEntry` rows logged against the event by the design team, against the design task's estimate, and lists who logged them — not the task's own `actual` column, which nobody types.
+
+> **Changed 23 Sep 2026 — uploads say when storage is off.** "Does it actually work if I try and upload something?" (Connor). Design now shows the same "file storage is not configured" notice Tech does, and hides the upload control, when R2 isn't set up. `docs/RUNNING.md` gained a "Testing uploads locally" section covering the bucket's CORS rule, since the browser uploads straight to R2.
+
 ### Promotion
 
 `PLATFORMS` list with per-platform integration mode (`api` vs `manual`) and a note on how each is handled — Gather.rsvp (source of truth), Facebook event (Graph API), Instagram (manual), Eventfinda, Eventbrite (inventory capped so it can't oversell), EventsHub (council, moderated, 2 working days), Linktree, Telegram, Discord. Plus channel spread state per event.
+
+> **Changed 23 Sep 2026 — the Promo lead card carries contact details.** "We need contact information on these sections, because if you need to call this person we want your phone number and email. That way external organisers can easily access it." (Connor). The Promo lead panel now shows the lead's email and phone as plain, selectable text underneath their name — no `mailto:`/`tel:` links. An external promoter sees this only for their own organisation's events; `loadPromo`'s existing `eventScope` is what enforces that, unchanged by this work. The same fields were added to the Design lead card, and to `User`'s row editor in Admin (below) so a staff account's phone has somewhere to be set. The event record's own leads block gets the same fields separately.
 
 ### Tech production
 
@@ -228,6 +236,8 @@ Also on Finance: the **milestone pipeline** (below), the **finance review panel*
 ### Admin
 
 Role × module **permission matrix** as toggle rows — turning a module off removes it from that role's sidebar on next paint, verifiable by signing in as them. Users table (person, role, access, "you" marker). **"Your people"** — every name is an editable field, and changing it changes that person on every shift, timesheet, run sheet and bar view at once, because there is only one record of a person. Plus a state reset.
+
+> **Changed 23 Sep 2026 — a staff account's phone can be set.** `User.phone` previously only travelled with an external promoter's own details (`setExternalDetails`). A staff row's editor now carries its own phone field, saved with a new `setPhone` action, so the number shown on the Design and Promo lead cards has somewhere to come from. Staff are still named through their Person record, not here.
 
 ### Sign-offs (external promoter portal)
 

@@ -344,10 +344,12 @@ describe('design — its status', () => {
     const noBios = ev({ artists: [act({ hasBio: false }), act({ hasPromo: false })] })
     expect(part(noBios, 'design')).toMatchObject({
       status: 'art signed off',
-      detail: '2 acts to chase',
+      detail: "2 acts' bios and pics to chase",
       done: false,
     })
-    expect(part(ev({ artists: [act({ hasBio: false })] }), 'design').detail).toBe('1 act to chase')
+    expect(part(ev({ artists: [act({ hasBio: false })] }), 'design').detail).toBe(
+      "1 act's bios and pics to chase",
+    )
   })
 
   it('counts what is open when more than one thing is', () => {

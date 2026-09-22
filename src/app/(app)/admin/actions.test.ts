@@ -305,3 +305,61 @@ describe('setEmployment', () => {
     expect(db.person.update).not.toHaveBeenCalled()
   })
 })
+
+describe('setPhone', () => {
+  /**
+   * Contact information for the venue to call a staff member on. `User`
+   * already carried `phone` for an external promoter (see `setExternalDetails`
+   * above) — this is the same field, editable from the same row, for staff.
+   * "We need contact information on these sections... that way external
+   * organisers can easily access it." (Connor, 23 Sep 2026.)
+   */
+  beforeEach(() => {
+    db.user.findUnique.mockResolvedValue({ ...mere, role: 'COORDINATOR' })
+  })
+
+  it('sets a staff account’s phone number', async () => {
+    const said = await actions.setPhone('u_mere', '021 555 0134')
+
+    expect(db.user.update).toHaveBeenCalledWith({
+      where: { id: 'u_mere' },
+      data: { phone: '021 555 0134' },
+    })
+    expect(said.kind).toBe('good')
+  })
+
+  it('trims what is typed, and clears the number on an empty string', async () => {
+    await actions.setPhone('u_mere', '  021 555 0134  ')
+    expect(db.user.update).toHaveBeenCalledWith({
+      where: { id: 'u_mere' },
+      data: { phone: '021 555 0134' },
+    })
+
+    await actions.setPhone('u_mere', '   ')
+    expect(db.user.update).toHaveBeenLastCalledWith({
+      where: { id: 'u_mere' },
+      data: { phone: null },
+    })
+  })
+
+  it('refuses an external promoter — their phone is set with their other details', async () => {
+    db.user.findUnique.mockResolvedValue({ ...mere, role: 'PROMOTER' })
+    const said = await actions.setPhone('u_mere', '021 555 0134')
+    expect(said.kind).toBe('stop')
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('says when the account does not exist', async () => {
+    db.user.findUnique.mockResolvedValue(null)
+    const said = await actions.setPhone('u_ghost', '021 555 0134')
+    expect(said.kind).toBe('stop')
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('is not something an external account can do', async () => {
+    permissions.requireModule.mockResolvedValue({ user: { ...sione, external: true } })
+    const said = await actions.setPhone('u_mere', '021 555 0134')
+    expect(said.kind).toBe('stop')
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+})

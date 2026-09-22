@@ -188,6 +188,37 @@ the same as the page rendering.
 
 ---
 
+## Testing uploads locally
+
+File storage (Design, Tech) is Cloudflare R2. Without it configured, both
+pages say "file storage is not configured on this install" and hide the
+upload control rather than 500ing — everything else on them still works.
+
+To turn uploads on, set these four keys in `.env`:
+
+```
+R2_ACCOUNT_ID=…
+R2_ACCESS_KEY_ID=…
+R2_SECRET_ACCESS_KEY=…
+R2_BUCKET=…
+```
+
+The bytes never pass through the Next server — the browser PUTs straight to
+R2 on a presigned URL, and reads a file back the same way (see
+`src/lib/r2.ts`). That means the **bucket's CORS rule** has to allow it, or
+every upload fails as a CORS error in the browser console, not a Pickle
+error:
+
+- Allowed origins: `http://localhost:3000` and whatever origin the app is
+  deployed to.
+- Allowed methods: `PUT`, `GET`.
+
+Without that rule, the presigned URL is valid but the browser refuses to
+send the request — nothing in the terminal running `npm run dev` will say
+so, only the browser's own console.
+
+---
+
 ## When something looks broken
 
 | What you see                                                                                          | What it is                                                                                                         | Fix                                                                        | Where  |

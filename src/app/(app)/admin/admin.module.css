@@ -138,6 +138,39 @@
   white-space: nowrap;
 }
 
+/* Reads as plain text until it is touched — a bordered box here would make
+   every row look half-filled-in, which most of them are not. */
+.phone {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 1px 4px;
+  margin: 0 0 0 -4px;
+  min-width: 0;
+  width: 100%;
+}
+
+.phone::placeholder {
+  color: var(--color-neutral-700);
+}
+
+.phone:hover:not(:disabled) {
+  border-color: var(--color-neutral-800);
+}
+
+.phone:focus {
+  border-color: var(--color-accent-600);
+  background: var(--color-bg);
+  outline: none;
+}
+
+.phone:disabled {
+  opacity: 0.5;
+}
+
 .select,
 .input {
   font: inherit;
