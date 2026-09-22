@@ -29,11 +29,6 @@ export const TECH_SET = [
     why: 'Where people stand. Decides the monitor count and the cable run.',
   },
   {
-    kind: 'RIDER_HOSPITALITY',
-    name: 'Hospitality rider',
-    why: 'Green room and catering. Not the crew’s job, but it arrives with the rest.',
-  },
-  {
     kind: 'TECH_SPEC',
     name: 'Venue spec sent',
     why: 'What XCHC sends them. Proof the act knew the room before they arrived.',
