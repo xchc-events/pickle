@@ -89,8 +89,11 @@
   display: grid;
   /* The status column is a fixed width: every row is its own grid, so an
      `auto` column there would size to each row's text and knock the selects
-     out of line. */
-  grid-template-columns: minmax(160px, 1.4fr) minmax(150px, 1fr) minmax(140px, 1fr) 176px auto;
+     out of line. The fourth column is the pay rate; an outside account's
+     row leaves it empty rather than dropping it, for the same reason. */
+  grid-template-columns:
+    minmax(160px, 1.4fr) minmax(150px, 1fr) minmax(140px, 1fr) minmax(150px, 1fr)
+    176px auto;
   align-items: center;
   gap: 14px;
   padding: 9px 12px;
