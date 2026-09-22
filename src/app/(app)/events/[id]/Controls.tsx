@@ -256,6 +256,13 @@ export function DealPanel({
  * Lives on this page because the "Date is locked" gate sends the coordinator
  * here to fix it — a gate whose Fix it link lands on a screen with no control
  * is a dead end.
+ *
+ * Reads as a status chip rather than an instruction: what it says is the
+ * date's state, not the click. What the click does moves to `title` —
+ * "Connor, 23 Sep 2026: rather than this button saying what it does, it
+ * should show that the date is confirmed, or negotiating … if it indicates
+ * the status and then you can manipulate that status." The click itself is
+ * unchanged — the same `setDateTbc` toggle.
  */
 export function DateLock({ eventId, tbc }: { eventId: string; tbc: boolean }) {
   const say = useToast()
@@ -264,11 +271,12 @@ export function DateLock({ eventId, tbc }: { eventId: string; tbc: boolean }) {
   return (
     <button
       type="button"
-      className={`${styles.chip} ${tbc ? styles.chipOn : ''}`}
+      className={`${styles.chip} ${tbc ? styles.chipWarn : styles.chipGood}`}
       disabled={pending}
+      title={tbc ? 'Hold this date' : 'Put the date back to TBC'}
       onClick={() => start(async () => say(await setDateTbc(eventId, !tbc)))}
     >
-      {tbc ? 'Lock this date' : 'Put the date back to TBC'}
+      {tbc ? 'Date TBC' : 'Date held'}
     </button>
   )
 }

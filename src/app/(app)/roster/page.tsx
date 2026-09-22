@@ -27,8 +27,7 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
         <div>
           <h1 className={styles.title}>Roster</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Crew</span> · assigning a shift books the hours ·
-            nobody types a timesheet twice
+            assigning a shift books the hours · nobody types a timesheet twice
           </p>
         </div>
       </header>
@@ -61,10 +60,15 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
                 {event.date} · {event.spaceName} · {event.format}
               </span>
             </div>
-            <div className={styles.call}>
-              <span className={styles.callLabel}>The call</span>
-              <span className={`${styles.callFigure} tabular`}>{event.callHours}</span>
-              <span className={styles.callCost}>{money(event.callCost)} planned</span>
+            <div className={styles.figures}>
+              <div className={styles.figure}>
+                <span className={styles.figureLabel}>Rostered hours</span>
+                <span className={`${styles.figureValue} tabular`}>{event.callHours}</span>
+              </div>
+              <div className={styles.figure}>
+                <span className={styles.figureLabel}>Projected cost</span>
+                <span className={`${styles.figureValue} tabular`}>{money(event.callCost)}</span>
+              </div>
             </div>
           </div>
 

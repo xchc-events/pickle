@@ -5,6 +5,8 @@ import { dateLabel } from './format'
 import { maskAccount, maskIrd } from './payments'
 import { withholdingRate } from './bank'
 import { grantStatus } from './grants'
+import { loadPipeline } from './pipeline-data'
+import { labourSplit, type LabourRow } from './pipeline'
 import type { SessionUser } from './session'
 
 /**
@@ -58,6 +60,9 @@ export interface FinanceEvent {
   date: string
   concluded: boolean
   payables: PayableRow[]
+  /** Which attendance scenario the projected settlement reads: 0/1/2 =
+   *  quiet/likely/great. Written by `setScenario` in ./actions.ts. */
+  scen: number
 }
 
 export interface FinanceLoad {
@@ -207,6 +212,19 @@ export async function loadFinance(
       date: dateLabel(row.date),
       concluded: row.concluded,
       payables,
+      scen: row.scen,
     },
   }
+}
+
+/**
+ * "Where the labour goes", moved here from Pipeline on 23 Sep 2026 — see the
+ * dated notes under Finance and Pipeline in docs/design-handoff/README.md.
+ * `labourSplit` is the one place that arithmetic lives and it stays in
+ * src/lib/pipeline.ts, unchanged and still tested there; this only feeds it
+ * the same pipeline `loadPipeline` already builds for that page, scoped to
+ * this user the same way.
+ */
+export async function loadLabour(user: SessionUser): Promise<LabourRow[]> {
+  return labourSplit(await loadPipeline(user))
 }

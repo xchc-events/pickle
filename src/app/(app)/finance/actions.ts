@@ -277,3 +277,29 @@ export async function toggleMilestone(eventId: string, key: 'deposit' | 'invoice
       : 'Raised. It shows on the event from now on.',
   )
 }
+
+/**
+ * Which attendance scenario the projected settlement reads.
+ *
+ * Moved here from Ticketing on 23 Sep 2026 — Connor's walkthrough: "the
+ * ticketing page is just for setting up the ticket sales." The checks are
+ * exactly the deleted Ticketing action's; only the module gate changed.
+ * `requireModule('finance')` is the refusal for an external promoter, the
+ * same as every other action in this file — Finance is never in their
+ * module set (see `approveReview`, above).
+ */
+export async function setScenario(eventId: string, scen: number): Promise<Said> {
+  const { user } = await requireModule('finance')
+  const id = await requireEvent(user, eventId)
+
+  if (![0, 1, 2].includes(scen)) return said('That is not one of the scenarios.', 'stop')
+
+  const labels = ['quiet', 'likely', 'great']
+  await db.event.update({ where: { id }, data: { scen } })
+  await record(id, user, `projection now reads the ${labels[scen]} case`)
+
+  refresh()
+  return said(
+    `Projection reads the ${labels[scen]} case. Every figure below moves with it — it is the same number.`,
+  )
+}

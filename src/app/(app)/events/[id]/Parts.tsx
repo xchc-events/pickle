@@ -63,23 +63,29 @@ export function Parts({
         // need, a settlement before the night — has no gates worth reading.
         const blocked = p.applies ? p.checks.filter((g) => !g.ok) : []
 
+        const note =
+          moving && next
+            ? `${next.title} · ${next.gatesDone}`
+            : p.applies && p.checks.length > 0
+              ? p.gatesDone
+              : ''
+
         const head = (
           <>
             <span className={styles.partName}>
               <i className={`ph ${p.icon}`} aria-hidden="true" />
               {p.label}
             </span>
-            <span className={`${styles.partStatus} ${styles[`tone_${p.tone}`] ?? ''}`}>
-              {p.tone === 'good' ? <i className="ph ph-check" aria-hidden="true" /> : null}
-              {p.status}
-              {p.detail ? <span className={styles.partDetail}>· {p.detail}</span> : null}
-            </span>
-            <span className={styles.partNote}>
-              {moving && next
-                ? `${next.title} · ${next.gatesDone}`
-                : p.applies && p.checks.length > 0
-                  ? p.gatesDone
-                  : ''}
+            {/* The chip and its count sit together so the row reads as one
+                line — "5 of 6 clear" belongs right after the chip it counts,
+                not stranded at the far right. */}
+            <span className={styles.partStatusRow}>
+              <span className={`${styles.partStatus} ${styles[`tone_${p.tone}`] ?? ''}`}>
+                {p.tone === 'good' ? <i className="ph ph-check" aria-hidden="true" /> : null}
+                {p.status}
+                {p.detail ? <span className={styles.partDetail}>· {p.detail}</span> : null}
+              </span>
+              {note ? <span className={styles.partNote}>{note}</span> : null}
             </span>
           </>
         )
