@@ -110,8 +110,11 @@ export function TiersTable({
         <button type="submit" className={styles.submit} disabled={pending || problem !== null}>
           {pending ? 'Saving…' : 'Save'}
         </button>
-        <p className={`${styles.formNote} ${problem ? styles.stop : total === 100 ? styles.good : ''}`}>
-          {problem ?? `${total}% — that makes a whole. Supporter and subsidised move with standard.`}
+        <p
+          className={`${styles.formNote} ${problem ? styles.stop : total === 100 ? styles.good : ''}`}
+        >
+          {problem ??
+            `${total}% — that makes a whole. Supporter and subsidised move with standard.`}
         </p>
       </div>
     </form>

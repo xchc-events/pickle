@@ -90,5 +90,7 @@ export async function setTiers(eventId: string, form: FormData): Promise<Said> {
   }
 
   refresh()
-  return said('Prices and mix updated. The average ticket price and the projection moved with them.')
+  return said(
+    'Prices and mix updated. The average ticket price and the projection moved with them.',
+  )
 }

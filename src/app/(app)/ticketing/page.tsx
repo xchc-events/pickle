@@ -133,8 +133,7 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
               </span>
             </div>
             <p className={styles.soldNote}>
-              Never typed by hand here — Gather.rsvp is the source of truth for how many have
-              sold.
+              Never typed by hand here — Gather.rsvp is the source of truth for how many have sold.
             </p>
 
             {/* Two different facts, so two sentences. The pace is about where
