@@ -799,6 +799,7 @@ describe('Your hours this month', () => {
     const mine = myHours({
       now,
       availability: null,
+      employment: 'CONTRACTOR',
       entries: [
         { hours: 5, workedOn: at(7, 31, 23), rostered: true },
         { hours: 2, workedOn: at(8, 1, 0), rostered: true },
@@ -807,13 +808,32 @@ describe('Your hours this month', () => {
       ],
     })
     expect(mine.total).toBe('5.5h')
-    expect(mine.cost).toBe(money(5.5 * CFG.loaded))
+    expect(mine.cost).toBe(money(5.5 * CFG.contractorRate))
+  })
+
+  /**
+   * Home shows the reader what they are paid, not what they cost the venue —
+   * those only agree for an employee. Connor's 22 Sep 2026 pay policy.
+   */
+  it('pays a contractor and an employee at their own rate, never the loaded rate', () => {
+    const entries = [{ hours: 10, workedOn: at(8, 3), rostered: true }]
+
+    const contractor = myHours({ now, availability: null, employment: 'CONTRACTOR', entries })
+    expect(contractor.cost).toBe(money(10 * CFG.contractorRate))
+    expect(contractor.rate).toBe(`${money(CFG.contractorRate)}/h`)
+
+    const employee = myHours({ now, availability: null, employment: 'EMPLOYEE', entries })
+    expect(employee.cost).toBe(money(10 * CFG.rate))
+    expect(employee.rate).toBe(`${money(CFG.rate)}/h`)
+    // Paid at the base rate, never what the hour costs the venue loaded.
+    expect(employee.cost).not.toBe(money(10 * CFG.loaded))
   })
 
   it('tells the hours worked from the hours still to come', () => {
     const mine = myHours({
       now,
       availability: null,
+      employment: 'CONTRACTOR',
       entries: [
         { hours: 6, workedOn: at(8, 3), rostered: true },
         { hours: 2, workedOn: at(8, 17, 9), rostered: false },
@@ -821,11 +841,14 @@ describe('Your hours this month', () => {
       ],
     })
     expect(mine.split).toBe('8h worked · 4.5h still to come')
-    expect(myHours({ now, availability: null, entries: [] }).split).toBe('nothing logged yet')
+    expect(myHours({ now, availability: null, employment: 'CONTRACTOR', entries: [] }).split).toBe(
+      'nothing logged yet',
+    )
     expect(
       myHours({
         now,
         availability: null,
+        employment: 'CONTRACTOR',
         entries: [{ hours: 3, workedOn: at(8, 29), rostered: true }],
       }).split,
     ).toBe('3h still to come')
@@ -839,6 +862,7 @@ describe('Your hours this month', () => {
     const mine = myHours({
       now: early,
       availability: null,
+      employment: 'CONTRACTOR',
       entries: [
         { hours: 4, workedOn: at(8, 15, 0), rostered: false },
         { hours: 6, workedOn: at(8, 20), rostered: true },
@@ -852,6 +876,7 @@ describe('Your hours this month', () => {
     const mine = myHours({
       now,
       availability: { weekly: 11, volunteer: 0 },
+      employment: 'CONTRACTOR',
       entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
     expect(mine.pct).toBe(25)
@@ -861,6 +886,7 @@ describe('Your hours this month', () => {
     const keen = myHours({
       now,
       availability: { weekly: 11, volunteer: 3.5 },
+      employment: 'CONTRACTOR',
       entries: [{ hours: 12, workedOn: at(8, 3), rostered: true }],
     })
     expect(keen.capLabel).toBe('of about 62h you can do this month')
@@ -870,6 +896,7 @@ describe('Your hours this month', () => {
     const over = myHours({
       now,
       availability: { weekly: 2, volunteer: 0 },
+      employment: 'CONTRACTOR',
       entries: [{ hours: 40, workedOn: at(8, 3), rostered: true }],
     })
     expect(over.pct).toBe(100)
@@ -880,6 +907,7 @@ describe('Your hours this month', () => {
       const mine = myHours({
         now,
         availability,
+        employment: 'CONTRACTOR',
         entries: [{ hours: 3, workedOn: at(8, 3), rostered: true }],
       })
       expect(mine.pct).toBeNull()

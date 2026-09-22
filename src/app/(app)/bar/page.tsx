@@ -4,7 +4,7 @@ import { requireModule } from '@/lib/permissions'
 import { barRefusal, DRIVER_LABEL, marginTone, varianceTone } from '@/lib/bar'
 import type { BarNight, DriverKey, Tone } from '@/lib/bar'
 import { loadBarEvents, loadBarMonths, type BarDetail } from '@/lib/bar-data'
-import { CFG } from '@/lib/finance'
+import { CFG, PLANNED_HOUR_COST } from '@/lib/finance'
 import { hrs, money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ActionButton } from '@/components/ActionButton'
@@ -362,7 +362,7 @@ const EFFECT_NOTE: Record<DriverKey, string> = {
   spend: 'each person spending more or less than budgeted',
   take: 'turnout and spend together — the door is not counted, so they cannot be told apart',
   rate: `the margin after stock against the ${pct(1 - CFG.stockCost)} the budget assumed`,
-  labour: 'more or fewer bar hours than planned, at the loaded rate',
+  labour: `more or fewer bar hours than planned, at $${PLANNED_HOUR_COST}/hr`,
 }
 
 /** The reasons, each in what the bar keeps. They add up to the total exactly. */

@@ -73,16 +73,19 @@ export async function logHours(form: FormData): Promise<Said> {
     await requireEvent(user, eventId)
   }
 
-  const entry = await db.hourEntry.create({
-    data: {
-      personId: user.personId,
-      eventId: kind === 'event' ? eventId : null,
-      hours,
-      role,
-      note,
-      workedOn,
-    },
-  })
+  const [entry, self] = await Promise.all([
+    db.hourEntry.create({
+      data: {
+        personId: user.personId,
+        eventId: kind === 'event' ? eventId : null,
+        hours,
+        role,
+        note,
+        workedOn,
+      },
+    }),
+    db.person.findUnique({ where: { id: user.personId }, select: { employment: true } }),
+  ])
 
   if (entry.eventId) {
     await record(entry.eventId, user, `logged ${hours}h of ${role.toLowerCase()}`)
@@ -91,7 +94,7 @@ export async function logHours(form: FormData): Promise<Said> {
   refresh()
   return said(
     kind === 'event'
-      ? `${hours}h logged. ${money(costOf(hours))} is now against that event, and its surplus is that much smaller.`
+      ? `${hours}h logged. ${money(costOf(hours, self?.employment))} is now against that event, and its surplus is that much smaller.`
       : `${hours}h logged org-wide. It spreads across the events in that month — see the pool below.`,
   )
 }

@@ -67,7 +67,9 @@ const HOME_SELECT = {
       payee: { select: { files: { select: { kind: true } } } },
     },
   },
-  shifts: { select: { hours: true, personId: true, state: true } },
+  shifts: {
+    select: { hours: true, personId: true, state: true, person: { select: { employment: true } } },
+  },
   tasks: { select: { est: true, actual: true } },
 } as const
 
@@ -169,7 +171,7 @@ async function hoursOf(personId: string | null, now: Date): Promise<MyHours | 'u
   const from = new Date(now.getFullYear(), now.getMonth(), 1)
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 1)
 
-  const [entries, availability] = await Promise.all([
+  const [entries, availability, person] = await Promise.all([
     db.hourEntry.findMany({
       where: { personId, workedOn: { gte: from, lt: to } },
       select: { hours: true, workedOn: true, shiftId: true },
@@ -178,6 +180,7 @@ async function hoursOf(personId: string | null, now: Date): Promise<MyHours | 'u
       where: { personId },
       select: { weekly: true, volunteer: true },
     }),
+    db.person.findUnique({ where: { id: personId }, select: { employment: true } }),
   ])
 
   return myHours({
@@ -188,5 +191,9 @@ async function hoursOf(personId: string | null, now: Date): Promise<MyHours | 'u
       workedOn: e.workedOn,
       rostered: e.shiftId !== null,
     })),
+    // Defaults to a contractor's rate in the unreachable case of a linked
+    // person record that has since gone — everyone who is not an employee is
+    // a contractor.
+    employment: person?.employment ?? 'CONTRACTOR',
   })
 }

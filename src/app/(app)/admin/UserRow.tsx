@@ -4,8 +4,16 @@ import { useTransition } from 'react'
 import { useToast } from '@/components/Toast'
 import type { AdminUser, PersonOption } from '@/lib/admin-data'
 import type { Said } from '@/lib/toast'
-import type { Role } from '@/generated/prisma/client'
+import { payRate } from '@/lib/finance'
+import { money } from '@/lib/format'
+import type { Employment, Role } from '@/generated/prisma/client'
 import styles from './admin.module.css'
+
+/** Connor's 22 Sep 2026 pay policy — read off finance.ts, never typed twice. */
+const EMPLOYMENTS: { value: Employment; label: string }[] = [
+  { value: 'CONTRACTOR', label: `Contractor · ${money(payRate('CONTRACTOR'))}/h` },
+  { value: 'EMPLOYEE', label: `Employee · ${money(payRate('EMPLOYEE'))}/h base` },
+]
 
 /**
  * One account, and the things that can be changed about it.
@@ -27,6 +35,7 @@ export function UserRow({
   setActive,
   linkPerson,
   setOrganisation,
+  setEmployment,
   sendInvite,
   endSessions,
 }: {
@@ -39,6 +48,7 @@ export function UserRow({
   setRole: (role: Role) => Promise<Said>
   setActive: (active: boolean) => Promise<Said>
   linkPerson: (personId: string) => Promise<Said>
+  setEmployment: (employment: Employment) => Promise<Said>
   sendInvite: () => Promise<Said>
   endSessions: () => Promise<Said>
 }) {
@@ -87,21 +97,40 @@ export function UserRow({
           ))}
         </select>
       ) : (
-        <select
-          className={styles.select}
-          value={user.personId ?? ''}
-          disabled={pending}
-          onChange={(e) => run(() => linkPerson(e.target.value))}
-        >
-          <option value="">— not linked —</option>
-          {people
-            .filter((p) => !p.taken || p.id === user.personId)
-            .map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
+        <>
+          <select
+            className={styles.select}
+            value={user.personId ?? ''}
+            disabled={pending}
+            onChange={(e) => run(() => linkPerson(e.target.value))}
+          >
+            <option value="">— not linked —</option>
+            {people
+              .filter((p) => !p.taken || p.id === user.personId)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+          </select>
+
+          {/* Pay is a person's, not the account's — there is nowhere to put
+              it until the account is linked to one. */}
+          <select
+            className={styles.select}
+            value={user.employment ?? ''}
+            disabled={pending || !user.personId}
+            title={!user.personId ? 'Link a person first' : 'Standard pay rate'}
+            onChange={(e) => run(() => setEmployment(e.target.value as Employment))}
+          >
+            {!user.personId ? <option value="">— not linked —</option> : null}
+            {EMPLOYMENTS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
               </option>
             ))}
-        </select>
+          </select>
+        </>
       )}
 
       <span className={styles.signedIn}>

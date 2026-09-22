@@ -435,7 +435,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 <span className="tabular">{ev.ourPeople}</span>
               </div>
               <p className={styles.factNote}>
-                {ev.hours} at $33.66/hr loaded. Paid before any split.
+                {ev.hours} at each person’s rate. Paid before any split.
               </p>
             </div>
           </div>
@@ -525,7 +525,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               <span>Role</span>
               <span>Who is on it</span>
               <span className={styles.right}>Hours</span>
-              <span className={styles.right}>Loaded</span>
+              <span className={styles.right}>Cost</span>
             </div>
             {ev.roleRows.length === 0 ? (
               <p className={styles.none}>No shifts generated yet.</p>
@@ -556,7 +556,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 <span className={styles.right}>Predicted</span>
                 <span className={styles.right}>Actual</span>
                 <span className={styles.right}>Variance</span>
-                <span className={styles.right}>Loaded</span>
+                <span className={styles.right}>Cost</span>
               </div>
               {ev.tasks.map((t) => (
                 <div key={t.id} className={styles.tableRow}>

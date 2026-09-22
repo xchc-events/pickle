@@ -1,4 +1,4 @@
-import { CFG } from './finance'
+import { PLANNED_HOUR_COST, hourCost, type Employment } from './finance'
 import { money } from './format'
 
 /**
@@ -53,8 +53,15 @@ export const ORG_ROLES = [
  */
 export const isOrgRole = (role: string): boolean => (ORG_ROLES as readonly string[]).includes(role)
 
-/** What an hour costs the venue. Always the loaded rate, never the base one. */
-export const costOf = (hours: number): number => hours * CFG.loaded
+/**
+ * What an hour costs the venue: the named person's own rate, at their
+ * employment — an employee's loaded rate, a contractor's flat rate. With no
+ * person named (hours nobody is assigned to, or a mix of several people), it
+ * falls back to `PLANNED_HOUR_COST` — the contractor rate, never the base
+ * rate.
+ */
+export const costOf = (hours: number, employment?: Employment | null): number =>
+  hours * (employment ? hourCost(employment) : PLANNED_HOUR_COST)
 
 // ------------------------------------------------------------------ months ---
 

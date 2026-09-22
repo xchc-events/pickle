@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest'
 import {
   CFG,
   COV,
+  PLANNED_HOUR_COST,
   avgTicket,
   billableHours,
   financeVals,
+  hourCost,
   marginHealth,
+  payRate,
   tiers,
   whekeFee,
   type FinanceEvent,
@@ -121,6 +124,39 @@ describe('billableHours', () => {
   })
 })
 
+describe('pay rates — Connor, 22 Sep 2026: contractors $35/h, employees $30/h base', () => {
+  it('has a standard contractor payout separate from the employee base rate', () => {
+    expect(CFG.contractorRate).toBe(35)
+    expect(CFG.contractorRate).not.toBe(CFG.rate)
+  })
+
+  describe('hourCost — what an hour costs the venue', () => {
+    it('costs an employee at the loaded rate', () => {
+      expect(hourCost('EMPLOYEE')).toBe(CFG.loaded)
+    })
+
+    it('costs a contractor at the flat contractor rate — no on-costs', () => {
+      expect(hourCost('CONTRACTOR')).toBe(CFG.contractorRate)
+      expect(hourCost('CONTRACTOR')).not.toBe(CFG.loaded)
+    })
+  })
+
+  describe('payRate — what an hour pays the person', () => {
+    it('pays an employee the base rate, before on-costs', () => {
+      expect(payRate('EMPLOYEE')).toBe(CFG.rate)
+    })
+
+    it('pays a contractor the flat contractor rate', () => {
+      expect(payRate('CONTRACTOR')).toBe(CFG.contractorRate)
+    })
+  })
+
+  it('plans an unassigned hour as a contractor hour — everyone who is not an employee is one', () => {
+    expect(PLANNED_HOUR_COST).toBe(CFG.contractorRate)
+    expect(PLANNED_HOUR_COST).toBe(hourCost('CONTRACTOR'))
+  })
+})
+
 describe('financeVals', () => {
   it('builds income from tickets ex-GST plus bar margin', () => {
     const v = financeVals(makeEvent())
@@ -163,10 +199,25 @@ describe('financeVals', () => {
     expect(v.ceil).toBe(900)
   })
 
-  it('pays wages at the loaded rate, never the base rate', () => {
+  it('costs hours at the planned rate when nobody is known to be on them', () => {
+    // makeEvent() sets no hourCost — nothing is known about who worked these
+    // hours, so it falls back to PLANNED_HOUR_COST — a contractor, since
+    // everyone who is not an employee is one. The org-wide pool is always
+    // planned, whatever hourCost is set.
     const v = financeVals(makeEvent())
+    expect(v.ourPeople).toBeCloseTo(v.hours * PLANNED_HOUR_COST, 6)
+    expect(v.orgCost).toBeCloseTo(12 * PLANNED_HOUR_COST, 6)
+  })
+
+  it('costs hours at the blended rate financeInputFor works out, never the base rate', () => {
+    // financeInputFor is the one place every caller shares that works this
+    // out, from who is actually on the hours — here, the whole event happens
+    // to be one employee's.
+    const v = financeVals(makeEvent({ hourCost: CFG.loaded }))
     expect(v.ourPeople).toBeCloseTo(v.hours * CFG.loaded, 6)
-    expect(v.orgCost).toBeCloseTo(12 * CFG.loaded, 6)
+    expect(v.ourPeople).not.toBeCloseTo(v.hours * CFG.rate, 6)
+    // Still planned — an event's own hourCost never prices the org-wide pool.
+    expect(v.orgCost).toBeCloseTo(12 * PLANNED_HOUR_COST, 6)
   })
 
   it('splits only a positive surplus — a loss is carried by the venue alone', () => {

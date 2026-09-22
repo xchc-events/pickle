@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CFG, financeVals, type FinanceEvent } from './finance'
+import { CFG, PLANNED_HOUR_COST, financeVals, type FinanceEvent } from './finance'
 import {
   BAR_ROLES,
   barBudgetFrom,
@@ -134,7 +134,8 @@ describe('the budget', () => {
 
   it('keeps the rates it was locked with, so a later change cannot rewrite it', () => {
     expect(budget.stockCostPct).toBe(CFG.stockCost)
-    expect(budget.loadedRate).toBe(CFG.loaded)
+    // Planned hours, nobody rostered yet — the contractor rate, not the loaded one.
+    expect(budget.loadedRate).toBe(PLANNED_HOUR_COST)
   })
 
   it('prices the take off heads and spend per head, GST included', () => {
@@ -161,7 +162,7 @@ describe('an actual night', () => {
     expect(night.spendPerHead).toBeCloseTo(20, 6)
     expect(night.margin).toBe(1150)
     expect(night.stockCost).toBeCloseTo(2300 / CFG.gst - 1150, 6)
-    expect(night.labour).toBeCloseTo(12 * CFG.loaded, 6)
+    expect(night.labour).toBeCloseTo(12 * PLANNED_HOUR_COST, 6)
   })
 
   it('has no spend per head until the door is counted', () => {
@@ -222,7 +223,7 @@ describe('varianceOf', () => {
 
   it('counts two more bar hours against the night', () => {
     const v = varianceOf(planned, happened)
-    expect(v.effects.labour).toBeCloseTo(-2 * CFG.loaded, 6)
+    expect(v.effects.labour).toBeCloseTo(-2 * PLANNED_HOUR_COST, 6)
   })
 
   it('cannot tell turnout from spend until the door is counted, and says so', () => {

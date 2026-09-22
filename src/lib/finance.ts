@@ -11,14 +11,25 @@
  * recorded against the venue's own settlements.
  */
 
+/**
+ * 22 Sep 2026 — Connor set pay policy: contractors $35/h, employees $30/h
+ * base. Not yet checked against a real settlement.
+ */
+
 /** House constants. */
 export const CFG = {
   /** Base hourly rate, before on-costs. */
   rate: 30,
   /** On-costs applied to the base rate. */
   loadPct: 0.122,
-  /** Loaded hourly rate. Every wage figure uses this, never `rate`. */
+  /** Loaded hourly rate: what an employee's hour costs the venue. */
   loaded: 33.66,
+  /**
+   * Standard payout per hour to a contractor: everyone who is not an
+   * employee. Contractors carry no on-costs, so this is also what their hour
+   * costs the venue.
+   */
+  contractorRate: 35,
   /** NZ GST divisor. */
   gst: 1.15,
   /** Weekly fixed cost base — rent, power, insurance, software. */
@@ -34,6 +45,27 @@ export const CFG = {
   // constants had no reader once that moved, and the room they named — the
   // Apartment — is no longer bookable.
 } as const
+
+/** Paid a wage with on-costs, or a flat contractor rate with none. */
+export type Employment = 'EMPLOYEE' | 'CONTRACTOR'
+
+/** What an hour someone actually worked costs the venue. */
+export function hourCost(employment: Employment): number {
+  return employment === 'EMPLOYEE' ? CFG.loaded : CFG.contractorRate
+}
+
+/** What an hour someone actually worked pays them. */
+export function payRate(employment: Employment): number {
+  return employment === 'EMPLOYEE' ? CFG.rate : CFG.contractorRate
+}
+
+/**
+ * What an hour costs the venue when nobody is assigned to it yet — a shift
+ * plan, the bar's labour budget, the enquiry model, an unassigned roster
+ * call. Everyone who is not an employee is a contractor, so an hour with no
+ * name on it is costed as one.
+ */
+export const PLANNED_HOUR_COST = CFG.contractorRate
 
 /** Day-of-week share of the weekly cost base. Unknown day falls back to 10%. */
 export const COV: Record<number, number> = {
@@ -100,6 +132,13 @@ export interface FinanceEvent {
   addons: FinanceAddon[]
   /** Org-wide labour hours apportioned to this event for its month. */
   orgShareHours: number
+  /**
+   * The blended cost per hour of the people actually on this event's hours —
+   * set by `financeInputFor` from who is assigned, never worked out here.
+   * Absent means nobody is known, so `ourPeople` falls back to
+   * `PLANNED_HOUR_COST`.
+   */
+  hourCost?: number
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
@@ -177,8 +216,9 @@ export function financeVals(e: FinanceEvent): FinanceVals {
   const comps = e.crew * e.tok * CFG.tokenPrice * CFG.stockCost
 
   const hours = billableHours(e)
-  const ourPeople = hours * CFG.loaded
-  const orgCost = e.orgShareHours * CFG.loaded
+  const ourPeople = hours * (e.hourCost ?? PLANNED_HOUR_COST)
+  // The org-wide pool is not this event's people to attribute — always planned.
+  const orgCost = e.orgShareHours * PLANNED_HOUR_COST
 
   // Declined acts are off the bill and off the floor.
   const live = e.artists.filter((a) => a.status !== 'declined')

@@ -89,7 +89,8 @@ const SCENARIO_LABELS = ['Quiet', 'Likely', 'Great'] as const
 const EVENT_INCLUDE = {
   space: { select: { name: true, capacity: true, seatedCapacity: true } },
   artists: { select: { low: true, high: true, status: true } },
-  shifts: { select: { hours: true, personId: true } },
+  // `person.employment` is what `financeInputFor` blends the wage cost from.
+  shifts: { select: { hours: true, personId: true, person: { select: { employment: true } } } },
   tasks: { select: { est: true, actual: true } },
   addons: { select: { kind: true, cost: true, hours: true } },
   channels: { where: { channel: 'gather' }, select: { live: true } },

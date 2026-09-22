@@ -64,7 +64,7 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
             <div className={styles.call}>
               <span className={styles.callLabel}>The call</span>
               <span className={`${styles.callFigure} tabular`}>{event.callHours}</span>
-              <span className={styles.callCost}>{money(event.callCost)} loaded</span>
+              <span className={styles.callCost}>{money(event.callCost)} planned</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
           </ul>
 
           <p className={styles.footnote}>
-            Every assignment above wrote an hour entry against this event at the loaded rate. The
+            Every assignment above wrote an hour entry against this event at that person’s rate. The
             figure in Finance and the figure here are the same number read twice, not two numbers
             kept in step.
           </p>

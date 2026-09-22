@@ -2,9 +2,9 @@ import 'server-only'
 import { db } from './db'
 import { eventScope } from './scope'
 import { ago, dateLabel, days, hrs, money } from './format'
-import { financeVals, CFG, type FinanceVals } from './finance'
+import { financeVals, marginHealth, PLANNED_HOUR_COST, type FinanceVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './finance-input'
-import { marginHealth } from './finance'
+import { costOf } from './hours'
 import { capacityOf, tierTable, normaliseMix, sellThrough, paceOf } from './ticketing'
 import { channelCards } from './promo'
 import { daysBetween } from './pipeline'
@@ -268,14 +268,15 @@ export async function loadEventRecord(
       files: { select: { kind: true, assetId: true, current: true, scan: true } },
       // Overrides FINANCE_SELECT's narrower shifts select, so it has to keep
       // `personId` — that is what `financeInputFor` reads to decide whether a
-      // shift carries wage cost.
+      // shift carries wage cost. `person.employment` is what prices it: this
+      // page shows real people's real hours, never a planned average.
       shifts: {
         select: {
           role: true,
           hours: true,
           state: true,
           personId: true,
-          person: { select: { name: true, initials: true } },
+          person: { select: { name: true, initials: true, employment: true } },
         },
       },
       tasks: { select: { id: true, name: true, est: true, actual: true } },
@@ -287,6 +288,10 @@ export async function loadEventRecord(
 
   const orgShareHours = await orgShareFor(row.date)
   const scen = scenarioOf(row.scen)
+  // The blend of who is actually on this event's hours is worked out by
+  // financeInputFor itself, from the same row — the one place every screen
+  // that prices a night shares, so this page cannot disagree with the
+  // Pipeline, Home or the settlement about the same night.
   const vals: FinanceVals = financeVals(financeInputFor(row, scen, orgShareHours))
 
   const leadBy = new Map(row.leads.map((l) => [l.role.toLowerCase() as LeadKey, l]))
@@ -352,17 +357,21 @@ export async function loadEventRecord(
   const pace = paceOf({ sold: row.sold, breakeven: vals.breakeven })
   const health = marginHealth(vals)
 
-  // On-site labour, grouped by role, exactly as the roster holds it.
-  const byRole = new Map<string, RecordRoleRow>()
+  // On-site labour, grouped by role, exactly as the roster holds it. Each
+  // shift is costed at the person on it, or planned where the shift is still
+  // open — never one flat rate for the whole role.
+  const byRole = new Map<string, RecordRoleRow & { costTotal: number }>()
   for (const s of row.shifts) {
     const existing = byRole.get(s.role) ?? {
       role: s.role,
       hours: 0,
       cost: '',
+      costTotal: 0,
       people: [],
       open: 0,
     }
     existing.hours += s.hours
+    existing.costTotal += costOf(s.hours, s.person?.employment)
     if (s.person) {
       existing.people.push({ name: s.person.name, initials: s.person.initials, paid: false })
     } else {
@@ -370,9 +379,12 @@ export async function loadEventRecord(
     }
     byRole.set(s.role, existing)
   }
-  const roleRows = [...byRole.values()].map((r) => ({
-    ...r,
-    cost: money(r.hours * CFG.loaded),
+  const roleRows: RecordRoleRow[] = [...byRole.values()].map((r) => ({
+    role: r.role,
+    hours: r.hours,
+    cost: money(r.costTotal),
+    people: r.people,
+    open: r.open,
   }))
 
   const onSiteHours = row.shifts.filter((s) => s.person !== null).reduce((n, s) => n + s.hours, 0)
@@ -486,7 +498,9 @@ export async function loadEventRecord(
         t.actual === null
           ? '—'
           : `${t.actual - t.est > 0 ? '+' : ''}${Math.round((t.actual - t.est) * 10) / 10}h`,
-      cost: money((t.actual ?? t.est) * CFG.loaded),
+      // Off-site task work, estimated against a team rather than a person —
+      // planned at the contractor rate, like every other unassigned hour.
+      cost: money((t.actual ?? t.est) * PLANNED_HOUR_COST),
     })),
     offSiteHours,
     loggedHours: hrs(row.hours.reduce((n, h) => n + h.hours, 0)),

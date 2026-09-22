@@ -3,7 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs } from './format'
 import { dayPeriod, fitFor, shortfall, type FitTone } from './roster'
-import { CFG } from './finance'
+import { PLANNED_HOUR_COST } from './finance'
 import type { SessionUser } from './session'
 
 /**
@@ -70,7 +70,7 @@ export interface RosterEventView {
   spaceName: string
   format: string
   shifts: RosterShift[]
-  /** Total call, and what it costs at the loaded rate. */
+  /** Total call, and what it costs planned at the contractor rate. */
   callHours: string
   callCost: number
   shortfall: string | null
@@ -191,7 +191,7 @@ export async function loadRoster(
       format: row.format,
       shifts,
       callHours: hrs(callHours),
-      callCost: callHours * CFG.loaded,
+      callCost: callHours * PLANNED_HOUR_COST,
       shortfall: shortfall(shifts),
     },
   }
