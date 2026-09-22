@@ -41,7 +41,12 @@ const act = (over: Partial<GateArtist> = {}): GateArtist => ({
 })
 
 const everyPiece = (state: AssetState = 'approved'): EventAsset[] =>
-  ASSET_SET.map((a) => ({ key: a.key, state, promoterSigned: true }))
+  ASSET_SET.map((a) => ({
+    key: a.key,
+    state,
+    promoterSigned: true,
+    signedById: state === 'approved' ? 'user_signer' : null,
+  }))
 
 /** The house set approved, but for the first `n` pieces, which are up for sign-off. */
 const inReview = (n: number): EventAsset[] =>
@@ -49,6 +54,7 @@ const inReview = (n: number): EventAsset[] =>
     key: a.key,
     state: i < n ? 'review' : 'approved',
     promoterSigned: true,
+    signedById: i < n ? null : 'user_signer',
   }))
 
 const input = (over: Partial<PartsEvent> = {}): PartsEvent => ({
@@ -338,6 +344,7 @@ describe('Needs you — what counts as today', () => {
       key: a.key,
       state: (a.key === 'story' ? 'review' : 'approved') as AssetState,
       promoterSigned: true,
+      signedById: a.key === 'story' ? null : 'user_signer',
     }))
     const e = night({}, { assets })
     expect(partsFor(e.input).find((p) => p.key === 'design')?.done).toBe(true)

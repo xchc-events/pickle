@@ -22,6 +22,7 @@ interface FakeEvent {
   date: Date
   promoter: string | null
   promoterId: string | null
+  ownerId: string | null
   concluded: boolean
   space: { name: string }
   format: string
@@ -59,6 +60,7 @@ const db = {
   user: { findMany: vi.fn().mockResolvedValue([]) },
   storedFile: { findMany: vi.fn().mockResolvedValue([]) },
   hourEntry: { findMany: vi.fn().mockResolvedValue([]) },
+  comment: { findMany: vi.fn().mockResolvedValue([]) },
 }
 vi.mock('./db', () => ({ db }))
 
@@ -94,6 +96,7 @@ beforeEach(() => {
       date: new Date('2026-10-10'),
       promoter: 'Kōura Collective',
       promoterId: 'org_a',
+      ownerId: 'person_owner_a',
       concluded: false,
       space: { name: 'Main' },
       format: 'DJs',
@@ -112,6 +115,7 @@ beforeEach(() => {
       date: new Date('2026-10-12'),
       promoter: 'Aro Label',
       promoterId: 'org_b',
+      ownerId: 'person_owner_b',
       concluded: false,
       space: { name: 'Main' },
       format: 'DJs',
@@ -163,5 +167,62 @@ describe('staff, reading the same card', () => {
     expect(event?.id).toBe('ev_b')
     expect(event?.leadEmail).toBe('reube@xchc.co.nz')
     expect(queue.map((q) => q.id).sort()).toEqual(['ev_a', 'ev_b'])
+  })
+})
+
+/**
+ * D6 — `maySignOff` on the loaded event drives Design's own Approve/Ask
+ * for a change/Reopen controls (see (app)/design/page.tsx). One flag for
+ * the whole event: `maySignOff` never looks at the piece.
+ */
+describe('who may sign this event’s design off', () => {
+  it('is true for the promoter of this event’s own organisation', async () => {
+    const { event } = await loadDesign(orgAUser, 'ev_a', true)
+    expect(event?.maySignOff).toBe(true)
+  })
+
+  it('is false for a promoter reading a different event, even scoped down to their own', async () => {
+    // orgAUser can never actually load ev_b (scoped out), but a design
+    // person with no personId match must not read as a signer either.
+    const staffNotOwner: SessionUser = {
+      ...orgAUser,
+      role: 'DESIGN',
+      roleKey: 'design',
+      external: false,
+      organisationId: null,
+      personId: 'person_someone_else',
+    }
+    const { event } = await loadDesign(staffNotOwner, 'ev_a', true)
+    expect(event?.maySignOff).toBe(false)
+  })
+
+  it('is true for the event’s internal owner', async () => {
+    const owner: SessionUser = {
+      ...orgAUser,
+      role: 'COORDINATOR',
+      roleKey: 'coordinator',
+      external: false,
+      organisationId: null,
+      personId: 'person_owner_a',
+    }
+    const { event } = await loadDesign(owner, 'ev_a', true)
+    expect(event?.maySignOff).toBe(true)
+  })
+})
+
+describe('comment threads on the loaded event', () => {
+  it('splits the general thread from each piece’s own', async () => {
+    events[0]!.assets = [
+      { id: 'asset_cover', key: 'cover', state: 'REVIEW', promoterSigned: false, signedById: null },
+    ] as never
+    db.comment.findMany.mockResolvedValueOnce([
+      { id: 'c1', assetId: 'asset_cover', who: 'TW', body: 'on the cover', at: new Date() },
+      { id: 'c2', assetId: null, who: 'TW', body: 'general note', at: new Date() },
+    ])
+
+    const { event } = await loadDesign(orgAUser, 'ev_a', true)
+    expect(event?.generalComments.map((c) => c.body)).toEqual(['general note'])
+    const cover = event?.lead.find((c) => c.key === 'cover')
+    expect(cover?.comments?.map((c) => c.body)).toEqual(['on the cover'])
   })
 })

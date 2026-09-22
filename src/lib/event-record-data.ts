@@ -250,7 +250,7 @@ export async function loadEventRecord(
       space: { select: { name: true, capacity: true, seatedCapacity: true } },
       owner: { select: { name: true, initials: true } },
       leads: { select: { role: true, personId: true, person: { select: { name: true } } } },
-      assets: { select: { key: true, state: true, promoterSigned: true } },
+      assets: { select: { key: true, state: true, promoterSigned: true, signedById: true } },
       channels: { select: { channel: true, live: true, stale: true, note: true } },
       beats: { select: { done: true } },
       activity: { orderBy: { at: 'desc' }, take: 20, select: { who: true, text: true, at: true } },

@@ -28,12 +28,29 @@ const act = (over: Partial<GateArtist> = {}): GateArtist => ({
 })
 
 /** The whole house set in one state. */
-const everyPiece = (state: AssetState = 'approved', promoterSigned = true): EventAsset[] =>
-  ASSET_SET.map((a) => ({ key: a.key, state, promoterSigned }))
+/**
+ * `signed` drives both `promoterSigned` and `signedById` together — every
+ * existing caller means "fully signed off" or "not", and D6 (23 Sep 2026)
+ * added `signedById` as the field the design gate actually reads, while
+ * `promoterSigned` stays only for the line that is specifically about the
+ * promoter's own portal. See `maySignOff` in design.ts.
+ */
+const everyPiece = (state: AssetState = 'approved', signed = true): EventAsset[] =>
+  ASSET_SET.map((a) => ({
+    key: a.key,
+    state,
+    promoterSigned: signed,
+    signedById: signed ? 'user_signer' : null,
+  }))
 
 /** The house set with the first `n` pieces approved and the rest in `rest`. */
 const approvedFirst = (n: number, rest: AssetState = 'draft'): EventAsset[] =>
-  ASSET_SET.map((a, i) => ({ key: a.key, state: i < n ? 'approved' : rest, promoterSigned: true }))
+  ASSET_SET.map((a, i) => ({
+    key: a.key,
+    state: i < n ? 'approved' : rest,
+    promoterSigned: true,
+    signedById: i < n ? 'user_signer' : null,
+  }))
 
 const ev = (over: Partial<PartsEvent> = {}): PartsEvent => ({
   booking: 'confirmed',
@@ -312,7 +329,9 @@ describe('design — its status', () => {
 
   it('treats a piece with no row as a draft, not as missing from the set', () => {
     // The set is what the house asks for, not what happens to exist.
-    const e = ev({ assets: [{ key: 'cover', state: 'approved', promoterSigned: true }] })
+    const e = ev({
+      assets: [{ key: 'cover', state: 'approved', promoterSigned: true, signedById: 'user_signer' }],
+    })
     expect(part(e, 'design').status).toBe('1 of 6')
   })
 
@@ -413,28 +432,70 @@ describe('design — its gates', () => {
     expect(gate(ev({ assets: noCopy }), 'design', 'Listing copy signed off').ok).toBe(false)
   })
 
-  it('counts the promoter sign-off only when they have a portal', () => {
+  /**
+   * D6, Connor 23 Sep 2026: sign-off is the owner's or the promoter's,
+   * whichever side did it — `signedById` is what the gate reads now, not
+   * `promoterSigned` (kept only for the portal-specific line on Design and
+   * the portal). See `maySignOff` in design.ts.
+   */
+  it('is clear once every hero and lead piece has a recorded signer', () => {
     const unsigned = everyPiece('approved', false)
-    expect(
-      gate(ev({ assets: unsigned, hasPortal: false }), 'design', 'Promoter signed off the creative')
-        .ok,
-    ).toBe(true)
-
     const g = gate(
       ev({ assets: unsigned, hasPortal: true }),
       'design',
-      'Promoter signed off the creative',
+      'Signed off by the owner or the promoter',
     )
     expect(g.ok).toBe(false)
-    // The two vertical cuts and the cover — the pieces a promoter signs.
-    expect(g.why).toBe('3 pieces not signed off in their portal')
+    // The two vertical cuts and the cover — the pieces that need a signer.
+    expect(g.why).toBe('3 pieces not signed off yet')
+
+    const signed = everyPiece('approved', true)
+    expect(
+      gate(ev({ assets: signed, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
+        .ok,
+    ).toBe(true)
+  })
+
+  it('escapes the gate only when nobody could sign — no portal and no owner', () => {
+    const unsigned = everyPiece('approved', false)
+    expect(
+      gate(
+        ev({ assets: unsigned, hasPortal: false, hasOwner: false }),
+        'design',
+        'Signed off by the owner or the promoter',
+      ).ok,
+    ).toBe(true)
+  })
+
+  it('requires signing once there is an owner, even with no portal to chase a promoter in', () => {
+    // The owner can sign a piece off too, so an in-house event is no longer
+    // let off this gate just because nobody outside the venue has a portal.
+    const unsigned = everyPiece('approved', false)
+    const g = gate(
+      ev({ assets: unsigned, hasPortal: false, hasOwner: true }),
+      'design',
+      'Signed off by the owner or the promoter',
+    )
+    expect(g.ok).toBe(false)
+    expect(g.why).toBe('3 pieces not signed off yet')
+  })
+
+  it('does not count an approved piece with no recorded signer as signed', () => {
+    // A piece approved before this feature existed carries no signedById —
+    // `promoterSigned` alone is not enough, however it got set.
+    const legacy = everyPiece('approved', true).map((a) => ({ ...a, signedById: null }))
+    expect(
+      gate(ev({ assets: legacy, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
+        .ok,
+    ).toBe(false)
   })
 
   it('says "piece" for one and "pieces" for more', () => {
-    const one = everyPiece().map((a) => (a.key === 'cover' ? { ...a, promoterSigned: false } : a))
+    const one = everyPiece().map((a) => (a.key === 'cover' ? { ...a, signedById: null } : a))
     expect(
-      gate(ev({ assets: one, hasPortal: true }), 'design', 'Promoter signed off the creative').why,
-    ).toBe('1 piece not signed off in their portal')
+      gate(ev({ assets: one, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
+        .why,
+    ).toBe('1 piece not signed off yet')
   })
 })
 
@@ -1010,6 +1071,11 @@ describe('the next move on an event', () => {
  * One was merged rather than moved. "Door list pulled" tested exactly what
  * "Tickets live on Gather.rsvp" tests — the door list is Gather's — so it
  * survives as that gate.
+ *
+ * One was renamed, 23 Sep 2026. "Promoter signed off the creative" tested
+ * only `promoterSigned`, which nothing ever set; it survives as "Signed off
+ * by the owner or the promoter", which tests a piece is APPROVED with a
+ * recorded signer — see `maySignOff` in design.ts.
  */
 const STAGE_GATES = [
   // Enquiry
@@ -1036,7 +1102,7 @@ const STAGE_GATES = [
   'Event cover signed off',
   'Listing copy signed off',
   'Promo lead assigned',
-  'Promoter signed off the creative',
+  'Signed off by the owner or the promoter',
   // On sale
   'Tickets live on Gather.rsvp',
   'Every channel listed or ticked off',
