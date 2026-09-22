@@ -7,6 +7,20 @@
       "runtimeArgs": ["run", "dev"],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "preview-e",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "DATABASE_URL=postgresql://pickle:pickle@127.0.0.1:5432/pickle_e_test",
+        "npx",
+        "next",
+        "dev",
+        "--webpack",
+        "-p",
+        "3101"
+      ],
+      "port": 3101
     }
   ]
 }
