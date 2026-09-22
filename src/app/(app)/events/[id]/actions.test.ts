@@ -84,6 +84,8 @@ const ARGS: Record<string, unknown[]> = {
   setSplit: [60],
   setModel: ['dry'],
   setFigures: [{ att: [60, 90, 120], barHead: 10, gear: 250, adv: 120, crew: 4, tok: 2 }],
+  issueArtistLink: ['artist_theirs'],
+  linkArtistToPayee: ['artist_theirs'],
 }
 
 const call = (name: string) => actions[name]!(EVENT, ...(ARGS[name] ?? []))
@@ -120,6 +122,11 @@ const mere = {
 
 const refusal = canChangeEventRecord(awhina)
 const REFUSED = { kind: 'stop', text: refusal.ok ? '' : refusal.why }
+// issueArtistLink is not a toast action — it hands ArtistLink.tsx a URL on
+// success, so it keeps the { ok, why } shape it had in tech/actions.ts
+// rather than adopting Said. Everything else here refuses in Said.
+const REFUSED_LINK = { ok: false, why: refusal.ok ? '' : refusal.why }
+const refusedShape = (name: string) => (name === 'issueArtistLink' ? REFUSED_LINK : REFUSED)
 
 beforeEach(() => {
   reached.length = 0
@@ -166,6 +173,12 @@ describe('the actions under test', () => {
         'setSplit',
         'setModel',
         'setFigures',
+        // Moved from Tech production 23 Sep 2026 — bank details and the
+        // payee link are the coordinator's business, not the rig's. What
+        // each does is covered in artist-link-actions.test.ts; this file
+        // only has to prove they are gated the same as everything else here.
+        'issueArtistLink',
+        'linkArtistToPayee',
       ]),
     )
   })
@@ -178,7 +191,7 @@ describe('an external promoter, on an event their organisation brought', () => {
   })
 
   it.each(names)('%s refuses them before anything is read or written', async (name) => {
-    await expect(call(name)).resolves.toEqual(REFUSED)
+    await expect(call(name)).resolves.toEqual(refusedShape(name))
     expect(reached).toEqual([])
   })
 })
