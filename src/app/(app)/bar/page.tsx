@@ -49,8 +49,7 @@ export default async function BarPage({ searchParams }: PageProps<'/bar'>) {
         <div>
           <h1 className={styles.title}>Bar</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Cellar</span> · what we expected, what happened, and
-            why · Epos Now is the till, and tells Xero
+            what we expected, what happened, and why · Epos Now is the till, and tells Xero
           </p>
         </div>
         <nav className={styles.views} aria-label="Bar views">
