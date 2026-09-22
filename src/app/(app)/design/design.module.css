@@ -300,6 +300,13 @@
   color: var(--st-good);
 }
 
+/* --- D5, the general design thread, under the brief ---------------------- */
+
+.generalThread {
+  margin-top: 14px;
+  max-width: 62ch;
+}
+
 /* --- hours -------------------------------------------------------------- */
 
 .hoursCard {
@@ -497,6 +504,24 @@
   font-size: 10.5px;
 }
 
+/* Signed off, with Reopen (D6/D3) beside it rather than under it — a
+   decision that is already made should not compete for a whole row. */
+.doneRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.waiting {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
 .actions {
   display: flex;
   gap: 6px;
@@ -509,6 +534,24 @@
 
 .actWide {
   flex: 1;
+}
+
+/* --- D5, comment threads on a piece -------------------------------------- */
+
+.thread {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 60%, transparent);
+}
+
+.threadSummary {
+  cursor: pointer;
+  font-size: 10.5px;
+  color: var(--color-accent-300);
+}
+
+.thread[open] .threadSummary {
+  margin-bottom: 6px;
 }
 
 /* --- content rules ------------------------------------------------------ */

@@ -17,14 +17,17 @@ import type { SessionUser } from '@/lib/session'
 
 vi.mock('server-only', () => ({}))
 
+// The mocked `requireModule` ignores which module was asked for — every
+// test here names its own `user` through `.mockResolvedValue`, never the
+// module key — so the wrapper below takes no arguments either.
 const requireModule = vi.fn(
-  async (..._a: unknown[]): Promise<{ user: SessionUser; modules: string[] }> => ({
+  async (): Promise<{ user: SessionUser; modules: string[] }> => ({
     user: tui,
     modules: ['design'],
   }),
 )
 vi.mock('@/lib/permissions', () => ({
-  requireModule: (...a: unknown[]) => requireModule(...a),
+  requireModule: () => requireModule(),
   requireEvent: vi.fn(async (_: unknown, id: string) => id),
 }))
 
@@ -155,8 +158,18 @@ describe('who may approve', () => {
     organisationId: 'payee_koura',
     initials: 'KP',
   }
-  const promoterOfAnotherOrg: SessionUser = { ...promoterOfOwnOrg, id: 'user_other_promo', organisationId: 'payee_wheke' }
-  const owner: SessionUser = { ...tui, id: 'user_owner', name: 'The Owner', role: 'COORDINATOR', roleKey: 'coordinator' }
+  const promoterOfAnotherOrg: SessionUser = {
+    ...promoterOfOwnOrg,
+    id: 'user_other_promo',
+    organisationId: 'payee_wheke',
+  }
+  const owner: SessionUser = {
+    ...tui,
+    id: 'user_owner',
+    name: 'The Owner',
+    role: 'COORDINATOR',
+    roleKey: 'coordinator',
+  }
 
   it('refuses a design-role user who is not this event’s owner', async () => {
     eventFindUnique.mockResolvedValue({ ownerId: 'person_someone_else', promoterId: 'payee_koura' })

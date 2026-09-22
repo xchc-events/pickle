@@ -11,14 +11,17 @@ import type { SessionUser } from '@/lib/session'
 
 vi.mock('server-only', () => ({}))
 
+// The mocked `requireModule` ignores which module was asked for — every
+// test here names its own `user` through `.mockResolvedValue`, never the
+// module key — so the wrapper below takes no arguments either.
 const requireModule = vi.fn(
-  async (..._a: unknown[]): Promise<{ user: SessionUser; modules: string[] }> => ({
+  async (): Promise<{ user: SessionUser; modules: string[] }> => ({
     user: owner,
     modules: ['design'],
   }),
 )
 vi.mock('@/lib/permissions', () => ({
-  requireModule: (...a: unknown[]) => requireModule(...a),
+  requireModule: () => requireModule(),
   requireEvent: vi.fn(async (_: unknown, id: string) => id),
 }))
 
@@ -57,7 +60,14 @@ const owner: SessionUser = {
   authenticated: true,
   sessionId: 'session_owner',
 }
-const designStaff: SessionUser = { ...owner, id: 'user_tui', role: 'DESIGN', roleKey: 'design', personId: 'person_tui', initials: 'TW' }
+const designStaff: SessionUser = {
+  ...owner,
+  id: 'user_tui',
+  role: 'DESIGN',
+  roleKey: 'design',
+  personId: 'person_tui',
+  initials: 'TW',
+}
 
 const { reopenPiece } = await import('./actions')
 

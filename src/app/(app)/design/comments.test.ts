@@ -75,7 +75,13 @@ describe('postDesignComment', () => {
     await postDesignComment(EVENT, null, 'general note')
     expect(assetUpsert).not.toHaveBeenCalled()
     expect(commentCreate).toHaveBeenCalledWith({
-      data: { eventId: EVENT, assetId: null, authorId: tui.id, who: tui.initials, body: 'general note' },
+      data: {
+        eventId: EVENT,
+        assetId: null,
+        authorId: tui.id,
+        who: tui.initials,
+        body: 'general note',
+      },
     })
   })
 

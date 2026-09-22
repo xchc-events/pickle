@@ -19,10 +19,16 @@ import type { SessionUser } from './session'
  * may sign.
  */
 
-const REFUSAL = "Sign-off is the owner's or the promoter's call — design puts a piece up for review."
+const REFUSAL =
+  "Sign-off is the owner's or the promoter's call — design puts a piece up for review."
 
-async function eventFor(eventId: string): Promise<{ ownerId: string | null; promoterId: string | null } | null> {
-  return db.event.findUnique({ where: { id: eventId }, select: { ownerId: true, promoterId: true } })
+async function eventFor(
+  eventId: string,
+): Promise<{ ownerId: string | null; promoterId: string | null } | null> {
+  return db.event.findUnique({
+    where: { id: eventId },
+    select: { ownerId: true, promoterId: true },
+  })
 }
 
 /** The same flattening design/actions.ts always did, now shared. */
@@ -110,7 +116,8 @@ export async function sendBackAsset(
   const spec = assetSpec(key)
   if (!spec) return said('That is not a piece of the set.', 'stop')
   const reason = words.trim()
-  if (!reason) return said('Say what needs to change — that becomes the comment design sees.', 'stop')
+  if (!reason)
+    return said('Say what needs to change — that becomes the comment design sees.', 'stop')
 
   await db.asset.upsert({
     where: { eventId_key: { eventId, key } },

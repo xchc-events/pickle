@@ -202,9 +202,7 @@ export async function loadDesign(
   )
   // `comments.byAsset` is keyed by Asset.id; row.assets is what maps a
   // house key back to the row it came from.
-  const commentsByKey = new Map(
-    row.assets.map((a) => [a.key, comments.byAsset.get(a.id) ?? []]),
-  )
+  const commentsByKey = new Map(row.assets.map((a) => [a.key, comments.byAsset.get(a.id) ?? []]))
 
   const withExtras = (cards: AssetCard[]): AssetCard[] =>
     cards.map((c) => ({

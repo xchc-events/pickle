@@ -330,7 +330,9 @@ describe('design — its status', () => {
   it('treats a piece with no row as a draft, not as missing from the set', () => {
     // The set is what the house asks for, not what happens to exist.
     const e = ev({
-      assets: [{ key: 'cover', state: 'approved', promoterSigned: true, signedById: 'user_signer' }],
+      assets: [
+        { key: 'cover', state: 'approved', promoterSigned: true, signedById: 'user_signer' },
+      ],
     })
     expect(part(e, 'design').status).toBe('1 of 6')
   })
@@ -451,8 +453,11 @@ describe('design — its gates', () => {
 
     const signed = everyPiece('approved', true)
     expect(
-      gate(ev({ assets: signed, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
-        .ok,
+      gate(
+        ev({ assets: signed, hasPortal: true }),
+        'design',
+        'Signed off by the owner or the promoter',
+      ).ok,
     ).toBe(true)
   })
 
@@ -485,16 +490,22 @@ describe('design — its gates', () => {
     // `promoterSigned` alone is not enough, however it got set.
     const legacy = everyPiece('approved', true).map((a) => ({ ...a, signedById: null }))
     expect(
-      gate(ev({ assets: legacy, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
-        .ok,
+      gate(
+        ev({ assets: legacy, hasPortal: true }),
+        'design',
+        'Signed off by the owner or the promoter',
+      ).ok,
     ).toBe(false)
   })
 
   it('says "piece" for one and "pieces" for more', () => {
     const one = everyPiece().map((a) => (a.key === 'cover' ? { ...a, signedById: null } : a))
     expect(
-      gate(ev({ assets: one, hasPortal: true }), 'design', 'Signed off by the owner or the promoter')
-        .why,
+      gate(
+        ev({ assets: one, hasPortal: true }),
+        'design',
+        'Signed off by the owner or the promoter',
+      ).why,
     ).toBe('1 piece not signed off yet')
   })
 })

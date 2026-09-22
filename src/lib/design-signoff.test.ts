@@ -54,7 +54,12 @@ const owner: SessionUser = {
   authenticated: true,
   sessionId: 'session_owner',
 }
-const otherCoordinator: SessionUser = { ...owner, id: 'user_other', personId: 'person_other', initials: 'OC' }
+const otherCoordinator: SessionUser = {
+  ...owner,
+  id: 'user_other',
+  personId: 'person_other',
+  initials: 'OC',
+}
 const designStaff: SessionUser = {
   id: 'user_tui',
   email: 'tui@xchc.test',
@@ -83,7 +88,11 @@ const promoter: SessionUser = {
   authenticated: true,
   sessionId: 'session_promo',
 }
-const otherPromoter: SessionUser = { ...promoter, id: 'user_other_promo', organisationId: 'payee_wheke' }
+const otherPromoter: SessionUser = {
+  ...promoter,
+  id: 'user_other_promo',
+  organisationId: 'payee_wheke',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -186,7 +195,9 @@ describe('signOffAsset — what it records', () => {
   })
 
   it('clears the event’s risk note once the last piece is approved, and says so', async () => {
-    assetFindMany.mockResolvedValue(ASSET_SET.map((a) => ({ key: a.key, state: 'APPROVED', promoterSigned: false })))
+    assetFindMany.mockResolvedValue(
+      ASSET_SET.map((a) => ({ key: a.key, state: 'APPROVED', promoterSigned: false })),
+    )
     const out = await signOffAsset('evt_1', 'listing', owner)
     expect(eventUpdate).toHaveBeenCalledWith({ where: { id: 'evt_1' }, data: { riskNote: null } })
     expect(out.text).toMatch(/last piece/)
@@ -222,7 +233,12 @@ describe('sendBackAsset', () => {
 
   it('posts the words as a comment on the piece', async () => {
     await sendBackAsset('evt_1', 'listing', promoter, 'wrong dates on the cover')
-    expect(postComment).toHaveBeenCalledWith('evt_1', 'listing', promoter, 'wrong dates on the cover')
+    expect(postComment).toHaveBeenCalledWith(
+      'evt_1',
+      'listing',
+      promoter,
+      'wrong dates on the cover',
+    )
   })
 
   it('records its own activity line for the state change, on top of the comment’s', async () => {
