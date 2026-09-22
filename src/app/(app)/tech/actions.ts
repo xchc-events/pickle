@@ -2,10 +2,8 @@
 
 import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
-import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import * as files from '@/lib/files-data'
-import { NO_LINK_ADDRESS, issueGrant } from '@/lib/grants-data'
 import type { FileKindKey } from '@/lib/files'
 import { said, type Said } from '@/lib/toast'
 
@@ -71,87 +69,4 @@ export async function linkToFile(eventId: string, fileId: string): Promise<strin
   if (!row || row.eventId !== id) return null
 
   return files.linkTo(fileId)
-}
-
-/**
- * Create the act as a payee, so their details survive this booking.
- *
- * An act that plays four times should enter their account number once. This
- * is the moment a typed-in name becomes a record — before it, `EventArtist`
- * carries only a string, which is fine for a pipeline row and useless for
- * paying somebody.
- */
-export async function linkArtistToPayee(eventId: string, artistId: string): Promise<Said> {
-  const { user } = await requireModule('tech')
-  const id = await requireEvent(user, eventId)
-
-  const artist = await db.eventArtist.findFirst({
-    where: { id: artistId, eventId: id },
-    select: { id: true, name: true, payeeId: true },
-  })
-  if (!artist) return said('That act is not on this event.', 'stop')
-  if (artist.payeeId) return said(`${artist.name} already has a record.`, 'warn')
-
-  // An act of the same name is almost certainly the same act. Reusing the
-  // record is the whole point — a second one would mean a second set of bank
-  // details to keep straight.
-  const existing = await db.payee.findFirst({
-    where: { kind: 'ARTIST', name: artist.name },
-    select: { id: true },
-  })
-
-  const payee =
-    existing ??
-    (await db.payee.create({ data: { kind: 'ARTIST', name: artist.name, country: 'NZ' } }))
-
-  await db.eventArtist.update({ where: { id: artist.id }, data: { payeeId: payee.id } })
-  await record(id, user, `linked ${artist.name} to a payee record`)
-
-  refresh()
-  return said(
-    existing
-      ? `${artist.name} already had a record — this booking now points at it, so their details carry across.`
-      : `${artist.name} now has a record of their own. Their details will follow them to the next booking.`,
-  )
-}
-
-export interface IssuedLink {
-  ok: boolean
-  url?: string
-  expires?: string
-  why?: string
-}
-
-/**
- * Mint a link for an act to fill in their own details.
- *
- * The URL comes back once and is never stored in readable form. The caller
- * shows it to the coordinator, who sends it — this deliberately does not send
- * anything itself, because a link that emails on its own is a link nobody
- * checked the address on.
- *
- * With no safe address to build it on — AUTH_URL unset in production — there
- * is no link, and the coordinator is told why rather than handed one to
- * localhost. Nothing is recorded, because nothing was sent.
- */
-export async function issueArtistLink(eventId: string, artistId: string): Promise<IssuedLink> {
-  const { user } = await requireModule('tech')
-  const id = await requireEvent(user, eventId)
-
-  const artist = await db.eventArtist.findFirst({
-    where: { id: artistId, eventId: id },
-    select: { name: true, payeeId: true },
-  })
-  if (!artist) return { ok: false, why: 'That act is not on this event.' }
-  if (!artist.payeeId) {
-    return { ok: false, why: 'Give the act a payee record first — the link points at one.' }
-  }
-
-  const grant = await issueGrant(artist.payeeId, 'BOTH', id, user.personId)
-  if (!grant) return { ok: false, why: NO_LINK_ADDRESS }
-
-  await record(id, user, `sent ${artist.name} a link for their details and rider`)
-
-  refresh()
-  return { ok: true, url: grant.url, expires: grant.expires.toDateString() }
 }

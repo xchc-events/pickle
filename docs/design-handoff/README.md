@@ -159,15 +159,21 @@ The hub. Back link, title, badges (stage, space, booking model), and tabbed/stac
 >
 > Three things are refused in words: any change once the night is put to bed, since its figures are the settlement's by then; a change to the status or fee of an act who has been paid, or taking them off the bill; and switching the model once a deposit or an invoice has been raised, until Finance reverses it. Attendance, bar spend a head, gear and hire, promotion, crew and tokens a head had no editor anywhere in the prototype, which took them from the Night Sheet; they are one small form under the terms, and the change is one activity line naming only what moved. The rules for all of these are in `src/lib/terms.ts`, which the enquiry form now reads too, so the two cannot disagree about what a valid fee is. Sound and the kind of night are left for Tech production, where the prototype edits them.
 
+> **Changed 23 Sep 2026 — wording and two controls.** "It should be like 'type of event' rather than 'kind of night'": the enquiry fact and the enquiry form field both read "Type of event" now; the underlying `kind` field is unchanged. "We don't need that little explainer there": the line under the lead pickers explaining that a lead is a person, not a typed-in name, is gone. "Rather than this button saying what it does, it should show that the date is confirmed, or negotiating … if it indicates the status and then you can manipulate that status": the date control is now a status chip reading "Date TBC" or "Date held" rather than an instruction, with what a click does moved into its title and the click itself unchanged. "This UI is massively overstretched. It would be better if this was closer in": Where each part stands is capped near the width of the leads block above it, and each part's gate count now sits beside its status chip instead of at the far right, so a row reads as one line. "Bank details... should be uploaded by the artist and promoter themselves, or the internal event coordinator, on the overall event view": the Artists section now carries "Give them a record" / "Send them a link" per act, moved here from Tech production — see the note under Tech production.
+
 ### Ticketing
 
 Tiers derive from one number: `std` (standard). `sub = round(std × 0.8)`, `sup = round(std × 1.2)`, plus a `door` price. A four-way `mix` (subsidised/standard/supporter/door proportions) produces the average ticket price. Shows allocation, sold count, sales curve, and door list. Source of truth is **Gather.rsvp**.
 
 > **Corrected 2 Sep 2026.** This line previously read "supporter/standard/subsidised", which contradicts the prototype it describes: `TIER_KEYS` is `[sub, std, sup, door]` and `avgTicket` pairs `mix[0]` with `tiers().sub`. Read the wrong way round it prices a supporter at 80% of standard rather than 120%, and the mix feeds the average ticket price straight into the P&L. The prototype code is authoritative and is unchanged; only this sentence was wrong.
 
+> **Changed 23 Sep 2026.** From Connor's walkthrough. "I don't call it 'the room'. That's dumb" — the first section is now **Ticket sales**, not "The room" (the capacity note is unchanged). "You definitely want to be able to see a big, really obvious thing of the revenue that's been generated" — a headline revenue figure sits at the top of that section, sold shown against capacity beside it and labelled GST inclusive, since that is what it is, not the ex-GST figure the settlement counts. "It needs to be clearer that if I change these numbers, that is going to change this data" — the Prices and Mix forms are folded into the tiers table itself: standard and door are typed, subsidised and supporter are derived and redraw live, and one Save sets both through a new `setTiers` action. "I don't want to be able to manually change how many tickets are sold ... that should be data that's pulled from Gather. We don't want it typed by hand at all" — the Sold form and `setSold` are gone; `src/lib/gather.ts` is a stub source for `sold` until the real Gather.rsvp API exists, shaped so the real client is a drop-in. "This shouldn't be where you're changing the financial projection ... the ticketing page is just for setting up the ticket sales" — the scenario picker ("How the night might go") and `setScenario` have left Ticketing for Finance.
+
 ### Design
 
 Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each with format spec and a rationale line. Hero = two vertical video cuts (9:16); lead = the 1920×1005 event cover; support = story, A2 poster, listing copy. `CONTENT_RULES` render as a short doctrine panel: vertical video first (twice), video beats a still, almost no words on an image, real over polished, one idea per asset.
+
+> **Changed 23 Sep 2026.** Connor: "Just 'design and communications' is fine" — the page title is now "Design & communications" (the sidebar still says "Design").
 
 ### Promotion
 
@@ -177,11 +183,15 @@ Asset checklist built from `ASSET_SET`, tiered `hero` / `lead` / `support`, each
 
 `PRESETS` are one-click rig bundles that append gear costs _and_ labour hours to the event: in-house projection mapping + VJ, full band backline, livestream & multitrack, extra lighting rig, silent disco headsets. Each item is `{kind: 'gear', cost}` or `{kind: 'labour', hours}` and flows straight into the finance model. Tech roles: `Sound — Lead`, `Sound — 2IC`, `Lighting — Lead`.
 
+> **Changed 23 Sep 2026 — hospitality riders and Acts and their details leave this module.** The sub-line no longer opens with "the Rig". "Hospitality riders are currently under the tech production section. We need to move that out. There's no reason for tech production to see that": the set this module tracks is now tech rider, stage plot and venue spec; the hospitality rider stays on the event record's own Artists section, per act. "We don't need bank details coming into this section. That should be uploaded by the artist and promoter themselves, or the internal event coordinator, on the overall event view": Acts and their details — names, status, masked account, the payee link — is gone from Tech entirely, and `issueArtistLink`/`linkArtistToPayee` moved to the event record's own actions, gated on Pipeline and `canChangeEventRecord` rather than the Tech module. Tech staff see no account figure anywhere on this page now.
+
 ### Roster
 
 Shifts generated per event from role windows (`ROLE_WIN`, or `ROLE_WIN_EARLY` for early events; apartment and workshop events get reduced hours). Each shift: role, hours, start offset, assigned person, state, "asked" count. Assignment is checked against `AVAIL_SEED` (per-person weekly hour cap, volunteer hours, yes/no day-period preferences keyed `Fri-eve`, `Mon-day` …). **Roster ↔ Hours is two-way**: assigning a shift creates the hours; editing hours reflects back.
 
 Roles: Duty manager, Bar staff, Sound — Lead, Sound — 2IC, Lighting — Lead, Door, Care team, Set-up crew, Clean-up crew.
+
+> **Changed 23 Sep 2026 — two headline figures in place of "the call".** The sub-line no longer opens with "the Crew". "Make that bigger and more obvious, rather than 'the call'. Maybe call it projected or rostered hours, and projected full cost": the single corner figure is now two labelled, headline-sized figures, Rostered hours and Projected cost — the same `callHours` and `callCost`, same source.
 
 ### Bar
 

@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionUser } from '@/lib/session'
 
 /**
- * Tech production sending an act a link for their details and rider.
+ * Sending an act a link for their own details and rider.
+ *
+ * Moved here from tech/actions.test.ts 23 Sep 2026 along with the action
+ * itself: bank details and the payee link are the event coordinator's
+ * business now, not tech production's. Everything below is unchanged except
+ * the gate — Pipeline and `canChangeEventRecord` in place of the Tech module
+ * — and the fixture that proves it: `mere` now carries Pipeline, not Tech.
+ * The other half of the move, the permission check itself, is proved for
+ * every export including this one in actions.test.ts; this file is only
+ * about what the action actually does once it is let through.
  *
  * `issueGrant` refusing is tested as a rule in src/lib/grants.test.ts. This is
  * about what the coordinator is told when it does. In production with no
@@ -37,20 +46,10 @@ const refresh = vi.fn()
 vi.mock('@/lib/activity', () => ({ record: (...args: unknown[]) => record(...args) }))
 vi.mock('next/cache', () => ({ refresh: () => refresh() }))
 
-// Uploads are not under test here. Reaching one is a mistake, not a pass.
-const stop = (what: string) => (): never => {
-  throw new Error(`reached ${what}`)
-}
-vi.mock('@/lib/files-data', () => ({
-  begin: stop('files.begin'),
-  finish: stop('files.finish'),
-  linkTo: stop('files.linkTo'),
-}))
-
 const { NO_LINK_ADDRESS } = await import('@/lib/grants-data')
 const { issueArtistLink } = await import('./actions')
 
-/** Slow Fold, on the night Tech is working on. */
+/** Slow Fold, on the night the event record is working on. */
 const EVENT = 'evt_slow_fold'
 const ARTIST = 'artist_slow_fold'
 
@@ -73,7 +72,7 @@ const send = () => issueArtistLink(EVENT, ARTIST)
 
 beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'production')
-  requireModule.mockReset().mockResolvedValue({ user: mere, modules: ['tech'] })
+  requireModule.mockReset().mockResolvedValue({ user: mere, modules: ['pipeline'] })
   requireEvent.mockReset().mockResolvedValue(EVENT)
   db.eventArtist.findFirst
     .mockReset()
@@ -129,9 +128,9 @@ describe('issueArtistLink, with AUTH_URL set', () => {
     vi.stubEnv('AUTH_URL', 'https://pickle.minim.nz')
   })
 
-  it('checks the Tech module and the event before anything else', async () => {
+  it('checks the Pipeline module and the event before anything else', async () => {
     await send()
-    expect(requireModule).toHaveBeenCalledWith('tech')
+    expect(requireModule).toHaveBeenCalledWith('pipeline')
     expect(requireEvent).toHaveBeenCalledWith(mere, EVENT)
     expect(db.eventArtist.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: ARTIST, eventId: EVENT } }),
