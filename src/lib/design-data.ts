@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel } from './format'
+import { ROLE_LABEL } from './constants'
 import type { SessionUser } from './session'
 import {
   DESIGN_TASK,
@@ -15,14 +16,19 @@ import {
   copyFit,
   designHours,
   designQueueRow,
+  missingBiosList,
   verticalCuts,
   type AssetCard,
   type CopyFit,
   type DesignQueueRow,
   type EventAsset,
   type HoursLine,
+  type MissingBioRow,
 } from './design'
 import { CONTENT_RULES } from './design'
+
+/** The design team's own name, as it is written onto an `HourEntry.role`. */
+const DESIGN_TEAM = ROLE_LABEL.design
 
 /**
  * Loads Design.
@@ -49,6 +55,9 @@ export interface DesignEvent {
   leadName: string | null
   leadInitials: string | null
   leadPersonId: string | null
+  /** The lead's own contact details — set on their account in Admin. */
+  leadEmail: string | null
+  leadPhone: string | null
   approved: string
   hero: AssetCard[]
   lead: AssetCard[]
@@ -56,6 +65,8 @@ export interface DesignEvent {
   verticals: { text: string; tone: 'good' | 'warn' | 'stop' | 'plain' }
   brief: { line: string; tone: string[]; from: string; mustAppear: readonly string[] }
   hours: HoursLine
+  /** Live acts still missing a press shot or a bio. Empty when none are. */
+  missingBios: MissingBioRow[]
   caption: string
   copy: CopyFit[]
 }
@@ -65,6 +76,8 @@ export interface DesignView {
   event: DesignEvent | null
   leadOptions: LeadOption[]
   rules: typeof CONTENT_RULES
+  /** Whether R2 is configured on this install — checked once, in the page. */
+  storageReady: boolean
 }
 
 const flatten = (assets: { key: string; state: string; promoterSigned: boolean }[]): EventAsset[] =>
@@ -74,7 +87,11 @@ const flatten = (assets: { key: string; state: string; promoterSigned: boolean }
     promoterSigned: a.promoterSigned,
   }))
 
-export async function loadDesign(user: SessionUser, wantedId?: string): Promise<DesignView> {
+export async function loadDesign(
+  user: SessionUser,
+  wantedId: string | undefined,
+  storageReady: boolean,
+): Promise<DesignView> {
   // Design takes an event from the enquiry on. It used to start at Confirmed,
   // on the reasoning that briefing an event before its terms are agreed is
   // work done on a show that may not happen — but a promoter sends the artwork
@@ -88,7 +105,18 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
       space: true,
       assets: true,
       tasks: true,
-      leads: { include: { person: true } },
+      leads: { include: { person: { include: { user: { select: { email: true, phone: true } } } } } },
+      // A file counts whether it arrived on the event or on the payee record —
+      // an act that sent their bio last time has sent their bio. Same rule
+      // parts-input.ts loads `hasPromo`/`hasBio` by.
+      files: { where: { current: true, scan: 'CLEAN' }, select: { kind: true } },
+      artists: {
+        select: {
+          name: true,
+          status: true,
+          payee: { select: { files: { where: { current: true, scan: 'CLEAN' }, select: { kind: true } } } },
+        },
+      },
     },
     orderBy: { date: 'asc' },
   })
@@ -129,20 +157,26 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
   }))
 
   const row = events.find((e) => e.id === wantedId) ?? events[0]
-  if (!row) return { queue, event: null, leadOptions, rules: CONTENT_RULES }
+  if (!row) return { queue, event: null, leadOptions, rules: CONTENT_RULES, storageReady }
 
   const assets = flatten(row.assets)
   const portal = hasPortal(row.promoter)
 
-  // The artwork attached to each piece. Keyed by asset key rather than by
-  // asset id so a piece with no Asset row yet still lines up.
+  // The artwork attached to each piece, and the hours the design team has
+  // logged against this event — independent queries, fetched together.
+  const [artworkFiles, loggedHours] = await Promise.all([
+    db.storedFile.findMany({
+      where: { eventId: row.id, kind: 'ARTWORK', current: true, scan: 'CLEAN' },
+      include: { asset: { select: { key: true } } },
+    }),
+    db.hourEntry.findMany({
+      where: { eventId: row.id, role: DESIGN_TEAM },
+      select: { personId: true, hours: true, person: { select: { name: true } } },
+    }),
+  ])
+
   const artwork = new Map(
-    (
-      await db.storedFile.findMany({
-        where: { eventId: row.id, kind: 'ARTWORK', current: true, scan: 'CLEAN' },
-        include: { asset: { select: { key: true } } },
-      })
-    )
+    artworkFiles
       .filter((f) => f.asset)
       .map((f) => [f.asset!.key, { id: f.id, name: f.name, size: f.size, version: f.version }]),
   )
@@ -160,10 +194,21 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
   const lead = designLead(row)
   const task = row.tasks.find((t) => t.name === DESIGN_TASK)
 
+  // Live acts still missing a press shot or a bio — the same computation
+  // parts.ts's design() counts for the Pipeline cell, over the same files.
+  const eventKinds = new Set(row.files.map((f) => f.kind))
+  const liveActs = row.artists
+    .filter((a) => a.status !== 'DECLINED')
+    .map((a) => {
+      const kinds = new Set([...eventKinds, ...(a.payee?.files ?? []).map((f) => f.kind)])
+      return { name: a.name, hasPromo: kinds.has('PRESS_SHOT'), hasBio: kinds.has('BIO') }
+    })
+
   return {
     queue,
     leadOptions,
     rules: CONTENT_RULES,
+    storageReady,
     event: {
       id: row.id,
       name: row.name,
@@ -174,6 +219,8 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
       leadName: lead?.person.name ?? null,
       leadInitials: lead?.person.initials ?? null,
       leadPersonId: lead?.personId ?? null,
+      leadEmail: lead?.person.user?.email ?? null,
+      leadPhone: lead?.person.user?.phone ?? null,
       approved: approvedLine(assets),
       hero: withArtwork(assetCards(assets, 'hero', { hasPortal: portal })),
       lead: withArtwork(assetCards(assets, 'lead', { hasPortal: portal })),
@@ -185,7 +232,11 @@ export async function loadDesign(user: SessionUser, wantedId?: string): Promise<
         from: briefFrom(row),
         mustAppear: MUST_APPEAR,
       },
-      hours: designHours(task ? { est: task.est, actual: task.actual } : undefined),
+      hours: designHours(
+        task?.est,
+        loggedHours.map((h) => ({ personId: h.personId, name: h.person.name, hours: h.hours })),
+      ),
+      missingBios: missingBiosList(liveActs, portal),
       caption: caption(facts),
       copy: copyFit(caption(facts), `${row.name} — ${dateLabel(row.date)}`),
     },
