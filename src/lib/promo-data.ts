@@ -67,7 +67,9 @@ export async function loadPromo(user: SessionUser, wantedId?: string): Promise<P
       space: true,
       channels: { include: { by: true } },
       beats: true,
-      leads: { include: { person: { include: { user: { select: { email: true, phone: true } } } } } },
+      leads: {
+        include: { person: { include: { user: { select: { email: true, phone: true } } } } },
+      },
     },
     orderBy: { date: 'asc' },
   })

@@ -251,9 +251,9 @@ describe('acts to chase', () => {
   })
 
   it('is empty, not a row for everyone, when nothing is missing', () => {
-    expect(missingBiosList([{ name: 'Static Bloom', hasPromo: true, hasBio: true }], false)).toEqual(
-      [],
-    )
+    expect(
+      missingBiosList([{ name: 'Static Bloom', hasPromo: true, hasBio: true }], false),
+    ).toEqual([])
   })
 
   it('names the portal chase only when the promoter has one', () => {
@@ -301,7 +301,11 @@ describe('acts to chase', () => {
       // Every piece approved: with one check still failing, this is the case
       // where the cell used to read "art signed off" but named nothing —
       // Connor's actual complaint.
-      assets: ASSET_SET.map((a) => ({ key: a.key, state: 'approved' as const, promoterSigned: true })),
+      assets: ASSET_SET.map((a) => ({
+        key: a.key,
+        state: 'approved' as const,
+        promoterSigned: true,
+      })),
       artworkFiles: 0,
       channels: [{ live: true, stale: false }],
       beatsDone: 2,

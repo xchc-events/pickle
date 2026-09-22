@@ -217,7 +217,9 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                   ))}
                 </ul>
               ) : (
-                <p className={styles.hoursNote}>Nobody has logged marketing hours on this event yet.</p>
+                <p className={styles.hoursNote}>
+                  Nobody has logged marketing hours on this event yet.
+                </p>
               )}
             </aside>
           </div>
@@ -240,7 +242,12 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                 </div>
                 <div className={t.key === 'lead' ? styles.oneUp : styles.cards}>
                   {cards.map((a) => (
-                    <AssetTile key={a.key} eventId={event.id} asset={a} storageReady={storageReady} />
+                    <AssetTile
+                      key={a.key}
+                      eventId={event.id}
+                      asset={a}
+                      storageReady={storageReady}
+                    />
                   ))}
                 </div>
               </section>

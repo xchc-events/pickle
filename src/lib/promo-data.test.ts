@@ -42,7 +42,8 @@ let events: FakeEvent[] = []
 /** Prisma's `where`, for the shapes eventScope() and promo-data.ts produce. */
 const matches = (event: FakeEvent, where: Record<string, unknown> | undefined): boolean => {
   if (!where) return true
-  if ('AND' in where) return (where.AND as Record<string, unknown>[]).every((w) => matches(event, w))
+  if ('AND' in where)
+    return (where.AND as Record<string, unknown>[]).every((w) => matches(event, w))
   return Object.entries(where).every(([key, want]) => {
     const have = (event as unknown as Record<string, unknown>)[key]
     if (want && typeof want === 'object' && 'in' in (want as object)) {
@@ -155,7 +156,12 @@ describe('an external promoter, reading the Promo lead panel', () => {
 
 describe('staff, reading the same panel', () => {
   it('are not scoped to one organisation', async () => {
-    const staff: SessionUser = { ...orgAUser, role: 'COORDINATOR', external: false, organisationId: null }
+    const staff: SessionUser = {
+      ...orgAUser,
+      role: 'COORDINATOR',
+      external: false,
+      organisationId: null,
+    }
     const { event, queue } = await loadPromo(staff, 'ev_b')
     expect(event?.id).toBe('ev_b')
     expect(event?.leadEmail).toBe('reube@xchc.co.nz')

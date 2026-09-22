@@ -39,7 +39,8 @@ let events: FakeEvent[] = []
 
 const matches = (event: FakeEvent, where: Record<string, unknown> | undefined): boolean => {
   if (!where) return true
-  if ('AND' in where) return (where.AND as Record<string, unknown>[]).every((w) => matches(event, w))
+  if ('AND' in where)
+    return (where.AND as Record<string, unknown>[]).every((w) => matches(event, w))
   return Object.entries(where).every(([key, want]) => {
     const have = (event as unknown as Record<string, unknown>)[key]
     if (want && typeof want === 'object' && 'in' in (want as object)) {
@@ -152,7 +153,12 @@ describe('an external promoter, reading the Design lead card', () => {
 
 describe('staff, reading the same card', () => {
   it('are not scoped to one organisation', async () => {
-    const staff: SessionUser = { ...orgAUser, role: 'COORDINATOR', external: false, organisationId: null }
+    const staff: SessionUser = {
+      ...orgAUser,
+      role: 'COORDINATOR',
+      external: false,
+      organisationId: null,
+    }
     const { event, queue } = await loadDesign(staff, 'ev_b', true)
     expect(event?.id).toBe('ev_b')
     expect(event?.leadEmail).toBe('reube@xchc.co.nz')

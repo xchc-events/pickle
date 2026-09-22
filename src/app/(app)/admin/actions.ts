@@ -420,7 +420,10 @@ export async function setPhone(userId: string, phone: string): Promise<Said> {
   })
   if (!target) return said('No such account.', 'stop')
   if (target.role === 'PROMOTER') {
-    return said('An external coordinator’s phone is set with their other details, not here.', 'stop')
+    return said(
+      'An external coordinator’s phone is set with their other details, not here.',
+      'stop',
+    )
   }
 
   await db.user.update({ where: { id: userId }, data: { phone: phone.trim() || null } })

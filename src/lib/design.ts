@@ -456,7 +456,11 @@ export function missingBiosList(
     .map((a) => ({
       name: a.name,
       missing:
-        !a.hasPromo && !a.hasBio ? 'a press shot and a bio' : !a.hasPromo ? 'a press shot' : 'a bio',
+        !a.hasPromo && !a.hasBio
+          ? 'a press shot and a bio'
+          : !a.hasPromo
+            ? 'a press shot'
+            : 'a bio',
       chaseNote: hasPortal ? 'chase it in their portal' : null,
     }))
 }

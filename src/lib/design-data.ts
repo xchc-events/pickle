@@ -105,7 +105,9 @@ export async function loadDesign(
       space: true,
       assets: true,
       tasks: true,
-      leads: { include: { person: { include: { user: { select: { email: true, phone: true } } } } } },
+      leads: {
+        include: { person: { include: { user: { select: { email: true, phone: true } } } } },
+      },
       // A file counts whether it arrived on the event or on the payee record —
       // an act that sent their bio last time has sent their bio. Same rule
       // parts-input.ts loads `hasPromo`/`hasBio` by.
@@ -114,7 +116,9 @@ export async function loadDesign(
         select: {
           name: true,
           status: true,
-          payee: { select: { files: { where: { current: true, scan: 'CLEAN' }, select: { kind: true } } } },
+          payee: {
+            select: { files: { where: { current: true, scan: 'CLEAN' }, select: { kind: true } } },
+          },
         },
       },
     },
