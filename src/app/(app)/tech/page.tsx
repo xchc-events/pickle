@@ -5,14 +5,7 @@ import { isConfigured } from '@/lib/r2'
 import { SectionHeading } from '@/components/SectionHeading'
 import { FileUpload } from '@/components/FileUpload'
 import { OpenFile } from './FileRowActions'
-import { ArtistLink } from './ArtistLink'
-import {
-  beginTechUpload,
-  finishTechUpload,
-  issueArtistLink,
-  linkArtistToPayee,
-  linkToFile,
-} from './actions'
+import { beginTechUpload, finishTechUpload, linkToFile } from './actions'
 import styles from './tech.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -82,8 +75,8 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
 
           {event.files.length === 0 ? (
             <p className={styles.none}>
-              Nothing has arrived yet. Send the acts a link below rather than asking them to email
-              it — a rider in somebody’s inbox is a rider the crew cannot see.
+              Nothing has arrived yet. Chase the act for it, or add it yourself below once it is in
+              hand — a rider in somebody’s inbox is a rider the crew cannot see.
             </p>
           ) : (
             <ul className={styles.files}>
@@ -125,40 +118,6 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
               ))}
             </ul>
           ) : null}
-
-          <SectionHeading note="one record of an act, across every booking">
-            Acts and their details
-          </SectionHeading>
-
-          {event.artists.length === 0 ? (
-            <p className={styles.none}>No acts on this event yet.</p>
-          ) : (
-            <ul className={styles.artists}>
-              {event.artists.map((a) => (
-                <li key={a.id} className={styles.artist}>
-                  <div className={styles.artistMain}>
-                    <span className={styles.artistName}>{a.name}</span>
-                    <span className={styles.artistStatus}>{a.status}</span>
-                  </div>
-
-                  <div className={styles.artistDetails}>
-                    <span className={a.detailsOnFile ? styles.good : styles.warn}>
-                      {a.detailsOnFile ? a.account : 'no bank details on file'}
-                    </span>
-                    {a.openGrant ? (
-                      <span className={styles.artistNote}>a link is already out with them</span>
-                    ) : null}
-                  </div>
-
-                  <ArtistLink
-                    hasPayee={a.payeeId !== null}
-                    issue={issueArtistLink.bind(null, event.id, a.id)}
-                    link={linkArtistToPayee.bind(null, event.id, a.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </div>

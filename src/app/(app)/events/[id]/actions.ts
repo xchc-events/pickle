@@ -6,6 +6,7 @@ import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
 import { internalContact } from '@/lib/intake'
 import { loadEventRecord } from '@/lib/event-record-data'
+import { NO_LINK_ADDRESS, issueGrant } from '@/lib/grants-data'
 import {
   canChangeEventRecord,
   LICENCE_WORD,
@@ -1016,4 +1017,107 @@ export async function challengeTheHold(eventId: string, holdId: string): Promise
  */
 async function recordAffected(user: SessionUser, affected: AffectedHold[]): Promise<void> {
   for (const hold of affected) await record(hold.eventId, user, affectedLine(hold))
+}
+
+/**
+ * Giving an act a record of their own, and a link to fill it in.
+ *
+ * Moved here from Tech production 23 Sep 2026 — "bank details... should be
+ * uploaded by the artist and promoter themselves, or the internal event
+ * coordinator, on the overall event view." Gated the same as everything else
+ * on this page: Pipeline, then `canChangeEventRecord`, so a tech lead without
+ * Pipeline 404s the same as anyone else who lacks it, and an external
+ * promoter is refused the same explained way. Tech staff no longer reach
+ * either export at all.
+ */
+
+/**
+ * Create the act as a payee, so their details survive this booking.
+ *
+ * An act that plays four times should enter their account number once. This
+ * is the moment a typed-in name becomes a record — before it, `EventArtist`
+ * carries only a string, which is fine for a pipeline row and useless for
+ * paying somebody.
+ */
+export async function linkArtistToPayee(eventId: string, artistId: string): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const artist = await db.eventArtist.findFirst({
+    where: { id: artistId, eventId: id },
+    select: { id: true, name: true, payeeId: true },
+  })
+  if (!artist) return said('That act is not on this event.', 'stop')
+  if (artist.payeeId) return said(`${artist.name} already has a record.`, 'warn')
+
+  // An act of the same name is almost certainly the same act. Reusing the
+  // record is the whole point — a second one would mean a second set of bank
+  // details to keep straight.
+  const existing = await db.payee.findFirst({
+    where: { kind: 'ARTIST', name: artist.name },
+    select: { id: true },
+  })
+
+  const payee =
+    existing ??
+    (await db.payee.create({ data: { kind: 'ARTIST', name: artist.name, country: 'NZ' } }))
+
+  await db.eventArtist.update({ where: { id: artist.id }, data: { payeeId: payee.id } })
+  await record(id, user, `linked ${artist.name} to a payee record`)
+
+  refresh()
+  return said(
+    existing
+      ? `${artist.name} already had a record — this booking now points at it, so their details carry across.`
+      : `${artist.name} now has a record of their own. Their details will follow them to the next booking.`,
+  )
+}
+
+export interface IssuedLink {
+  ok: boolean
+  url?: string
+  expires?: string
+  why?: string
+}
+
+/**
+ * Mint a link for an act to fill in their own details.
+ *
+ * The URL comes back once and is never stored in readable form. The caller
+ * shows it to the coordinator, who sends it — this deliberately does not send
+ * anything itself, because a link that emails on its own is a link nobody
+ * checked the address on.
+ *
+ * With no safe address to build it on — AUTH_URL unset in production — there
+ * is no link, and the coordinator is told why rather than handed one to
+ * localhost. Nothing is recorded, because nothing was sent.
+ *
+ * Returns `{ ok, why }` rather than a `Said` toast — ArtistLink.tsx needs the
+ * URL back on success, which a toast cannot carry — so its refusal is not the
+ * shape every other export here uses. See actions.test.ts's REFUSED_LINK.
+ */
+export async function issueArtistLink(eventId: string, artistId: string): Promise<IssuedLink> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return { ok: false, why: verdict.why }
+  const id = await requireEvent(user, eventId)
+
+  const artist = await db.eventArtist.findFirst({
+    where: { id: artistId, eventId: id },
+    select: { name: true, payeeId: true },
+  })
+  if (!artist) return { ok: false, why: 'That act is not on this event.' }
+  if (!artist.payeeId) {
+    return { ok: false, why: 'Give the act a payee record first — the link points at one.' }
+  }
+
+  const grant = await issueGrant(artist.payeeId, 'BOTH', id, user.personId)
+  if (!grant) return { ok: false, why: NO_LINK_ADDRESS }
+
+  await record(id, user, `sent ${artist.name} a link for their details and rider`)
+
+  refresh()
+  return { ok: true, url: grant.url, expires: grant.expires.toDateString() }
 }

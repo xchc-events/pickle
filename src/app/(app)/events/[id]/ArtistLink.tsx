@@ -3,10 +3,14 @@
 import { useState, useTransition } from 'react'
 import { useToast } from '@/components/Toast'
 import type { IssuedLink } from './actions'
-import styles from './tech.module.css'
+import styles from './event.module.css'
 
 /**
  * Getting an act to fill in their own details.
+ *
+ * Moved here from Tech production 23 Sep 2026, with the actions behind it —
+ * bank details and the payee link are the event coordinator's business, not
+ * the rig's. Drawn only for `canChange` users, in the Artists section.
  *
  * Two states, because they are two different decisions. Giving an act a payee
  * record is a claim that this name is a real, repeating act. Sending them a
@@ -60,7 +64,7 @@ export function ArtistLink({
     return (
       <button
         type="button"
-        className={styles.smallButton}
+        className={styles.smallBtn}
         disabled={pending}
         onClick={() => start(async () => say(await link()))}
       >
@@ -73,7 +77,7 @@ export function ArtistLink({
   return (
     <button
       type="button"
-      className={styles.smallButton}
+      className={styles.smallBtn}
       disabled={pending}
       onClick={() =>
         start(async () => {

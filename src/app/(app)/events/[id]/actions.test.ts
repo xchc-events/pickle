@@ -17,6 +17,12 @@ import type { SessionUser } from '@/lib/session'
  * fails here without anybody having to remember to add it.
  */
 
+// issueArtistLink pulls in @/lib/grants-data, which imports 'server-only'.
+// The real package throws outside a server-component build, so this needs
+// mocking here too, the same as every other file that imports actions.ts for
+// real — see artist-link-actions.test.ts.
+vi.mock('server-only', () => ({}))
+
 /** Everything an action reached that reads or writes. A refused call reaches none. */
 const reached: string[] = []
 

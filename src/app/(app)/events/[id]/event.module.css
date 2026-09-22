@@ -1112,3 +1112,80 @@ details[open] > .partToggle::after {
   gap: var(--space-2);
   margin: 9px 0;
 }
+
+/* ----------------------------------------------------- artist link --- */
+/* Moved from Tech production 23 Sep 2026, with ArtistLink.tsx and the
+   actions behind it. Venue only, one row per act, under the acts editor
+   or the read-only list above — whichever the Artists section is showing. */
+
+.artistLinks {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.artistLinkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  border-top: 1px solid var(--color-divider);
+  padding: 7px 0;
+}
+
+.artistLinkName {
+  font-size: 12px;
+  color: var(--color-neutral-300);
+}
+
+/* A minted link, shown once. .copy reuses .smallBtn's look; the box just
+   needs a border to set it apart from the row it replaces. */
+
+.linkBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  padding: 9px 11px;
+}
+
+.linkNote {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.linkUrl {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--color-neutral-200);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copy {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  background: var(--color-accent-900);
+  border: 1px solid var(--color-accent-700);
+  color: var(--color-accent-200);
+  border-radius: var(--radius-sm);
+  padding: 4px 11px;
+}

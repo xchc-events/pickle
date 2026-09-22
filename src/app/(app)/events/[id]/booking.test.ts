@@ -28,6 +28,12 @@ const mere = {
   sessionId: 'session_mere',
 } satisfies SessionUser
 
+// actions.ts now imports @/lib/grants-data (for issueArtistLink, moved here
+// from Tech 23 Sep 2026), which imports 'server-only'. The real package
+// throws outside a server-component build, so every test file that imports
+// actions.ts for real needs this — see artist-link-actions.test.ts.
+vi.mock('server-only', () => ({}))
+
 vi.mock('@/lib/permissions', () => ({
   requireModule: vi.fn(async () => ({ user: mere, modules: ['pipeline'] })),
   requireEvent: vi.fn(async (_: unknown, id: string) => id),
