@@ -639,7 +639,9 @@
   margin: 12px 0 0;
 }
 
-/* --- the artwork on a piece --------------------------------------------- */
+/* --- the artwork on a piece ----------------------------------------------
+   The open/download control itself is shared — src/components/OpenArtwork.
+   Only this page's own layout around it lives here. */
 
 .artwork {
   display: flex;
@@ -655,35 +657,6 @@
   align-items: center;
   gap: 5px;
   min-width: 0;
-}
-
-.artworkOpen {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  font: inherit;
-  font-size: 11px;
-  color: var(--color-accent-200);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.artworkOpen:hover:not(:disabled) {
-  color: var(--color-accent-100);
-  text-decoration: underline;
-}
-
-.artworkOpen:disabled {
-  opacity: 0.5;
-}
-
-.artworkName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .artworkVersion {

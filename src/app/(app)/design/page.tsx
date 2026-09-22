@@ -10,7 +10,7 @@ import { LeadPicker } from '@/components/LeadPicker'
 import { FileUpload } from '@/components/FileUpload'
 import { ReasonAction } from '@/components/ReasonAction'
 import { CommentThread } from '@/components/CommentThread'
-import { OpenArtwork } from './OpenArtwork'
+import { OpenArtwork } from '@/components/OpenArtwork'
 import {
   approveAsset,
   beginArtworkUpload,

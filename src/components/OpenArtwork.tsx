@@ -1,8 +1,8 @@
 'use client'
 
 import { useTransition } from 'react'
-import { useToast } from '@/components/Toast'
-import styles from './design.module.css'
+import { useToast } from './Toast'
+import styles from './OpenArtwork.module.css'
 
 /**
  * Open a piece of artwork.
@@ -11,6 +11,10 @@ import styles from './design.module.css'
  * here to paste into a group chat that still works tomorrow. It always
  * downloads rather than rendering inline — artwork can be an SVG, and an SVG
  * rendered from an origin the app shares would run its own script.
+ *
+ * Shared by Design and the promoter portal: `link` is whichever surface's
+ * own scoped `linkToArtwork` action, so this component never itself decides
+ * whether the caller may see the file.
  */
 export function OpenArtwork({
   eventId,
@@ -29,7 +33,7 @@ export function OpenArtwork({
   return (
     <button
       type="button"
-      className={styles.artworkOpen}
+      className={styles.open}
       disabled={pending}
       title="Download — the link is signed and expires"
       onClick={() =>
@@ -44,7 +48,7 @@ export function OpenArtwork({
       }
     >
       <i className="ph ph-download-simple" aria-hidden="true" />
-      <span className={styles.artworkName}>{children}</span>
+      <span className={styles.name}>{children}</span>
     </button>
   )
 }
