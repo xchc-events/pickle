@@ -87,6 +87,35 @@ describe('endNightFor', () => {
     expect(endNightFor(date, null, '11:30pm')).toBeNull()
     expect(endNightFor(date, '8:00pm', null)).toBeNull()
   })
+
+  describe('with pack-out', () => {
+    const nightAfterNext = nightOf(2026, 8, 21)
+
+    it('does not carry further when pack-out reads later in the day than everyone-out', () => {
+      expect(endNightFor(date, '8:00pm', '1:00am', '3:00am')).toEqual(nextNight)
+    })
+
+    it('carries one night further when pack-out reads before everyone-out — past its own midnight', () => {
+      expect(endNightFor(date, '8:00pm', '1:00am', '12:30am')).toEqual(nightAfterNext)
+    })
+
+    it('does not carry further when pack-out reads the same clock time as everyone-out — the same instant, not a day later', () => {
+      expect(endNightFor(date, '8:00pm', '1:00am', '1:00am')).toEqual(nextNight)
+    })
+
+    it('is fine following a same-day everyone-out too — pack-out after it, same night', () => {
+      expect(endNightFor(date, '2:00pm', '5:00pm', '6:00pm')).toEqual(date)
+    })
+
+    it('is unaffected by pack-out when there is no everyone-out to read it against', () => {
+      expect(endNightFor(date, '8:00pm', null, '3:00am')).toBeNull()
+    })
+
+    it('is unaffected when pack-out is not set', () => {
+      expect(endNightFor(date, '8:00pm', '11:30pm', null)).toEqual(date)
+      expect(endNightFor(date, '8:00pm', '11:30pm')).toEqual(date)
+    })
+  })
 })
 
 describe('runProblems', () => {
@@ -159,6 +188,104 @@ describe('runProblems', () => {
     expect(runProblems({ ...base, endDate: fine })).toEqual({})
     expect(runProblems({ ...base, endDate: tooFar })).toEqual({
       endDate: 'That is more than two weeks from start to finish — check the dates.',
+    })
+  })
+
+  describe('pack-in and pack-out', () => {
+    it('is fine when pack-in is before doors and pack-out is after everyone out', () => {
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:00pm',
+          endDate: date,
+          packIn: '3:00pm',
+          packOut: '1:30am',
+        }),
+      ).toEqual({})
+    })
+
+    it('is fine when pack-in reads the same as doors and pack-out the same as everyone out', () => {
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:00pm',
+          endDate: date,
+          packIn: '8:00pm',
+          packOut: '11:00pm',
+        }),
+      ).toEqual({})
+    })
+
+    it('refuses a pack-in after doors', () => {
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:00pm',
+          endDate: date,
+          packIn: '9:00pm',
+          packOut: null,
+        }),
+      ).toEqual({ packIn: 'Pack-in has to be at or before the doors open.' })
+    })
+
+    it('refuses a pack-out before everyone out, on the same night', () => {
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:30pm',
+          endDate: date,
+          packIn: null,
+          packOut: '11:00pm',
+        }),
+      ).toEqual({ packOut: 'Pack-out has to be at or after everyone is out.' })
+    })
+
+    it('is fine with a pack-out shortly after midnight, following a late everyone-out', () => {
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:30pm',
+          endDate: date,
+          packIn: null,
+          packOut: '1:00am',
+        }),
+      ).toEqual({})
+    })
+
+    it('is not checked while pack-in or pack-out is not decided, or doors is not', () => {
+      expect(runProblems({ ...base, packIn: '3:00pm', packOut: '1:30am' })).toEqual({})
+      expect(
+        runProblems({ date, doors: '8:00pm', barClose: null, allOut: null, endDate: null, packOut: '1:30am' }),
+      ).toEqual({})
+    })
+
+    it('has no rule about another event — nothing here reads any event but its own', () => {
+      // No other event, hold or room is ever passed to runProblems — there is
+      // nothing for a rule about one to read. This test exists so the absence
+      // stays a decision, not an oversight: Connor, 23 Sep 2026, "We don't
+      // need a hard rule that says an event has to be packed out before
+      // another has packed in."
+      expect(
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: '11:00pm',
+          endDate: date,
+          packIn: '3:00pm',
+          packOut: '11:00am', // packs out long after this event's own night
+        }),
+      ).toEqual({})
     })
   })
 })
