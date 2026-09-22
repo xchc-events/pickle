@@ -213,6 +213,8 @@ Also on Finance: the **milestone pipeline** (below), the **finance review panel*
 
 > **Changed 23 Sep 2026 — "Where the labour goes" arrives from Pipeline.** *"This type of financial breakdown isn't helpful on this screen. It would be helpful to see this on the Finance module."* The same rows — team, bar, hours, planned cost — now render under the settlement, loaded through the new `loadLabour` in `src/lib/finance-data.ts`, which is `labourSplit` (unchanged, in `src/lib/pipeline.ts`) fed by `loadPipeline(user)`. It is org-wide, not scoped to the event selected in the queue above it — the same "all events in the pipeline" figure Pipeline showed.
 
+> **Changed 23 Sep 2026 — the scenario picker arrives from Ticketing.** *"The ticketing page is just for setting up the ticket sales."* Quiet / likely / great, with a "Use this" per case, now sits beside the Settlement heading, above the sheet it moves. It writes `Event.scen` through a new `setScenario` in `src/app/(app)/finance/actions.ts` — the same checks the deleted Ticketing action had, gated on the finance module instead: refused for external users, since Finance is never in their module set, the same as every other action in this file. An activity line records the switch, as the Ticketing one did.
+
 ### Admin
 
 Role × module **permission matrix** as toggle rows — turning a module off removes it from that role's sidebar on next paint, verifiable by signing in as them. Users table (person, role, access, "you" marker). **"Your people"** — every name is an editable field, and changing it changes that person on every shift, timesheet, run sheet and bar view at once, because there is only one record of a person. Plus a state reset.

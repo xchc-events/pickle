@@ -11,7 +11,7 @@ import { Review } from './Review'
 import { Milestones } from './Milestones'
 import { Reveal } from './Reveal'
 import { PayeeActions } from './PayeeActions'
-import { chaseDetails, forget, markPaid, reveal, revokeAllLinks } from './actions'
+import { chaseDetails, forget, markPaid, reveal, revokeAllLinks, setScenario } from './actions'
 import styles from './finance.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -19,6 +19,9 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 /** How a half of the night got its figures — the authority behind them. */
 const sourceWords = (source: 'MANUAL' | 'POS' | null) =>
   source === 'POS' ? ', read off Epos Now' : source === 'MANUAL' ? ', entered by hand' : ''
+
+/** Index into `Event.scen` — same order the deleted Ticketing action used. */
+const SCENARIOS = ['quiet', 'likely', 'great'] as const
 
 /**
  * Finance — the paying-people half.
@@ -131,6 +134,31 @@ export default async function FinancePage({ searchParams }: PageProps<'/finance'
               >
                 Settlement
               </SectionHeading>
+
+              <div className={styles.scenario}>
+                <span className={styles.scenarioLabel}>How the night might go</span>
+                <div className={styles.scenarioChips}>
+                  {SCENARIOS.map((label, i) => (
+                    <div
+                      key={label}
+                      className={`${styles.scenarioChip} ${event.scen === i ? styles.scenarioOn : ''}`}
+                    >
+                      <span className={styles.scenarioName}>{label}</span>
+                      {event.scen === i ? (
+                        <span className={styles.scenarioCurrent}>current</span>
+                      ) : (
+                        <ActionButton
+                          className={styles.scenarioUse}
+                          action={setScenario.bind(null, event.id, i)}
+                          title={`Use the ${label} case`}
+                        >
+                          Use this
+                        </ActionButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <SettlementSheet lines={settlement.lines} />
 

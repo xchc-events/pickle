@@ -60,6 +60,9 @@ export interface FinanceEvent {
   date: string
   concluded: boolean
   payables: PayableRow[]
+  /** Which attendance scenario the projected settlement reads: 0/1/2 =
+   *  quiet/likely/great. Written by `setScenario` in ./actions.ts. */
+  scen: number
 }
 
 export interface FinanceLoad {
@@ -209,6 +212,7 @@ export async function loadFinance(
       date: dateLabel(row.date),
       concluded: row.concluded,
       payables,
+      scen: row.scen,
     },
   }
 }
