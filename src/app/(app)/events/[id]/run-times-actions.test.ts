@@ -360,7 +360,14 @@ describe('setEndDate', () => {
 
     expect(findUniqueOrThrow).toHaveBeenCalledWith({
       where: { id: EVENT },
-      select: { date: true, doors: true, barClose: true, allOut: true, packIn: true, packOut: true },
+      select: {
+        date: true,
+        doors: true,
+        barClose: true,
+        allOut: true,
+        packIn: true,
+        packOut: true,
+      },
     })
     expect(update).toHaveBeenCalledWith({ where: { id: EVENT }, data: { endDate: NEXT_NIGHT } })
     expect(record).toHaveBeenCalledWith(

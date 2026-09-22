@@ -5,7 +5,7 @@ import { useToast } from '@/components/Toast'
 import { LICENCE_STATES, type DealState, type LicenceState } from '@/lib/event-record'
 import { nightInput } from '@/lib/night'
 import { clockToInput } from '@/lib/run-times'
-import { setDateTbc, setDeal, setEndDate, setLicence, setRunTime } from './actions'
+import { setDateTbc, setDeal, setEndDate, setLicence, setPromoterOrg, setRunTime } from './actions'
 import styles from './event.module.css'
 import type { DealState as DbDealState } from '@/generated/prisma/client'
 
@@ -25,7 +25,7 @@ function TimeField({
   note,
 }: {
   eventId: string
-  field: 'doors' | 'barClose' | 'allOut'
+  field: 'doors' | 'barClose' | 'allOut' | 'packIn' | 'packOut'
   label: string
   value: string | null
   note?: string
@@ -88,46 +88,140 @@ function EndsField({ eventId, value }: { eventId: string; value: Date | null }) 
   )
 }
 
+/**
+ * "Starts" — the date, read-only here (it is not typed anywhere on this
+ * page), with the date-held chip from wave one beside it. Connor, 23 Sep
+ * 2026: "it's annoying that I have to look up here to see the beginning
+ * date" — of the header, where it still also prints.
+ */
+function StartsField({ eventId, date, tbc }: { eventId: string; date: string; tbc: boolean }) {
+  return (
+    <div className={styles.timeField}>
+      <span className={styles.factKey}>Starts</span>
+      <span className={styles.factValue}>
+        {date}
+        <DateLock eventId={eventId} tbc={tbc} />
+      </span>
+      <span className={styles.factNote}>
+        {tbc
+          ? 'still a best guess — an enquiry cannot move on until it is held'
+          : 'held in the calendar'}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * The "When" block: a beginning date and an end date, then the five run
+ * times in a single condensed row. Connor, 23 Sep 2026: "it'd be nice if all
+ * of this date and time stuff was in one smaller, more condensed thing."
+ */
 export function RunTimes({
   eventId,
+  date,
+  dateTbc,
+  packIn,
   doors,
   barClose,
   allOut,
+  packOut,
   endDate,
   late,
 }: {
   eventId: string
+  date: string
+  dateTbc: boolean
+  packIn: string | null
   doors: string | null
   barClose: string | null
   allOut: string | null
+  packOut: string | null
   endDate: Date | null
   late: boolean
 }) {
   return (
-    <div className={styles.times}>
-      <TimeField
-        eventId={eventId}
-        field="doors"
-        label="Doors"
-        value={doors}
-        note="every shift offsets from here"
-      />
-      <TimeField
-        eventId={eventId}
-        field="barClose"
-        label="Bar close"
-        value={barClose}
-        note={late ? 'past midnight — needs a special licence' : 'within the standard licence'}
-      />
-      <EndsField eventId={eventId} value={endDate} />
-      <TimeField
-        eventId={eventId}
-        field="allOut"
-        label="Everyone out"
-        value={allOut}
-        note="clean-up works back from it"
-      />
+    <div>
+      <div className={styles.whenTop}>
+        <StartsField eventId={eventId} date={date} tbc={dateTbc} />
+        <EndsField eventId={eventId} value={endDate} />
+      </div>
+      <div className={styles.timesRow}>
+        <TimeField
+          eventId={eventId}
+          field="packIn"
+          label="Pack-in"
+          value={packIn}
+          note="set-up can start from here"
+        />
+        <TimeField
+          eventId={eventId}
+          field="doors"
+          label="Doors"
+          value={doors}
+          note="every shift offsets from here"
+        />
+        <TimeField
+          eventId={eventId}
+          field="barClose"
+          label="Bar close"
+          value={barClose}
+          note={late ? 'past midnight — needs a special licence' : 'within the standard licence'}
+        />
+        <TimeField
+          eventId={eventId}
+          field="allOut"
+          label="Everyone out"
+          value={allOut}
+          note="clean-up works back from it"
+        />
+        <TimeField
+          eventId={eventId}
+          field="packOut"
+          label="Pack-out"
+          value={packOut}
+          note="the room is blocked out until here"
+        />
+      </div>
     </div>
+  )
+}
+
+/**
+ * The external coordinator — a picker over the promoter organisations on
+ * file, plus "None". Modelled on LeadPicker, but over `Payee` records
+ * rather than `Person` ones, so its own picker rather than a repurposing of
+ * one documented as being about people.
+ */
+export function OrgPicker({
+  eventId,
+  value,
+  options,
+}: {
+  eventId: string
+  value: string
+  options: { id: string; name: string }[]
+}) {
+  const say = useToast()
+  const [pending, start] = useTransition()
+
+  return (
+    <select
+      className={styles.leadSelect}
+      aria-label="External coordinator"
+      defaultValue={value}
+      disabled={pending}
+      onChange={(e) => {
+        const next = e.target.value
+        start(async () => say(await setPromoterOrg(eventId, next)))
+      }}
+    >
+      <option value="">None</option>
+      {options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+    </select>
   )
 }
 

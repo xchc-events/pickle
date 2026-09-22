@@ -4,14 +4,13 @@ import { db } from '@/lib/db'
 import { requireModule } from '@/lib/permissions'
 import { loadEventRecord } from '@/lib/event-record-data'
 import { canChangeEventRecord, headsLine } from '@/lib/event-record'
-import { dateLabel } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
 import { advanceBooking, putToBed, setLead, setOwner } from './actions'
-import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
+import { DealPanel, LicencePicker, OrgPicker, RunTimes } from './Controls'
 import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
 import { Holds } from './Holds'
@@ -69,10 +68,33 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
     : []
   const leadOptions = people.map((p) => ({ personId: p.id, name: p.name }))
 
+  // The internal owner picker lists only people whose account carries the
+  // coordinator or administrator role — Connor, 23 Sep 2026. A second, more
+  // scoped query rather than filtering `people` above, which every other
+  // lead still picks from freely.
+  const owners = canChange
+    ? await db.person.findMany({
+        where: { active: true, user: { role: { in: ['COORDINATOR', 'ADMIN'] } } },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      })
+    : []
+  const ownerOptions = owners.map((p) => ({ personId: p.id, name: p.name }))
+
+  // The external coordinator picker: every promoter organisation on file.
+  const promoterOrgs = canChange
+    ? await db.payee.findMany({
+        where: { kind: 'PROMOTER' },
+        orderBy: { name: 'asc' },
+        select: { id: true, name: true },
+      })
+    : []
+
   // The record exposes ownerName/ownerInitials for display, not the id a
   // picker's value needs, and matching ev.ownerName against `people` would be
   // wrong — names are not unique. Read only for whoever is allowed to change
-  // it, the same as `people` above.
+  // it, the same as `people` above. `promoterId` is the external coordinator
+  // picker's own current value, for the same reason.
   //
   // Extended into the one read the Artists and Terms editors need too — the
   // figures columns loadEventRecord does not select, and each act's `paid`,
@@ -83,6 +105,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         where: { id: ev.id },
         select: {
           ownerId: true,
+          promoterId: true,
           att: true,
           barHead: true,
           gear: true,
@@ -124,6 +147,78 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   const next = ev.next
   const blocked = next ? next.gates.filter((g) => !g.ok).length : 0
 
+  // "Event leads": the internal owner and the external coordinator, above
+  // the four department leads — one tight list rather than the owner living
+  // up in the facts row on its own. Connor, 23 Sep 2026: "it should be
+  // identified under these leads who the coordinator or external promoter
+  // is ... so you can see all of the team." Built once here, the same
+  // {label, value} idiom RunTimesReadout's own `times` array already uses,
+  // rather than four near-identical blocks of JSX.
+  const leadRows: {
+    key: string
+    label: string
+    icon: string
+    name: string | null
+    email: string | null
+    phone: string | null
+    empty: string
+    emptyWarn: boolean
+    picker: React.ReactNode | null
+  }[] = [
+    {
+      key: 'owner',
+      label: 'Internal owner',
+      icon: 'ph-user',
+      name: ev.ownerName,
+      email: ev.ownerEmail,
+      phone: ev.ownerPhone,
+      empty: 'nobody yet',
+      emptyWarn: true,
+      picker: canChange ? (
+        <LeadPicker
+          action={setOwner.bind(null, ev.id)}
+          value={ownerRow?.ownerId ?? ''}
+          options={ownerOptions}
+          label="Internal owner"
+        />
+      ) : null,
+    },
+    {
+      key: 'extCoord',
+      label: 'External coordinator',
+      icon: 'ph-buildings',
+      name: ev.extCoordName,
+      email: ev.extCoordEmail,
+      phone: ev.extCoordPhone,
+      empty: 'none',
+      emptyWarn: false,
+      picker: canChange ? (
+        <OrgPicker eventId={ev.id} value={ownerRow?.promoterId ?? ''} options={promoterOrgs} />
+      ) : null,
+    },
+    ...ev.leads.map((l) => ({
+      key: l.role,
+      label: l.label,
+      icon: l.icon,
+      name: l.name,
+      email: l.email,
+      phone: l.phone,
+      empty: 'nobody yet',
+      emptyWarn: true,
+      picker: canChange ? (
+        /* Bound, not wrapped in an arrow: a closure created here is an
+           ordinary function, and a Server Component may only hand a Client
+           Component a server action itself. */
+        <LeadPicker
+          action={setLead.bind(null, ev.id, l.role.toUpperCase() as LeadRole)}
+          value={l.personId ?? ''}
+          options={leadOptions}
+          label={`${l.label} lead`}
+        />
+      ) : null,
+    })),
+  ]
+
   return (
     <div>
       <header className={styles.header}>
@@ -149,8 +244,7 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               {ev.dateTbc ? ' · date not held' : ''}
             </span>
             {' · '}
-            {ev.spaceName} · {ev.promoter} ·{' '}
-            {ev.concluded ? 'concluded' : `${ev.daysToDoor} to door`}
+            {ev.spaceName} · {ev.concluded ? 'concluded' : `${ev.daysToDoor} to door`}
             {ev.booking === 'confirmed'
               ? ''
               : ` · ${ev.bookingDays}d at ${ev.bookingLabel.toLowerCase()}`}
@@ -201,31 +295,43 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
             Event overview
           </SectionHeading>
 
-          <div className={styles.leads}>
-            {ev.leads.map((l) => (
-              <div key={l.role} className={styles.lead}>
-                <span className={styles.leadLabel}>
+          <h3 className={styles.blockLabel}>Event leads</h3>
+          <div className={styles.eventLeads}>
+            {leadRows.map((l) => (
+              <div key={l.key} className={styles.leadRow}>
+                <span className={styles.leadRowLabel}>
                   <i className={`ph ${l.icon}`} aria-hidden="true" />
-                  {l.label} lead
+                  {l.label}
                 </span>
-                {canChange ? (
-                  /* Bound, not wrapped in an arrow: a closure created here is
-                     an ordinary function, and a Server Component may only hand
-                     a Client Component a server action itself. */
-                  <LeadPicker
-                    action={setLead.bind(null, ev.id, l.role.toUpperCase() as LeadRole)}
-                    value={l.personId ?? ''}
-                    options={leadOptions}
-                    label={`${l.label} lead`}
-                  />
-                ) : (
-                  <span className={styles.factValue}>
-                    {l.name ?? <span className={styles.warn}>nobody yet</span>}
-                  </span>
-                )}
+                <span className={styles.leadRowBody}>
+                  {l.picker ? (
+                    <span className={styles.pickerWrap}>{l.picker}</span>
+                  ) : (
+                    <span className={styles.factValue}>
+                      {l.name ?? (
+                        <span className={l.emptyWarn ? styles.warn : styles.plain}>{l.empty}</span>
+                      )}
+                    </span>
+                  )}
+                  {l.email || l.phone ? (
+                    <span className={styles.leadContact}>
+                      {l.email ? (
+                        <a className={styles.contactLink} href={`mailto:${l.email}`}>
+                          {l.email}
+                        </a>
+                      ) : null}
+                      {l.phone ? (
+                        <a className={styles.contactLink} href={`tel:${l.phone}`}>
+                          {l.phone}
+                        </a>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </span>
               </div>
             ))}
           </div>
+
           <div className={styles.facts}>
             {ev.facts.map((f) => (
               <div key={f.key} className={styles.fact}>
@@ -234,58 +340,33 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
                 <span className={styles.factNote}>{f.note}</span>
               </div>
             ))}
-            <div className={styles.fact}>
-              <span className={styles.factKey}>Owner</span>
-              <span className={styles.factValue}>
-                {canChange ? (
-                  <LeadPicker
-                    action={setOwner.bind(null, ev.id)}
-                    value={ownerRow?.ownerId ?? ''}
-                    options={leadOptions}
-                    label="Owner"
-                  />
-                ) : ev.ownerName ? (
-                  <>
-                    <Avatar initials={ev.ownerInitials ?? '–'} title={ev.ownerName} accent />
-                    {ev.ownerName}
-                  </>
-                ) : (
-                  <span className={styles.warn}>nobody yet</span>
-                )}
-              </span>
-              <span className={styles.factNote}>answerable for this night</span>
-            </div>
-            <div className={styles.fact}>
-              <span className={styles.factKey}>Date</span>
-              <span className={styles.factValue}>
-                {canChange ? (
-                  <DateLock eventId={ev.id} tbc={ev.dateTbc} />
-                ) : (
-                  <span className={ev.dateTbc ? styles.warn : undefined}>{ev.date}</span>
-                )}
-              </span>
-              <span className={styles.factNote}>
-                {ev.dateTbc
-                  ? 'still a best guess — an enquiry cannot move on until it is held'
-                  : 'held in the calendar'}
-              </span>
-              {ev.endDate && dateLabel(ev.endDate) !== ev.date ? (
-                <span className={styles.factNote}>ends {dateLabel(ev.endDate)}</span>
-              ) : null}
-            </div>
           </div>
 
+          <h3 className={styles.blockLabel}>When</h3>
           {canChange ? (
             <RunTimes
               eventId={ev.id}
+              date={ev.date}
+              dateTbc={ev.dateTbc}
+              packIn={ev.packIn}
               doors={ev.doors}
               barClose={ev.barClose}
               allOut={ev.allOut}
+              packOut={ev.packOut}
               endDate={ev.endDate}
               late={ev.licenceLate}
             />
           ) : (
-            <RunTimesReadout doors={ev.doors} barClose={ev.barClose} allOut={ev.allOut} />
+            <RunTimesReadout
+              date={ev.date}
+              dateTbc={ev.dateTbc}
+              packIn={ev.packIn}
+              doors={ev.doors}
+              barClose={ev.barClose}
+              allOut={ev.allOut}
+              packOut={ev.packOut}
+              endDate={ev.endDate}
+            />
           )}
 
           {/* The parts, and what holds each one up. */}

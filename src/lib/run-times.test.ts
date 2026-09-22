@@ -265,7 +265,14 @@ describe('runProblems', () => {
     it('is not checked while pack-in or pack-out is not decided, or doors is not', () => {
       expect(runProblems({ ...base, packIn: '3:00pm', packOut: '1:30am' })).toEqual({})
       expect(
-        runProblems({ date, doors: '8:00pm', barClose: null, allOut: null, endDate: null, packOut: '1:30am' }),
+        runProblems({
+          date,
+          doors: '8:00pm',
+          barClose: null,
+          allOut: null,
+          endDate: null,
+          packOut: '1:30am',
+        }),
       ).toEqual({})
     })
 

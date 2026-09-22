@@ -62,13 +62,15 @@ describe('crewCallStart', () => {
     })
 
     it('falls back to the generic window when pack-out is not set', () => {
-      expect(crewCallStart('Clean-up crew', 0.75, FALLBACK, '8:00pm', '3:00pm', null)).toBe(FALLBACK)
+      expect(crewCallStart('Clean-up crew', 0.75, FALLBACK, '8:00pm', '3:00pm', null)).toBe(
+        FALLBACK,
+      )
     })
 
     it('is unaffected by pack-in', () => {
-      expect(crewCallStart('Clean-up crew', 0.75, FALLBACK, '8:00pm', '3:00pm', '1:30am')).toBeCloseTo(
-        4.75,
-      )
+      expect(
+        crewCallStart('Clean-up crew', 0.75, FALLBACK, '8:00pm', '3:00pm', '1:30am'),
+      ).toBeCloseTo(4.75)
     })
   })
 })
@@ -83,12 +85,20 @@ describe('fiveTimesLine', () => {
         allOut: '1:00am',
         packOut: '1:30am',
       }),
-    ).toBe('Pack-in 3:00pm · Doors 8:00pm · Bar close 11:30pm · Everyone out 1:00am · Pack-out 1:30am')
+    ).toBe(
+      'Pack-in 3:00pm · Doors 8:00pm · Bar close 11:30pm · Everyone out 1:00am · Pack-out 1:30am',
+    )
   })
 
   it('leaves out whichever are not decided yet, keeping the rest in order', () => {
     expect(
-      fiveTimesLine({ packIn: null, doors: '8:00pm', barClose: null, allOut: '1:00am', packOut: null }),
+      fiveTimesLine({
+        packIn: null,
+        doors: '8:00pm',
+        barClose: null,
+        allOut: '1:00am',
+        packOut: null,
+      }),
     ).toBe('Doors 8:00pm · Everyone out 1:00am')
   })
 

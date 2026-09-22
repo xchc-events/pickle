@@ -748,7 +748,12 @@ export async function setLicence(eventId: string, state: LicenceState): Promise<
 function firstRunProblem(r: RunTimes): string | null {
   const problems = runProblems(r)
   return (
-    problems.endDate ?? problems.allOut ?? problems.packOut ?? problems.barClose ?? problems.packIn ?? null
+    problems.endDate ??
+    problems.allOut ??
+    problems.packOut ??
+    problems.barClose ??
+    problems.packIn ??
+    null
   )
 }
 
