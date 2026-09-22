@@ -15,6 +15,7 @@
  */
 
 import { tiers } from './finance'
+import { hrs } from './format'
 
 export type AssetTier = 'hero' | 'lead' | 'support'
 export type AssetState = 'draft' | 'review' | 'approved'
@@ -378,19 +379,84 @@ export function copyFit(text: string, subject: string): CopyFit[] {
 /** The Design & comms task line, the module's own cost. */
 export const DESIGN_TASK = 'Design & comms'
 
+export interface HoursContributor {
+  name: string
+  hoursLabel: string
+}
+
 export interface HoursLine {
   text: string
   /** 0–100. */
   pct: number
   over: boolean
+  /** Who logged the hours behind `text`, biggest contributor first. */
+  by: HoursContributor[]
 }
 
-export function designHours(task: { est: number; actual: number | null } | undefined): HoursLine {
-  if (!task || task.est <= 0) return { text: '—', pct: 0, over: false }
-  const actual = task.actual ?? 0
-  return {
-    text: `${actual} of ${task.est}h`,
-    pct: Math.min(100, Math.round((actual / task.est) * 100)),
-    over: actual > task.est,
+/**
+ * The design task's estimate against what the design team has actually
+ * logged on this event — not the task's own `actual` column, which nobody
+ * types. "Run the timer from the event record" was never true; hours arrive
+ * from `HourEntry` rows the same way every other module's do, and this reads
+ * them rather than a figure nobody enters. Connor, 23 Sep 2026.
+ */
+export function designHours(
+  est: number | undefined,
+  logged: readonly { personId: string; name: string; hours: number }[],
+): HoursLine {
+  const byPerson = new Map<string, { name: string; hours: number }>()
+  for (const e of logged) {
+    const cur = byPerson.get(e.personId)
+    if (cur) cur.hours += e.hours
+    else byPerson.set(e.personId, { name: e.name, hours: e.hours })
   }
+  const by = [...byPerson.values()]
+    .sort((a, b) => b.hours - a.hours)
+    .map((p) => ({ name: p.name, hoursLabel: hrs(p.hours) }))
+
+  const total = Math.round(logged.reduce((n, e) => n + e.hours, 0) * 10) / 10
+
+  if (!est || est <= 0) return { text: '—', pct: 0, over: false, by }
+  return {
+    text: `${total} of ${est}h`,
+    pct: Math.min(100, Math.round((total / est) * 100)),
+    over: total > est,
+    by,
+  }
+}
+
+// ------------------------------------------------------------- to chase ---
+
+/** One live act still missing something Design needs. */
+export interface MissingBioRow {
+  name: string
+  /** "a press shot", "a bio", or "a press shot and a bio". */
+  missing: string
+  /**
+   * Descriptive rather than a real link: there is no staff-side page into a
+   * specific promoter's portal, only the fact that one exists. See the note
+   * on `hasPortal` in design-data.ts.
+   */
+  chaseNote: string | null
+}
+
+/**
+ * The same per-act computation `parts.ts`'s `design()` counts for the
+ * Pipeline cell — reused here rather than re-derived, so the two screens
+ * cannot disagree about which acts are missing what. `hasPromo`/`hasBio` are
+ * loaded the way `parts-input.ts` loads them: a file counts whether it
+ * arrived on the event or on the payee record.
+ */
+export function missingBiosList(
+  acts: readonly { name: string; hasPromo: boolean; hasBio: boolean }[],
+  hasPortal: boolean,
+): MissingBioRow[] {
+  return acts
+    .filter((a) => !a.hasPromo || !a.hasBio)
+    .map((a) => ({
+      name: a.name,
+      missing:
+        !a.hasPromo && !a.hasBio ? 'a press shot and a bio' : !a.hasPromo ? 'a press shot' : 'a bio',
+      chaseNote: hasPortal ? 'chase it in their portal' : null,
+    }))
 }

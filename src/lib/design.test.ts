@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { partsFor, type GateArtist, type PartsEvent } from './parts'
 import {
   ASSET_SET,
   allApproved,
@@ -11,6 +12,7 @@ import {
   copyFit,
   designHours,
   designQueueRow,
+  missingBiosList,
   verticalCuts,
   type EventAsset,
 } from './design'
@@ -200,18 +202,130 @@ describe('written once, cut to fit', () => {
 
 describe('design hours', () => {
   it('reads nothing logged as zero against the estimate', () => {
-    expect(designHours({ est: 6, actual: null })).toEqual({ text: '0 of 6h', pct: 0, over: false })
+    expect(designHours(6, [])).toEqual({ text: '0 of 6h', pct: 0, over: false, by: [] })
   })
 
-  it('flags an overrun and caps the bar', () => {
-    expect(designHours({ est: 6, actual: 7.5 })).toEqual({
+  it('flags an overrun and caps the bar, and names who logged it', () => {
+    expect(designHours(6, [{ personId: 'p1', name: 'Tui Ware', hours: 7.5 }])).toEqual({
       text: '7.5 of 6h',
       pct: 100,
       over: true,
+      by: [{ name: 'Tui Ware', hoursLabel: '7.5h' }],
     })
   })
 
   it('has nothing to say without a task line', () => {
-    expect(designHours(undefined).text).toBe('—')
+    expect(designHours(undefined, []).text).toBe('—')
+  })
+
+  it('sums more than one row for the same person, and ranks the biggest contributor first', () => {
+    const line = designHours(10, [
+      { personId: 'p1', name: 'Tui Ware', hours: 2 },
+      { personId: 'p2', name: 'Reube Katene', hours: 5 },
+      { personId: 'p1', name: 'Tui Ware', hours: 1 },
+    ])
+    expect(line.text).toBe('8 of 10h')
+    expect(line.by).toEqual([
+      { name: 'Reube Katene', hoursLabel: '5h' },
+      { name: 'Tui Ware', hoursLabel: '3h' },
+    ])
+  })
+})
+
+describe('acts to chase', () => {
+  it('lists only what is actually missing, per act', () => {
+    const rows = missingBiosList(
+      [
+        { name: 'Static Bloom', hasPromo: true, hasBio: true },
+        { name: 'Aro Collective', hasPromo: false, hasBio: true },
+        { name: 'Kōura Trio', hasPromo: true, hasBio: false },
+        { name: 'The Wheke', hasPromo: false, hasBio: false },
+      ],
+      false,
+    )
+    expect(rows).toEqual([
+      { name: 'Aro Collective', missing: 'a press shot', chaseNote: null },
+      { name: 'Kōura Trio', missing: 'a bio', chaseNote: null },
+      { name: 'The Wheke', missing: 'a press shot and a bio', chaseNote: null },
+    ])
+  })
+
+  it('is empty, not a row for everyone, when nothing is missing', () => {
+    expect(missingBiosList([{ name: 'Static Bloom', hasPromo: true, hasBio: true }], false)).toEqual(
+      [],
+    )
+  })
+
+  it('names the portal chase only when the promoter has one', () => {
+    const [row] = missingBiosList([{ name: 'Aro Collective', hasPromo: false, hasBio: true }], true)
+    expect(row?.chaseNote).toBe('chase it in their portal')
+  })
+
+  /**
+   * The point of E9: the list on Design and the "N acts to chase" cell on
+   * Pipeline read the same `hasPromo`/`hasBio` per live act, so they cannot
+   * land on different counts the way they did when Connor asked "why is it
+   * saying six acts to chase, and then... it doesn't look like there's
+   * anything left to do?" (23 Sep 2026).
+   */
+  it('counts exactly what parts.ts counts for the same acts, live or not', () => {
+    const artists: GateArtist[] = [
+      { status: 'confirmed', hasPromo: false, hasBio: true, hasTechRider: true },
+      { status: 'pencilled', hasPromo: true, hasBio: false, hasTechRider: true },
+      { status: 'declined', hasPromo: false, hasBio: false, hasTechRider: false },
+    ]
+
+    const partsEvent: PartsEvent = {
+      booking: 'confirmed',
+      bookingDays: 2,
+      concluded: false,
+      daysToDoor: 20,
+      hasOwner: true,
+      dateTbc: false,
+      hasSpace: true,
+      kind: 'djs',
+      promoter: 'Kōura Collective',
+      hasPortal: false,
+      split: 0.6,
+      dealState: 'agreed',
+      dealNote: null,
+      floor: 500,
+      ceil: 1200,
+      artists,
+      barClose: '11:00pm',
+      doors: '8:00pm',
+      allOut: '12:00am',
+      licence: 'not_required',
+      techStatus: 'confirmed',
+      leads: { ticketing: true, design: true, promo: true, tech: true },
+      // Every piece approved: with one check still failing, this is the case
+      // where the cell used to read "art signed off" but named nothing —
+      // Connor's actual complaint.
+      assets: ASSET_SET.map((a) => ({ key: a.key, state: 'approved' as const, promoterSigned: true })),
+      artworkFiles: 0,
+      channels: [{ live: true, stale: false }],
+      beatsDone: 2,
+      std: 30,
+      ticketsLive: true,
+      sold: 40,
+      capacity: 220,
+      shifts: [{ assigned: true, pencilled: false }],
+      hoursLogged: 3,
+      tasksWithActual: 1,
+      doorCounted: true,
+      barClosed: true,
+    }
+
+    // The declined act is left out of `acts` here exactly as `liveActs` in
+    // parts.ts leaves it out — that is the "same input" the two screens share.
+    const liveActs = artists
+      .filter((a) => a.status !== 'declined')
+      .map((a, i) => ({ name: `Act ${i}`, hasPromo: a.hasPromo, hasBio: a.hasBio }))
+
+    const list = missingBiosList(liveActs, false)
+    const designPart = partsFor(partsEvent).find((p) => p.key === 'design')
+
+    expect(list.length).toBe(2)
+    expect(designPart?.detail).toBe(`${list.length} acts' bios and pics to chase`)
   })
 })
