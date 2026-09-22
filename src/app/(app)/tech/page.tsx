@@ -35,8 +35,7 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
         <div>
           <h1 className={styles.title}>Tech production</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Rig</span> · riders arrive from the act, not from an
-            inbox · nothing here was forwarded twice
+            riders arrive from the act, not from an inbox · nothing here was forwarded twice
           </p>
         </div>
       </header>

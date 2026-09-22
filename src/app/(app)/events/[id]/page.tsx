@@ -226,13 +226,6 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               </div>
             ))}
           </div>
-          {canChange ? (
-            <p className={styles.note}>
-              A lead is a person, not a typed-in name — renaming them in Admin renames them on every
-              brief, chase and timesheet at once.
-            </p>
-          ) : null}
-
           <div className={styles.facts}>
             {ev.facts.map((f) => (
               <div key={f.key} className={styles.fact}>

@@ -27,8 +27,7 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
         <div>
           <h1 className={styles.title}>Roster</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Crew</span> · assigning a shift books the hours ·
-            nobody types a timesheet twice
+            assigning a shift books the hours · nobody types a timesheet twice
           </p>
         </div>
       </header>

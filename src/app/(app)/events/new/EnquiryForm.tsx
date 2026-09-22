@@ -513,7 +513,7 @@ export function EnquiryForm({
               </label>
 
               <label className={styles.field}>
-                <span className={styles.label}>Kind</span>
+                <span className={styles.label}>Type of event</span>
                 <select
                   name={FIELD.kind}
                   value={kind}

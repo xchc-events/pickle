@@ -429,7 +429,7 @@ export async function loadEventRecord(
         value: row.model === 'DRY' ? 'Dry hire' : 'Curator model',
         note: 'drives which milestones apply',
       },
-      { key: 'Kind of night', value: row.kind, note: 'drives the roster' },
+      { key: 'Type of event', value: row.kind, note: 'drives the roster' },
       { key: 'Format', value: row.format, note: 'what the room is told it is' },
       { key: 'Space', value: row.space.name, note: `holds ${capacity}` },
       // Doors, bar close and everyone-out are not repeated here — they are
