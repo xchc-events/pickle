@@ -203,6 +203,22 @@
   color: var(--st-stop);
 }
 
+/* No owner named yet — wants attention, but it is not the coordinator's own
+   flag, so it carries the tone on its own rather than through the row. */
+.metaWarn {
+  color: var(--st-warn);
+}
+
+/* The second meta line: the date and the run, under the owner/format/room. */
+.runLine {
+  display: block;
+  font-size: 11px;
+  color: var(--color-neutral-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* A part's cell: its status, and a figure under it where there is one. The
    five tones say where the part stands on its own — none of them is about
    the part to its left. */
@@ -281,11 +297,6 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 11px;
-}
-
-.figures {
-  text-align: right;
 }
 
 .days {
@@ -294,29 +305,6 @@
   font-size: 15px;
   line-height: 1.1;
   color: var(--color-neutral-100);
-}
-
-.proj {
-  display: block;
-  font-size: 10.5px;
-}
-
-.good {
-  color: var(--st-good);
-}
-
-.muted {
-  color: var(--color-neutral-600);
-}
-
-.dim {
-  color: var(--color-neutral-700);
-}
-
-/* Holds the column when an event has no external coordinator. */
-.avatarGap {
-  flex: none;
-  width: 23px;
 }
 
 .empty {
@@ -355,10 +343,6 @@
 }
 
 /* --- below the matrix ----------------------------------------------- */
-
-.metrics {
-  margin-top: 24px;
-}
 
 .labour {
   margin-top: 26px;
