@@ -40,7 +40,8 @@ export interface HomeLoad {
   /** Events not yet put to bed. */
   live: number
   tiles: Tile[]
-  next: NextNight | null
+  /** Up to the two soonest confirmed nights, soonest first. */
+  next: NextNight[]
   /**
    * The reader's hours, or 'unlinked' for an account with no person behind
    * it; null when the reader cannot open Hours.
@@ -141,23 +142,29 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
     return taken === null ? [] : [{ date: r.date, taken }]
   })
 
-  // The surplus is the event record's own figure, worked out exactly as the
-  // event record works it out — and only for a reader who can open it.
-  const nextEvent = pickNext(events)
-  let surplus: number | null = null
-  if (nextEvent && modules.includes('pipeline')) {
-    const row = rows.find((r) => r.id === nextEvent.id)
-    if (row) {
-      const orgShareHours = await orgShareFor(row.date)
-      surplus = financeVals(financeInputFor(row, scenarioOf(row.scen), orgShareHours)).surplus
-    }
-  }
+  // Up to the two soonest confirmed nights. Each one's surplus is the event
+  // record's own figure, worked out exactly as the event record works it
+  // out, and only for a reader who can open it — the same rule as when this
+  // only ever showed the one night.
+  const next = await Promise.all(
+    pickNext(events, 2).map(async (e) => {
+      let surplus: number | null = null
+      if (modules.includes('pipeline')) {
+        const row = rows.find((r) => r.id === e.id)
+        if (row) {
+          const orgShareHours = await orgShareFor(row.date)
+          surplus = financeVals(financeInputFor(row, scenarioOf(row.scen), orgShareHours)).surplus
+        }
+      }
+      return nextNight(e, viewer, surplus)
+    }),
+  )
 
   return {
     needs: needsFor(events, viewer, actors),
     live: events.length,
     tiles: homeTiles(events, counted, viewer),
-    next: nextEvent ? nextNight(nextEvent, viewer, surplus) : null,
+    next,
     hours: modules.includes('hours') ? await hoursOf(user.personId, now) : null,
   }
 }
