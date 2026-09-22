@@ -137,6 +137,10 @@ model User {
   /// Things this account did to other accounts' access — invitations sent,
   /// sessions ended. Only ever an administrator.
   authActs   AuthEvent[] @relation("AuthEventActor")
+  /// Design assets this account has signed off — the owner's or a
+  /// promoter's, never design staff's. See `Asset.signedById`.
+  signedAssets Asset[]
+  comments     Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -535,6 +539,7 @@ model Event {
   actual    Actual?
   leads     EventLead[]
   assets    Asset[]
+  comments  Comment[]
   channels  ChannelPush[]
   beats     Beat[]
   files     StoredFile[]
@@ -714,14 +719,50 @@ model Asset {
   key     String
   state   AssetState @default(DRAFT)
   /// Hero and lead pieces also need the promoter's sign-off, given in their
-  /// portal. Never set by the venue.
+  /// portal. Never set by the venue. Kept true only when `signedById` below
+  /// was the promoter — see `maySignOff` in src/lib/design.ts — so nothing
+  /// already reading this field breaks now that the owner can sign too.
   promoterSigned Boolean @default(false)
+
+  /// Who pressed Approve — the event's internal owner or a promoter of its
+  /// organisation, whichever it was. Null while the piece has never been
+  /// through that decision, and cleared again by Reopen. Connor, 23 Sep
+  /// 2026: sign-off is theirs, not design's — see `maySignOff`.
+  signedById String?
+  signedBy   User?     @relation(fields: [signedById], references: [id], onDelete: SetNull)
+  signedAt   DateTime?
 
   /// The artwork itself. A piece can carry more than one file — a print PDF
   /// and the flattened preview beside it — and keeps superseded versions.
-  files StoredFile[]
+  files    StoredFile[]
+  comments Comment[]
 
   @@unique([eventId, key])
+}
+
+/// One message in a design thread — under one piece of the set, or the
+/// event's general design thread when `assetId` is null.
+///
+/// Like `Activity`, a comment is never edited or deleted: saying something
+/// different is a new comment, not a change to an old one. `who` is
+/// denormalised the same way `Activity.who` is, so a thread still reads
+/// correctly for an author who later leaves. `authorId` is a `User` rather
+/// than a `Person` because a promoter — the other person this thread is
+/// for — has no `Person` record at all.
+model Comment {
+  id       String   @id @default(cuid())
+  eventId  String
+  event    Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assetId  String?
+  asset    Asset?   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  authorId String?
+  author   User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  who      String
+  body     String
+  at       DateTime @default(now())
+
+  @@index([eventId, at])
+  @@index([assetId, at])
 }
 
 // ------------------------------------------------------------- promotion ---
