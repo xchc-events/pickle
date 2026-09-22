@@ -102,11 +102,15 @@
   fill: currentColor;
 }
 
-/* One colour per tier, all from tokens, distinct from the warn/good used
-   above for breakeven and full-pay so a tier line is never mistaken for a
-   threshold. */
+/* One colour per tier, from the neutral and accent scales — never a status
+   token: `--st-warn` and `--st-good` already mean breakeven and full-pay on
+   this chart, and `--st-stop` reads as "blocked" everywhere else in the app,
+   not as a tier's identity. Each holds well against `--color-surface`
+   (#232532) — `--color-neutral-500`, the least contrasty of the four, still
+   clears ~5.3:1. The legend's swatch uses the same class as the line, so
+   they are always the same colour. */
 .tierSub {
-  color: var(--color-accent-2);
+  color: var(--color-accent-2-400);
 }
 
 .tierStd {
@@ -114,11 +118,11 @@
 }
 
 .tierSup {
-  color: var(--st-stop);
+  color: var(--color-neutral-100);
 }
 
 .tierDoor {
-  color: var(--color-neutral-300);
+  color: var(--color-neutral-500);
 }
 
 /* --- legend ------------------------------------------------------------- */
@@ -174,4 +178,14 @@
 .figures b {
   font-weight: 500;
   color: var(--color-neutral-100);
+}
+
+/* --- the projection's own caveat ----------------------------------------- */
+
+.caveat {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
 }

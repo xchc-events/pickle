@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { TIME_SCALES, buildChart, type ChartGeometry, type TimeScale } from '@/lib/sales-chart'
-import type { MixKey } from '@/lib/ticketing'
+import { SOLD_BY_NOW, type MixKey } from '@/lib/ticketing'
 import styles from './SalesChart.module.css'
 
 export interface SalesChartProps {
@@ -202,6 +202,14 @@ export function SalesChart(props: SalesChartProps) {
           <b>{props.fullPay}</b> to pay everyone in full
         </span>
       </div>
+
+      {/* The projection is drawn, not just implied — say what it assumes,
+          in the same number paceOf actually used, so it reads as a rough
+          read rather than a forecast. */}
+      <p className={styles.caveat}>
+        Projection assumes sales so far are {Math.round(SOLD_BY_NOW * 100)}% of the eventual total —
+        a rough read, not a model, until Gather.rsvp is connected.
+      </p>
     </div>
   )
 }
