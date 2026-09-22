@@ -51,10 +51,9 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
     <div>
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Design &amp; comms</h1>
+          <h1 className={styles.title}>Design &amp; communications</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Label</span> · briefs written once, in the event
-            record · nothing here arrived by email
+            briefs written once, in the event record · nothing here arrived by email
           </p>
         </div>
       </header>
