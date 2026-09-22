@@ -179,6 +179,12 @@ export default async function PromoPage({ searchParams }: PageProps<'/promo'>) {
               <div className={`${styles.lead} ${event.leadName ? '' : styles.warn}`}>
                 {event.leadName ?? 'no promo lead'}
               </div>
+              {event.leadEmail || event.leadPhone ? (
+                <p className={styles.leadContact}>
+                  {event.leadEmail ? <span>{event.leadEmail}</span> : null}
+                  {event.leadPhone ? <span>{event.leadPhone}</span> : null}
+                </p>
+              ) : null}
               <p className={styles.panelFoot}>
                 Set on the event record alongside the ticketing, design and tech leads. Manual
                 pushes are logged against whoever ticks them off, not against the lead.

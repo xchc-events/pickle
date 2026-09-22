@@ -389,7 +389,9 @@ function design(e: PartsEvent): PartState {
   // so the cell says the art is signed off and names what is open instead.
   const open = [
     e.leads.design ? null : 'no lead',
-    missingBios > 0 ? `${missingBios} ${plural(missingBios, 'act', 'acts')} to chase` : null,
+    missingBios > 0
+      ? `${missingBios} ${plural(missingBios, "act's", "acts'")} bios and pics to chase`
+      : null,
   ].filter((s) => s !== null)
 
   const shown: Pick<PartState, 'status' | 'detail' | 'tone'> =
