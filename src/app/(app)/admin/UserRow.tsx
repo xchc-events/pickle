@@ -36,6 +36,7 @@ export function UserRow({
   linkPerson,
   setOrganisation,
   setEmployment,
+  setPhone,
   sendInvite,
   endSessions,
 }: {
@@ -49,6 +50,7 @@ export function UserRow({
   setActive: (active: boolean) => Promise<Said>
   linkPerson: (personId: string) => Promise<Said>
   setEmployment: (employment: Employment) => Promise<Said>
+  setPhone: (phone: string) => Promise<Said>
   sendInvite: () => Promise<Said>
   endSessions: () => Promise<Said>
 }) {
@@ -64,6 +66,25 @@ export function UserRow({
           {isSelf ? <span className={styles.you}>you</span> : null}
         </span>
         <span className={styles.email}>{user.email}</span>
+        {/* An external account's phone travels with its other details
+            (setExternalDetails) — this row only edits a staff member's. */}
+        {user.role !== 'PROMOTER' ? (
+          <input
+            type="tel"
+            className={styles.phone}
+            defaultValue={user.phone ?? ''}
+            disabled={pending}
+            placeholder="phone — not on file"
+            title="The number the venue calls them on"
+            onBlur={(e) => {
+              const next = e.target.value.trim()
+              if (next !== (user.phone ?? '')) run(() => setPhone(next))
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
+          />
+        ) : null}
       </div>
 
       <select

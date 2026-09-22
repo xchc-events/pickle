@@ -398,6 +398,37 @@ export async function setOrganisation(userId: string, organisationId: string): P
   )
 }
 
+/**
+ * A staff account's phone number.
+ *
+ * `firstName`/`lastName` are not set here — a staff member is named through
+ * their Person record (see `setExternalDetails` below, and "Your people" in
+ * Admin) — but `phone` lives on `User` regardless of role, and staff never
+ * had anywhere to set theirs. "We need contact information on these
+ * sections, because if you need to call this person we want your phone
+ * number and email. That way external organisers can easily access it."
+ * (Connor, 23 Sep 2026.) The email half is the account's own sign-in
+ * address, already shown on the row; only the phone needed a place to go.
+ */
+export async function setPhone(userId: string, phone: string): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+
+  const target = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, name: true, email: true },
+  })
+  if (!target) return said('No such account.', 'stop')
+  if (target.role === 'PROMOTER') {
+    return said('An external coordinator’s phone is set with their other details, not here.', 'stop')
+  }
+
+  await db.user.update({ where: { id: userId }, data: { phone: phone.trim() || null } })
+
+  refresh()
+  return said(`Saved. This is the number the venue contacts ${target.name ?? target.email} on.`)
+}
+
 /** Name and phone for somebody outside the venue. */
 export async function setExternalDetails(
   userId: string,

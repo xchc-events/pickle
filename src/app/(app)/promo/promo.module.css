@@ -372,6 +372,15 @@
   margin-top: 7px;
 }
 
+.leadContact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+  margin: 4px 0 0;
+}
+
 .rule {
   margin-top: 9px;
 }

@@ -35,6 +35,9 @@ export interface PromoEvent {
   /** "16 days out", "tonight", "past". */
   doorLine: string
   leadName: string | null
+  /** The lead's own contact details — set on their account in Admin. */
+  leadEmail: string | null
+  leadPhone: string | null
   summary: ChannelSummary
   channels: ChannelCard[]
   beats: BeatRow[]
@@ -64,7 +67,7 @@ export async function loadPromo(user: SessionUser, wantedId?: string): Promise<P
       space: true,
       channels: { include: { by: true } },
       beats: true,
-      leads: { include: { person: true } },
+      leads: { include: { person: { include: { user: { select: { email: true, phone: true } } } } } },
     },
     orderBy: { date: 'asc' },
   })
@@ -94,6 +97,7 @@ export async function loadPromo(user: SessionUser, wantedId?: string): Promise<P
 
   const channels = flatten(row.channels)
   const beats = row.beats.map((b) => ({ key: b.key, done: b.done }))
+  const promoLead = row.leads.find((l) => l.role === 'PROMO')
 
   return {
     queue,
@@ -104,7 +108,9 @@ export async function loadPromo(user: SessionUser, wantedId?: string): Promise<P
       dateLabel: dateLabel(row.date),
       spaceName: row.space.name,
       doorLine: doorLine(daysBetween(now, row.date)),
-      leadName: row.leads.find((l) => l.role === 'PROMO')?.person.name ?? null,
+      leadName: promoLead?.person.name ?? null,
+      leadEmail: promoLead?.person.user?.email ?? null,
+      leadPhone: promoLead?.person.user?.phone ?? null,
       summary: channelSummary(channels),
       channels: channelCards(channels),
       beats: beatRows(beats),
