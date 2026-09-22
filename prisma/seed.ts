@@ -309,7 +309,7 @@ const EVENTS: SeedEvent[] = [
     sinceDays: 9,
     format: 'Live music',
     kind: 'live',
-    risk: 'Confirmed 9d, no creative brief yet',
+    risk: 'Confirmed 9 days ago, no creative brief yet',
     riskKind: 'warn',
   },
   {

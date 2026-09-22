@@ -14,7 +14,7 @@
  * mathematics lives.
  */
 
-import { hrs, money, days as dayLabel } from './format'
+import { hrs, money, days as dayLabel, dateLabel } from './format'
 import { PLANNED_HOUR_COST } from './finance'
 import { gatesDoneLabel } from './event-record'
 import { PARTS, type BookingStatus, type PartKey, type PartState } from './parts'
@@ -43,6 +43,16 @@ export interface PipelineEvent {
   booking: BookingStatus
   /** Days until doors. Negative once the event is past. */
   daysToDoor: number
+  /** The calendar date the night runs on — the enquiry's best guess until
+   *  `dateTbc` clears. See `runLine`. */
+  date: Date
+  /** The night this run ends, once the room and times say so. Null while no
+   *  end time is set. See `runLine`. */
+  endDate: Date | null
+  /** "8:00pm" — printed exactly as the event stores it, never parsed. */
+  doors: string | null
+  /** "1:00am" — printed exactly as the event stores it, never parsed. */
+  allOut: string | null
   /** The coordinator's own words for why this is flagged. Null = not at risk. */
   riskNote: string | null
   riskKind: RiskKind
@@ -113,30 +123,45 @@ export function attentionOf(e: Pick<PipelineEvent, 'parts' | 'riskNote' | 'riskK
   return e.parts.reduce((n, p) => n + weight(p.tone), flag)
 }
 
-export interface Projection {
-  text: string
-  tone: 'good' | 'muted' | 'dim'
+/**
+ * The meta line under the event name: the internal owner (or "no owner yet" —
+ * Connor, 23 Sep 2026, wants a person named, not "internal"), the external
+ * coordinator where there is one, the format and the room. The risk note
+ * still wins when there is one.
+ */
+export function metaLine(e: PipelineEvent): string {
+  if (e.riskNote) return e.riskNote
+  return [e.ownerName ?? 'no owner yet', e.extCoordName, e.format, e.spaceName]
+    .filter((part): part is string => part !== null)
+    .join(' · ')
 }
 
 /**
- * What the right-hand figure says. Before the booking is confirmed there is
- * nothing worth projecting, so it says so rather than showing a number built
- * on guesses.
+ * The second meta line under the event name: the date, and doors to
+ * everyone-out. Doors and everyone-out print exactly as the event stores
+ * them ("8:00pm") — this only arranges what is there, never parses or
+ * recomputes a time. When `endDate` falls on a different calendar day from
+ * `date`, the date itself spans both: "Sun 27 Sep – Mon 28 Sep". A missing
+ * time prints only what there is, down to the date alone.
+ *
+ * Pack-in and pack-out times join this line once that wave lands.
  */
-export function projection(
-  e: Pick<PipelineEvent, 'concluded' | 'booking' | 'surplus' | 'actualTotal'>,
-): Projection {
-  if (e.concluded) return { text: `took ${money(e.actualTotal ?? 0)}`, tone: 'good' }
-  if (e.booking !== 'confirmed') return { text: 'modelling', tone: 'dim' }
-  return {
-    text: `proj. ${money(e.surplus)}`,
-    tone: e.surplus > 500 ? 'good' : 'muted',
-  }
-}
+export function runLine(e: Pick<PipelineEvent, 'date' | 'endDate' | 'doors' | 'allOut'>): string {
+  const when =
+    e.endDate && daysBetween(e.date, e.endDate) !== 0
+      ? `${dateLabel(e.date)} – ${dateLabel(e.endDate)}`
+      : dateLabel(e.date)
 
-/** The meta line under the event name: the risk note wins when there is one. */
-export function metaLine(e: PipelineEvent): string {
-  return e.riskNote ?? `${e.promoter} · ${e.format} · ${e.spaceName}`
+  const times =
+    e.doors && e.allOut
+      ? `${e.doors} – ${e.allOut}`
+      : e.doors
+        ? `doors ${e.doors}`
+        : e.allOut
+          ? `out ${e.allOut}`
+          : null
+
+  return times ? `${when} · ${times}` : when
 }
 
 export interface RowFilters {
@@ -213,6 +238,11 @@ export function partHeads(all: PipelineEvent[]): PartHead[] {
 
 // --------------------------------------------------------------- metrics ---
 
+/**
+ * The Pipeline no longer builds any of these — the four metric cards are
+ * gone (Connor, 23 Sep 2026: "None of these cards are useful at all. We can
+ * get rid of those cards"). The type stays: `MetricStrip` still reads it.
+ */
 export interface Metric {
   label: string
   value: string
@@ -221,51 +251,6 @@ export interface Metric {
   tone: 'warn' | 'stop' | 'good' | 'plain'
   /** True where the figure is not yet computed from real data. */
   placeholder?: boolean
-}
-
-/** How many confirmed events it takes to cover the fixed cost base. */
-export const EVENTS_TO_COVER_BASE = 18
-
-export function pipelineMetrics(all: PipelineEvent[]): Metric[] {
-  const live = all.filter((e) => !e.concluded)
-  const hours = live.reduce((a, e) => a + e.hours, 0)
-  const confirmed = live.filter((e) => e.booking === 'confirmed').length
-
-  return [
-    // These two want a median over the last 20 bookings, which needs stage
-    // transition history we do not record yet. The prototype hard-codes them
-    // and so, for now, do we — flagged rather than quietly presented as real.
-    {
-      label: 'How long a booking takes to confirm',
-      note: 'From the enquiry landing to terms agreed — median of the last 20 bookings',
-      value: '11 days',
-      sub: 'we aim for 7',
-      tone: 'warn',
-      placeholder: true,
-    },
-    {
-      label: 'How long from confirmed to on sale',
-      note: 'Terms agreed to tickets live — this is where events lose their run-up',
-      value: '9 days',
-      sub: 'we aim for 4',
-      tone: 'stop',
-      placeholder: true,
-    },
-    {
-      label: 'Labour booked to events this month',
-      note: `Every rostered shift plus every hour entered against a task, planned at $${PLANNED_HOUR_COST}/hr`,
-      value: hrs(hours),
-      sub: money(hours * PLANNED_HOUR_COST),
-      tone: 'plain',
-    },
-    {
-      label: 'Events confirmed for the next 60 days',
-      note: `Any booking confirmed, however far along the rest is. We need roughly ${EVENTS_TO_COVER_BASE} to cover the fixed cost base`,
-      value: `${confirmed} of ${EVENTS_TO_COVER_BASE}`,
-      sub: `covers ${Math.round((confirmed / EVENTS_TO_COVER_BASE) * 100)}% of the base`,
-      tone: 'good',
-    },
-  ]
 }
 
 export interface LabourRow {
