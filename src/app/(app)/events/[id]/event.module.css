@@ -222,6 +222,11 @@
 /* --- gates -------------------------------------------------------------- */
 
 .gates {
+  /* "This UI is massively overstretched. It would be better if this was
+     closer in." — Connor, 23 Sep 2026. Capped near the leads block above it:
+     four of its own minmax(184px, …) columns plus their gaps, so the two
+     line up rather than the panel running the full page width. */
+  max-width: calc(184px * 4 + var(--space-2) * 3);
   border: 1px solid var(--color-divider);
   border-radius: var(--radius-lg);
   padding: 13px 15px;
@@ -360,6 +365,21 @@
   color: var(--st-stop);
   border-color: var(--st-stop);
   background: color-mix(in srgb, var(--st-stop) 12%, transparent);
+}
+
+/* Status-reading chips (DateLock): the same warn/good tones as .warn/.good
+   above, carried onto the chip shape — a plain classlist merge would lose to
+   .chip's own color here, since .chip is declared after them in this file. */
+.chipWarn {
+  color: var(--st-warn);
+  border-color: var(--st-warn);
+  background: color-mix(in srgb, var(--st-warn) 12%, transparent);
+}
+
+.chipGood {
+  color: var(--st-good);
+  border-color: var(--st-good);
+  background: color-mix(in srgb, var(--st-good) 12%, transparent);
 }
 
 /* --- artists ------------------------------------------------------------ */
@@ -866,7 +886,7 @@
 
 .partHead {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr) auto 10px;
+  grid-template-columns: 112px minmax(0, 1fr) 10px;
   align-items: center;
   gap: 11px;
   font-size: 12.5px;
@@ -877,6 +897,14 @@
   align-items: center;
   gap: 7px;
   color: var(--color-neutral-100);
+}
+
+/* The chip and its count, held together as one line — see Parts.tsx. */
+.partStatusRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
 }
 
 .partStatus {
@@ -897,7 +925,6 @@
 .partNote {
   font-size: 11px;
   color: var(--color-neutral-600);
-  text-align: right;
 }
 
 /* A part's gates sit under its status, not under its name. */
