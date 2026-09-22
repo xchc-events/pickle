@@ -1,4 +1,5 @@
 import { ASSET_SET, type EventAsset } from './design'
+import { days } from './format'
 import { BEATS, GATED_BEATS } from './promo'
 import {
   LICENCE_WORD,
@@ -315,7 +316,7 @@ function booking(e: PartsEvent): PartState {
   return {
     ...def('booking'),
     status: bookingStep(e.booking).label.toLowerCase(),
-    detail: confirmed ? null : `${e.bookingDays}d`,
+    detail: confirmed ? null : days(e.bookingDays),
     tone: confirmed
       ? 'good'
       : queried || isPastBookingTarget(e.booking, e.bookingDays)

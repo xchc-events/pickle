@@ -31,8 +31,7 @@ export default async function HoursPage({ searchParams }: PageProps<'/hours'>) {
         <div>
           <h1 className={styles.title}>Hours</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>the Ledger</span> · one record of an hour · the roster
-            writes the on-site ones, nobody types them twice
+            one record of an hour · the roster writes the on-site ones, nobody types them twice
           </p>
         </div>
       </header>

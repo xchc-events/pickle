@@ -22,6 +22,18 @@ export const dateLabel = (d: Date): string =>
   `${DOW[d.getDay()]} ${d.getDate()} ${MONTH[d.getMonth()]}`
 
 /**
+ * `4:10 pm`, `12:00 am` — the 12-hour clock, no leading zero on the hour,
+ * lower-case suffix. Built by hand alongside `dateLabel` and for the same
+ * reason: `toLocaleTimeString` gives "4:10 PM" or "16:10" depending on the
+ * platform's ICU data, and every screen should say it the same way.
+ */
+export const timeLabel = (d: Date): string => {
+  const h = d.getHours()
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(d.getMinutes()).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
+}
+
+/**
  * `just now`, `20 minutes ago`, `3 days ago`. What the activity feed and the
  * "ticked off by" lines read; the prototype stores the phrase, we derive it
  * so it cannot go stale.

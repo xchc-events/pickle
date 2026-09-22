@@ -179,7 +179,7 @@ describe('booking — its status', () => {
   it('counts the days an enquiry has sat', () => {
     expect(part(ev({ booking: 'enquiry', bookingDays: 2 }), 'booking')).toMatchObject({
       status: 'enquiry',
-      detail: '2d',
+      detail: '2 days',
       tone: 'plain',
       done: false,
     })

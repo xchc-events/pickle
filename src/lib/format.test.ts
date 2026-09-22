@@ -1,5 +1,33 @@
 import { describe, expect, it } from 'vitest'
-import { deviceOf } from './format'
+import { deviceOf, timeLabel } from './format'
+
+/**
+ * `timeLabel` is `dateLabel`'s other half — Ticketing needs both to say when
+ * a figure from Gather was last read ("Tue 22 Sep, 4:10 pm"). Hand-rolled for
+ * the same reason as `dateLabel`: consistent lower-case "am"/"pm" rather than
+ * whatever `toLocaleTimeString` gives a given platform.
+ */
+describe('timeLabel', () => {
+  it('formats an afternoon time with no leading zero on the hour', () => {
+    expect(timeLabel(new Date(2026, 8, 22, 16, 10))).toBe('4:10 pm')
+  })
+
+  it('formats a morning time', () => {
+    expect(timeLabel(new Date(2026, 8, 22, 9, 5))).toBe('9:05 am')
+  })
+
+  it('treats midnight as 12 am, not 0 am', () => {
+    expect(timeLabel(new Date(2026, 8, 22, 0, 0))).toBe('12:00 am')
+  })
+
+  it('treats noon as 12 pm, not 0 pm', () => {
+    expect(timeLabel(new Date(2026, 8, 22, 12, 0))).toBe('12:00 pm')
+  })
+
+  it('pads single-digit minutes', () => {
+    expect(timeLabel(new Date(2026, 8, 22, 7, 3))).toBe('7:03 am')
+  })
+})
 
 /**
  * `deviceOf` names a session in somebody's own list of where they are signed

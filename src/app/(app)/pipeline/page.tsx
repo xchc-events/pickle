@@ -7,17 +7,14 @@ import {
   metaLine,
   partHeads,
   partTitle,
-  pipelineMetrics,
   pipelineRows,
   pipelineSubline,
-  projection,
+  runLine,
   type SortKey,
   type StatusFilter,
 } from '@/lib/pipeline'
 import { days as dayLabel } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
-import { MetricStrip } from '@/components/MetricStrip'
-import { Avatar } from '@/components/Avatar'
 import { NewEnquiry } from '@/components/NewEnquiry'
 import styles from './pipeline.module.css'
 
@@ -59,7 +56,6 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
   const all = await loadPipeline(user)
   const rows = pipelineRows(all, { status, sort, meInitials: user.initials })
   const heads = partHeads(all)
-  const metrics = pipelineMetrics(all)
   const labour = labourSplit(all)
 
   const href = (next: Partial<{ status: string; sort: string }>) => {
@@ -73,10 +69,12 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
         <div>
           <h1 className={styles.title}>{user.external ? 'Your events' : 'Pipeline'}</h1>
           <p className={styles.sub}>
-            <span className={styles.kicker}>
-              {user.external ? user.organisationName : 'the Crock'}
-            </span>{' '}
-            · {pipelineSubline(all, rows.length)}
+            {user.external ? (
+              <>
+                <span className={styles.kicker}>{user.organisationName}</span> ·{' '}
+              </>
+            ) : null}
+            {pipelineSubline(all, rows.length)}
           </p>
         </div>
         {mayStartEnquiry(user).ok ? <NewEnquiry /> : null}
@@ -117,12 +115,15 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                   </span>
                 ))}
               </div>
-              <div className={styles.headRight}>Door · projection · who owns it</div>
+              <div className={styles.headRight}>Door</div>
             </div>
 
             {rows.map((e) => {
               const atRisk = e.riskNote !== null
-              const proj = projection(e)
+              // A missing owner wants attention too, but it is not the
+              // coordinator's own flag — it only takes the tone when nothing
+              // louder is already claiming this line.
+              const noOwner = !atRisk && e.ownerName === null
               const tone = e.riskKind === 'stop' ? styles.stop : styles.warn
               return (
                 <div
@@ -134,7 +135,9 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                     <Link href={`/events/${e.id}`} className={styles.eventName}>
                       {e.name}
                     </Link>
-                    <span className={`${styles.meta} ${atRisk ? styles.metaRisk : ''}`}>
+                    <span
+                      className={`${styles.meta} ${atRisk ? styles.metaRisk : noOwner ? styles.metaWarn : ''}`}
+                    >
                       {atRisk ? (
                         <i
                           className={`ph ${e.riskKind === 'stop' ? 'ph-warning-octagon' : 'ph-warning'}`}
@@ -143,6 +146,7 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                       ) : null}
                       {metaLine(e)}
                     </span>
+                    <span className={styles.runLine}>{runLine(e)}</span>
                   </span>
 
                   {/* Each part of the event, where it stands on its own. None of
@@ -167,30 +171,9 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                   </span>
 
                   <span className={styles.right}>
-                    <span className={styles.figures}>
-                      <span className={`${styles.days} tabular`}>
-                        {e.concluded ? 'done' : dayLabel(e.daysToDoor)}
-                      </span>
-                      <span className={`${styles.proj} ${styles[proj.tone]} tabular`}>
-                        {proj.text}
-                      </span>
+                    <span className={`${styles.days} tabular`}>
+                      {e.concluded ? 'done' : dayLabel(e.daysToDoor)}
                     </span>
-                    <Avatar
-                      initials={e.ownerInitials ?? '–'}
-                      title={
-                        e.ownerName ? `Internal owner — ${e.ownerName}` : 'No internal owner yet'
-                      }
-                      accent={e.ownerAccent}
-                    />
-                    {e.extCoordInitials ? (
-                      <Avatar
-                        initials={e.extCoordInitials}
-                        title={`External coordinator — ${e.extCoordName}`}
-                        external
-                      />
-                    ) : (
-                      <span className={styles.avatarGap} />
-                    )}
                   </span>
                 </div>
               )
@@ -210,10 +193,6 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
               </span>
             </p>
           </div>
-        </div>
-
-        <div className={styles.metrics}>
-          <MetricStrip metrics={metrics} />
         </div>
 
         <div className={styles.labour}>

@@ -6,10 +6,9 @@ import {
   metaLine,
   partHeads,
   partTitle,
-  pipelineMetrics,
   pipelineRows,
   pipelineSubline,
-  projection,
+  runLine,
   type PipelineEvent,
 } from './pipeline'
 import { PARTS, type PartKey, type PartState } from './parts'
@@ -44,6 +43,10 @@ const ev = (over: Partial<PipelineEvent> = {}): PipelineEvent => ({
   concluded: false,
   booking: 'confirmed',
   daysToDoor: 20,
+  date: new Date(2026, 8, 27),
+  endDate: null,
+  doors: '7:00 pm',
+  allOut: '11:30 pm',
   riskNote: null,
   riskKind: 'warn',
   ownerInitials: 'MT',
@@ -72,38 +75,6 @@ describe('daysBetween', () => {
   })
 })
 
-describe('projection', () => {
-  it('says modelling before the booking is confirmed', () => {
-    expect(projection(ev({ booking: 'enquiry', surplus: 9999 })).text).toBe('modelling')
-    expect(projection(ev({ booking: 'negotiating', surplus: 9999 })).text).toBe('modelling')
-  })
-
-  it('shows the projected surplus once the booking is confirmed', () => {
-    expect(projection(ev({ surplus: 1200 }))).toEqual({
-      text: 'proj. $1,200',
-      tone: 'good',
-    })
-  })
-
-  it('does not call a thin surplus good', () => {
-    expect(projection(ev({ surplus: 500 })).tone).toBe('muted')
-    expect(projection(ev({ surplus: 501 })).tone).toBe('good')
-  })
-
-  it('shows what a concluded event actually took', () => {
-    // actualTotal already comes off takenOf ex GST (PG-20, fixed 22 Sep
-    // 2026); this is money() formatting it, not re-deriving it.
-    expect(projection(ev({ concluded: true, actualTotal: 3643, surplus: -1 }))).toEqual({
-      text: 'took $3,643',
-      tone: 'good',
-    })
-  })
-
-  it('formats a loss with the sign outside the dollar', () => {
-    expect(projection(ev({ surplus: -320 })).text).toBe('proj. -$320')
-  })
-})
-
 describe('metaLine', () => {
   it('gives the risk note the line when there is one', () => {
     expect(metaLine(ev({ riskNote: 'Artwork awaiting sign-off 6d' }))).toBe(
@@ -111,8 +82,82 @@ describe('metaLine', () => {
     )
   })
 
-  it('otherwise names the promoter, format and room', () => {
-    expect(metaLine(ev())).toBe('Puha Sound · DJs · Main')
+  it('otherwise names the internal owner, the format and the room', () => {
+    expect(metaLine(ev({ ownerName: 'Ana Kelliher', extCoordName: null }))).toBe(
+      'Ana Kelliher · DJs · Main',
+    )
+  })
+
+  it('adds the external coordinator when there is one', () => {
+    expect(
+      metaLine(ev({ ownerName: 'Ana Kelliher', extCoordName: 'Kōura Records', format: 'Cabaret' })),
+    ).toBe('Ana Kelliher · Kōura Records · Cabaret · Main')
+  })
+
+  it('says "no owner yet" — Connor did not want "internal" (23 Sep 2026)', () => {
+    expect(metaLine(ev({ ownerName: null, extCoordName: null }))).toBe('no owner yet · DJs · Main')
+  })
+
+  it('keeps the external coordinator even with no internal owner yet', () => {
+    expect(metaLine(ev({ ownerName: null, extCoordName: 'Kōura Records' }))).toBe(
+      'no owner yet · Kōura Records · DJs · Main',
+    )
+  })
+
+  it('lets the risk note win over a missing owner too', () => {
+    expect(metaLine(ev({ ownerName: null, riskNote: 'stuck' }))).toBe('stuck')
+  })
+})
+
+describe('runLine', () => {
+  it('gives the date and the run from doors to everyone out', () => {
+    expect(runLine(ev({ date: new Date(2026, 8, 27), doors: '7:00 pm', allOut: '11:30 pm' }))).toBe(
+      'Sun 27 Sep · 7:00 pm – 11:30 pm',
+    )
+  })
+
+  it('spans the date when the end date is a different day', () => {
+    expect(
+      runLine(
+        ev({
+          date: new Date(2026, 8, 27),
+          endDate: new Date(2026, 8, 28),
+          doors: '7:00 pm',
+          allOut: '1:30 am',
+        }),
+      ),
+    ).toBe('Sun 27 Sep – Mon 28 Sep · 7:00 pm – 1:30 am')
+  })
+
+  it('does not span the date when the end date is the same day', () => {
+    expect(
+      runLine(
+        ev({
+          date: new Date(2026, 8, 27),
+          endDate: new Date(2026, 8, 27),
+          doors: '7:00 pm',
+          allOut: '11:30 pm',
+        }),
+      ),
+    ).toBe('Sun 27 Sep · 7:00 pm – 11:30 pm')
+  })
+
+  it('prints only doors when everyone out is not set', () => {
+    expect(runLine(ev({ date: new Date(2026, 8, 27), doors: '7:00 pm', allOut: null }))).toBe(
+      'Sun 27 Sep · doors 7:00 pm',
+    )
+  })
+
+  it('prints only everyone out when doors is not set', () => {
+    expect(runLine(ev({ date: new Date(2026, 8, 27), doors: null, allOut: '1:30 am' }))).toBe(
+      'Sun 27 Sep · out 1:30 am',
+    )
+  })
+
+  it('prints only the date when neither time is set', () => {
+    expect(runLine(ev({ date: new Date(2026, 8, 27), doors: null, allOut: null }))).toBe(
+      'Sun 27 Sep',
+    )
   })
 })
 
@@ -346,35 +391,6 @@ describe('labourSplit', () => {
   it('leaves concluded events out of the breakdown', () => {
     const rows = labourSplit([ev({ concluded: true, taskHours: [{ team: 'Gone', hours: 9 }] })])
     expect(rows.map((r) => r.label)).not.toContain('Gone')
-  })
-})
-
-describe('pipelineMetrics', () => {
-  it('counts confirmed bookings towards the cost base, whatever else is unfinished', () => {
-    const m = pipelineMetrics([
-      ev({ booking: 'confirmed', parts: parts({ design: { done: false } }) }),
-      ev({ booking: 'confirmed' }),
-      ev({ booking: 'negotiating' }),
-    ])
-    expect(m[3].value).toBe('2 of 18')
-    expect(m[3].sub).toBe('covers 11% of the base')
-  })
-
-  it('marks the two figures that are not computed yet', () => {
-    const m = pipelineMetrics([])
-    expect(m.filter((x) => x.placeholder)).toHaveLength(2)
-    expect(m[2].placeholder).toBeUndefined()
-  })
-
-  it('totals labour hours across live events at the planned contractor rate', () => {
-    const m = pipelineMetrics([
-      ev({ hours: 10 }),
-      ev({ hours: 5 }),
-      ev({ hours: 99, concluded: true }),
-    ])
-    expect(m[2].value).toBe('15h')
-    // 15h × $35 planned.
-    expect(m[2].sub).toBe('$525')
   })
 })
 
