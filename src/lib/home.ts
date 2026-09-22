@@ -134,17 +134,6 @@ const opens = (modules: readonly ModuleKey[], g: Gate): boolean => {
 const fixHref = (screen: string, eventId: string): string =>
   screen === 'event' ? `/events/${eventId}` : `/${screen}?event=${eventId}`
 
-const CTA: Readonly<Record<string, string>> = {
-  event: 'Open the event',
-  design: 'Open design',
-  promo: 'Open promotion',
-  ticketing: 'Open ticketing',
-  tech: 'Open tech',
-  roster: 'Open roster',
-  bar: 'Open the bar',
-  hours: 'Log hours',
-}
-
 /**
  * What each gate asks somebody to do, in the words of a to-do list. Keyed by
  * the gate's label, which src/lib/parts.test.ts pins; home.test.ts fails if a
@@ -310,7 +299,6 @@ export interface Need {
   /** Days until it is due, negative once it is overdue. The list sorts by it. */
   due: number
   href: string
-  cta: string
   /**
    * 'yours' when it is the reader's by name, 'unclaimed' when it reached them
    * because nobody named could act on it, null where nobody is ever named.
@@ -329,7 +317,6 @@ interface Draft {
   title?: string
   /** Replaces the lead gate's reason, and the count of what else is open. */
   sub?: string
-  cta?: string
   icon?: string
 }
 
@@ -388,7 +375,6 @@ function draftsFor(e: HomeEvent, p: PartState): Draft[] {
             gates: toFront(failing, 'Nothing stale on a listing'),
             title: `${stale} ${plural(stale, 'listing', 'listings')} stale`,
             sub: 'Changed since it went out',
-            cta: 'Push',
             icon: 'ph-upload-simple',
           },
         ]
@@ -525,7 +511,6 @@ export function needsFor(events: HomeEvent[], viewer: Viewer, actors: Actors): N
           when: d.clock.when,
           due: d.clock.due,
           href: fixHref(head.screen, e.id),
-          cta: d.cta ?? CTA[head.screen] ?? 'Open',
           claim,
         })
       }
@@ -542,13 +527,26 @@ export function needsFor(events: HomeEvent[], viewer: Viewer, actors: Actors): N
   )
 }
 
-/** How many rows the list shows. The rest are counted, not dropped. */
-export const NEEDS_SHOWN = 6
+export interface SplitNeeds {
+  /** Named to the reader, or a queue addressed to anyone who can open the module. */
+  yours: Need[]
+  /** Reached this reader only because nobody named could act on it — everyone's to notice. */
+  unclaimed: Need[]
+}
 
-export function shownNeeds(needs: Need[]): { shown: Need[]; more: number } {
+/**
+ * "Needs you" from "nobody's on it". Connor: "if there's a super admin with
+ * zero of their own events, I don't see why it would be saying that these
+ * things need to be done by me" — a claim of `null` is still a queue
+ * addressed to anyone who can open the module (fill a shift, close a bar),
+ * and stays theirs to be asked about; only `'unclaimed'` — the fallback for
+ * an event's own business with nobody reachable to own it — moves out.
+ * Order within each half is kept as `needsFor` sorted it.
+ */
+export function splitNeeds(needs: Need[]): SplitNeeds {
   return {
-    shown: needs.slice(0, NEEDS_SHOWN),
-    more: Math.max(0, needs.length - NEEDS_SHOWN),
+    yours: needs.filter((n) => n.claim !== 'unclaimed'),
+    unclaimed: needs.filter((n) => n.claim === 'unclaimed'),
   }
 }
 
@@ -752,14 +750,14 @@ export function homeTiles(
   return tiles.slice(0, 4)
 }
 
-// ------------------------------------------------- next through the door ---
+// -------------------------------------------------- next upcoming events ---
 
-/** The soonest night still to come that is actually happening. */
-export function pickNext(events: HomeEvent[]): HomeEvent | null {
+/** The soonest nights still to come that are actually happening, soonest first. */
+export function pickNext(events: HomeEvent[], count: number): HomeEvent[] {
   const ahead = events.filter(
     (e) => !e.input.concluded && e.input.booking === 'confirmed' && e.input.daysToDoor >= 0,
   )
-  return ahead.sort((a, b) => a.input.daysToDoor - b.input.daysToDoor)[0] ?? null
+  return ahead.sort((a, b) => a.input.daysToDoor - b.input.daysToDoor).slice(0, count)
 }
 
 export interface NextNight {
@@ -840,9 +838,9 @@ export interface MyHours {
   total: string
   /** At the loaded rate, as every hour is costed. */
   cost: string
-  /** "8h worked · 4.5h still to come". */
+  /** "4.5h still to come" when some is ahead, "nothing logged yet" for zero, else "". */
   split: string
-  /** 0–100 against what they can do this month, or null with nothing to measure against. */
+  /** 0–100 against what they're available for this month, or null with nothing to measure against. */
   pct: number | null
   capLabel: string | null
 }
@@ -874,19 +872,17 @@ export function myHours({ now, availability, entries }: MyHoursInput): MyHours {
     ? ((availability.weekly + availability.volunteer) * daysInMonth) / 7
     : 0
 
-  const split = [
-    worked > 0 ? `${hrs(worked)} worked` : null,
-    ahead > 0 ? `${hrs(ahead)} still to come` : null,
-  ]
-    .filter((s) => s !== null)
-    .join(' · ')
+  // The total is already the headline figure above; this line only ever adds
+  // to it — what's still ahead — or says there is nothing logged yet. A
+  // month that is all worked and nothing ahead has nothing left to add.
+  const split = ahead > 0 ? `${hrs(ahead)} still to come` : total > 0 ? '' : 'nothing logged yet'
 
   return {
     total: hrs(total),
     cost: money(costOf(total)),
-    split: split || 'nothing logged yet',
+    split,
     pct: ceiling > 0 ? Math.min(100, Math.round((total / ceiling) * 100)) : null,
-    capLabel: ceiling > 0 ? `of about ${Math.round(ceiling)}h you can do this month` : null,
+    capLabel: ceiling > 0 ? `of the ~${Math.round(ceiling)}h you’re available this month` : null,
   }
 }
 
