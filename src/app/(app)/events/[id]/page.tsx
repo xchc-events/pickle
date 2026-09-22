@@ -10,18 +10,10 @@ import { holdsForEvent } from '@/lib/holds-data'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
-import {
-  advanceBooking,
-  issueArtistLink,
-  linkArtistToPayee,
-  putToBed,
-  setLead,
-  setOwner,
-} from './actions'
+import { advanceBooking, putToBed, setLead, setOwner } from './actions'
 import { DateLock, DealPanel, LicencePicker, RunTimes } from './Controls'
 import { DealReadout, LicenceReadout, RunTimesReadout } from './Readouts'
 import { Actuals } from './Actuals'
-import { ArtistLink } from './ArtistLink'
 import { Holds } from './Holds'
 import { Parts } from './Parts'
 import { ActsEditor } from './Acts'
@@ -390,24 +382,6 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
               ))}
             </ul>
           )}
-
-          {/* Bank details are the artist's, the promoter's or the
-              coordinator's to give — not tech production's, which moved
-              out 23 Sep 2026. One row per act, venue only. */}
-          {canChange && ev.artists.length > 0 ? (
-            <ul className={styles.artistLinks}>
-              {ev.artists.map((a) => (
-                <li key={a.id} className={styles.artistLinkRow}>
-                  <span className={styles.artistLinkName}>{a.name}</span>
-                  <ArtistLink
-                    hasPayee={a.payeeName !== null}
-                    issue={issueArtistLink.bind(null, ev.id, a.id)}
-                    link={linkArtistToPayee.bind(null, ev.id, a.id)}
-                  />
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </section>
 
         {/* ------------------------------------------------------- terms --- */}

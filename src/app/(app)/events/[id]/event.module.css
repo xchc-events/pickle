@@ -1115,33 +1115,11 @@ details[open] > .partToggle::after {
 
 /* ----------------------------------------------------- artist link --- */
 /* Moved from Tech production 23 Sep 2026, with ArtistLink.tsx and the
-   actions behind it. Venue only, one row per act, under the acts editor
-   or the read-only list above — whichever the Artists section is showing. */
-
-.artistLinks {
-  list-style: none;
-  margin: var(--space-3) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.artistLinkRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 11px;
-  border-top: 1px solid var(--color-divider);
-  padding: 7px 0;
-}
-
-.artistLinkName {
-  font-size: 12px;
-  color: var(--color-neutral-300);
-}
+   actions behind it. Folded into each act's own row in Acts.tsx, beside
+   .unlinked — not a second list, so a coordinator sees an act once. */
 
 /* A minted link, shown once. .copy reuses .smallBtn's look; the box just
-   needs a border to set it apart from the row it replaces. */
+   needs a border to set it apart from the row around it. */
 
 .linkBox {
   display: flex;

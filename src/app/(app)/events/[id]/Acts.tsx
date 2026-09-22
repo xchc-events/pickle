@@ -3,7 +3,16 @@
 import { useState, useTransition } from 'react'
 import { useToast } from '@/components/Toast'
 import { BILL_STATUSES, FEE_STEP, actLockedBecause, tidyName } from '@/lib/terms'
-import { addAct, removeAct, renameAct, setActFees, setActStatus } from './actions'
+import {
+  addAct,
+  issueArtistLink,
+  linkArtistToPayee,
+  removeAct,
+  renameAct,
+  setActFees,
+  setActStatus,
+} from './actions'
+import { ArtistLink } from './ArtistLink'
 import styles from './event.module.css'
 
 /**
@@ -130,6 +139,15 @@ function ActRow({ eventId, act }: { eventId: string; act: Act }) {
             not linked
           </span>
         )}
+
+        {/* Moved from Tech production 23 Sep 2026 — bank details and the
+            payee link are the coordinator's business, on the row that
+            already carries everything else about the act. */}
+        <ArtistLink
+          hasPayee={act.payeeName !== null}
+          issue={issueArtistLink.bind(null, eventId, act.id)}
+          link={linkArtistToPayee.bind(null, eventId, act.id)}
+        />
 
         <button
           type="button"
