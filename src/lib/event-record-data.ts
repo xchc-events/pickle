@@ -45,6 +45,10 @@ export interface RecordLead {
   icon: string
   personId: string | null
   name: string | null
+  /** `Person.email` and the linked `User.phone` — Connor, 23 Sep 2026: "if
+   *  you need to call this person we want your phone number and email." */
+  email: string | null
+  phone: string | null
 }
 
 const LEAD_DEFS: readonly { role: LeadKey; label: string; icon: string }[] = [
@@ -130,6 +134,14 @@ export interface EventRecord {
 
   ownerName: string | null
   ownerInitials: string | null
+  ownerEmail: string | null
+  ownerPhone: string | null
+  /** The promoter organisation's own name — `Payee.name`, unprefixed — null
+   *  while no external coordinator is on the event. Not `promoter`, which is
+   *  the display string an internal night's own contact uses instead. */
+  extCoordName: string | null
+  extCoordEmail: string | null
+  extCoordPhone: string | null
   leads: RecordLead[]
   facts: RecordFact[]
 
@@ -144,9 +156,11 @@ export interface EventRecord {
   licenceLate: boolean
   techStatus: TechStatus
 
+  packIn: string | null
   doors: string | null
   barClose: string | null
   allOut: string | null
+  packOut: string | null
   /** A night (UTC midnight — src/lib/night.ts), or null before either time is known. */
   endDate: Date | null
 
@@ -238,9 +252,11 @@ export async function loadEventRecord(
       deal: true,
       dealNote: true,
       techStatus: true,
+      packIn: true,
       doors: true,
       barClose: true,
       allOut: true,
+      packOut: true,
       endDate: true,
       kind: true,
       format: true,
@@ -248,8 +264,24 @@ export async function loadEventRecord(
       internal: true,
       sold: true,
       space: { select: { name: true, capacity: true, seatedCapacity: true } },
-      owner: { select: { name: true, initials: true } },
-      leads: { select: { role: true, personId: true, person: { select: { name: true } } } },
+      owner: {
+        select: {
+          name: true,
+          initials: true,
+          email: true,
+          user: { select: { phone: true } },
+        },
+      },
+      promoterPayee: { select: { name: true, email: true, phone: true } },
+      leads: {
+        select: {
+          role: true,
+          personId: true,
+          person: {
+            select: { name: true, email: true, user: { select: { phone: true } } },
+          },
+        },
+      },
       assets: { select: { key: true, state: true, promoterSigned: true, signedById: true } },
       channels: { select: { channel: true, live: true, stale: true, note: true } },
       beats: { select: { done: true } },
@@ -414,12 +446,19 @@ export async function loadEventRecord(
 
     ownerName: row.owner?.name ?? null,
     ownerInitials: row.owner?.initials ?? null,
+    ownerEmail: row.owner?.email ?? null,
+    ownerPhone: row.owner?.user?.phone ?? null,
+    extCoordName: row.promoterPayee?.name ?? null,
+    extCoordEmail: row.promoterPayee?.email ?? null,
+    extCoordPhone: row.promoterPayee?.phone ?? null,
     leads: LEAD_DEFS.map((d) => {
       const found = leadBy.get(d.role)
       return {
         ...d,
         personId: found?.personId ?? null,
         name: found?.person.name ?? null,
+        email: found?.person.email ?? null,
+        phone: found?.person.user?.phone ?? null,
       }
     }),
 
@@ -446,9 +485,11 @@ export async function loadEventRecord(
     licenceLate: isLate(row.barClose),
     techStatus,
 
+    packIn: row.packIn,
     doors: row.doors,
     barClose: row.barClose,
     allOut: row.allOut,
+    packOut: row.packOut,
     endDate: row.endDate,
 
     std: row.std,

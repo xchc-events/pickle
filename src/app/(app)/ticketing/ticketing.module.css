@@ -166,98 +166,15 @@
   color: var(--color-neutral-600);
 }
 
-/* --- the room ----------------------------------------------------------- */
-
-.room {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-}
-
-.roomTrack {
-  position: relative;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  background: var(--color-neutral-900);
-  overflow: hidden;
-}
-
-.roomSold {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--color-accent-500);
-}
-
-/* What is projected on top of what has actually gone. Hatched rather than
-   solid, because it has not happened. */
-.roomProjected {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: repeating-linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--color-accent) 35%, transparent) 0 5px,
-    transparent 5px 10px
-  );
-}
-
-.marker {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--st-warn);
-}
-
-.markerFull {
-  background: var(--st-good);
-}
-
-.roomLegend {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-  font-size: 11.5px;
-  color: var(--color-neutral-500);
-}
-
-.roomLegend b {
-  font-weight: 500;
-  color: var(--color-neutral-100);
-}
-
-.sold {
-  color: var(--color-accent-200) !important;
-}
+/* --- ticket sales --------------------------------------------------------
+   The chart itself is SalesChart.module.css, beside its component. This is
+   just the caption underneath it. */
 
 .soldNote {
   margin: 0;
   font-size: 10.5px;
   line-height: 1.5;
   color: var(--color-neutral-600);
-}
-
-.pace {
-  margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-}
-
-.paceToday {
-  margin: 0;
-  font-size: 12px;
-  color: var(--color-neutral-400);
-}
-
-.paceCaveat {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--color-neutral-600);
-  max-width: 68ch;
 }
 
 /* --- tiers -------------------------------------------------------------- */

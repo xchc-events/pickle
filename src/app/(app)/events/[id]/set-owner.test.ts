@@ -34,10 +34,17 @@ vi.mock('@/lib/permissions', () => ({
   requireEvent: (...args: unknown[]) => requireEvent(...args),
 }))
 
-/** Who is on the books. Ori has left, so Admin marked him inactive. */
+/**
+ * Who is on the books. Ori has left, so Admin marked him inactive. Dev has
+ * an account but the design role; Nomi has no account at all — Person and
+ * User are separate records, and only some people have both.
+ */
 const PEOPLE = [
-  { id: 'person_jonty', name: 'Jonty Rewi', active: true },
-  { id: 'person_ori', name: 'Ori Beckett', active: false },
+  { id: 'person_jonty', name: 'Jonty Rewi', active: true, accountRole: 'COORDINATOR' },
+  { id: 'person_ori', name: 'Ori Beckett', active: false, accountRole: 'COORDINATOR' },
+  { id: 'person_amiria', name: 'Amiria Ngata', active: true, accountRole: 'ADMIN' },
+  { id: 'person_dev', name: 'Dev Patel', active: true, accountRole: 'DESIGN' },
+  { id: 'person_nomi', name: 'Nomi Tane', active: true, accountRole: null },
 ]
 
 /**
@@ -52,7 +59,9 @@ type PersonQuery = { where: { id?: string; active?: boolean } }
 
 const findFirst = vi.fn(async ({ where }: PersonQuery) => {
   const hit = PEOPLE.find((p) => matches(p.id, where.id) && matches(p.active, where.active))
-  return hit ? { id: hit.id, name: hit.name } : null
+  return hit
+    ? { id: hit.id, name: hit.name, user: hit.accountRole ? { role: hit.accountRole } : null }
+    : null
 })
 
 /** Whether the event under test is one of ours. Reset to external each test. */
@@ -171,7 +180,7 @@ describe('setOwner', () => {
 
       expect(findFirst).toHaveBeenCalledWith({
         where: { id: 'person_ori', active: true },
-        select: { id: true, name: true },
+        select: { id: true, name: true, user: { select: { role: true } } },
       })
       expect(update).not.toHaveBeenCalled()
       expect(record).not.toHaveBeenCalled()
@@ -181,6 +190,40 @@ describe('setOwner', () => {
       await expect(setOwner(EVENT, 'person_ghost')).resolves.toEqual({
         kind: 'stop',
         text: 'That person is not on the books.',
+      })
+
+      expect(update).not.toHaveBeenCalled()
+      expect(record).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('the internal owner has to be a coordinator or an administrator', () => {
+    it('accepts an administrator, same as a coordinator', async () => {
+      await expect(setOwner(EVENT, 'person_amiria')).resolves.toEqual({
+        kind: 'good',
+        text: 'Amiria Ngata owns this one now — its gates come to them.',
+      })
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: EVENT },
+        data: { ownerId: 'person_amiria' },
+      })
+    })
+
+    it('refuses a person whose account has some other role, and leaves the owner as it was', async () => {
+      await expect(setOwner(EVENT, 'person_dev')).resolves.toEqual({
+        kind: 'stop',
+        text: 'Only a coordinator or an administrator can be the internal owner.',
+      })
+
+      expect(update).not.toHaveBeenCalled()
+      expect(record).not.toHaveBeenCalled()
+    })
+
+    it('refuses a person with no account at all', async () => {
+      await expect(setOwner(EVENT, 'person_nomi')).resolves.toEqual({
+        kind: 'stop',
+        text: 'Only a coordinator or an administrator can be the internal owner.',
       })
 
       expect(update).not.toHaveBeenCalled()

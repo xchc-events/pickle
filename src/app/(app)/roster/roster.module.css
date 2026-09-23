@@ -113,6 +113,16 @@
   color: var(--color-neutral-600);
 }
 
+/* The five run times, pack-in to pack-out — its own line under .eventMeta
+   rather than appended to it, since five labelled times already reads as a
+   full line on its own. */
+.eventTimes {
+  display: block;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--color-neutral-600);
+}
+
 /* Two headline figures, not one small corner one — "make that bigger and
    more obvious, rather than 'the call'." Connor, 23 Sep 2026. Same headline
    scale as the event record's own big numbers (event.module.css .splitBig). */

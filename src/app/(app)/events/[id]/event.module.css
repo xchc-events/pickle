@@ -114,30 +114,110 @@
   margin: 0;
 }
 
-/* --- leads -------------------------------------------------------------- */
+/* --- block labels --------------------------------------------------------
+   "When" and "Event leads" are sub-groups inside the overview section, not
+   sections of their own — a smaller marker than SectionHeading's h2, closer
+   in weight to .gatesTitle/.tiersLabel just below. */
 
-.leads {
+.blockLabel {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+/* --- event leads ---------------------------------------------------------
+   Internal owner and external coordinator, above the four department leads
+   — "so you can see all of the team," Connor, 23 Sep 2026. Two columns,
+   each row the same border-left accent .fact uses below, label stacked over
+   its value rather than beside it: "External coordinator" is long enough
+   that a fixed side-by-side label column would either clip or force the
+   grid wider than the tight list this is meant to be. */
+
+.eventLeads {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
-  gap: var(--space-2);
-  margin: var(--space-3) 0 var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
-.lead {
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-md);
-  padding: 9px 11px;
+.leadRow {
+  border-left: 2px solid var(--color-divider);
+  padding: 1px 0 1px 10px;
+  min-width: 0;
 }
 
-.leadLabel {
+.leadRowLabel {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-neutral-500);
-  margin-bottom: 6px;
+  margin-bottom: 3px;
+}
+
+.leadRowBody {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Selectable text beside the name — Connor, 23 Sep 2026: "if you need to
+   call this person we want your phone number and email." A link so it is
+   tap-to-call/email too, coloured as plain text rather than the accent so it
+   does not read as a call to action. */
+.leadContact {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.contactLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.contactLink:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+/* Stops a LeadPicker/OrgPicker select stretching to the row's full width —
+   "the four lead pickers stop stretching across the page," Connor, 23 Sep
+   2026. An inline-block wrapper sizes to the select's own content instead of
+   whatever flex or grid context the row around it happens to give it. */
+.pickerWrap {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.leadSelect {
+  width: auto;
+  max-width: 220px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+}
+
+.leadSelect:hover:not(:disabled) {
+  border-color: var(--color-accent-600);
+}
+
+.leadSelect:disabled {
+  opacity: 0.45;
 }
 
 /* --- facts -------------------------------------------------------------- */
@@ -179,11 +259,24 @@
   margin-top: 2px;
 }
 
-/* --- run times ---------------------------------------------------------- */
+/* --- run times ------------------------------------------------------------
+   The "When" block: a beginning date and an end date on top, then the five
+   run times — pack-in, doors, bar close, everyone out, pack-out — in one
+   condensed row of smaller fields below. Connor, 23 Sep 2026: "it'd be nice
+   if all of this date and time stuff was in one smaller, more condensed
+   thing." */
 
-.times {
+.whenTop {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(184px, 1fr));
+  gap: var(--space-2);
+  max-width: calc(184px * 2 + var(--space-2));
+  margin-bottom: var(--space-2);
+}
+
+.timesRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }

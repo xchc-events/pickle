@@ -135,8 +135,11 @@ export function sellThrough(sold: number, capacity: number): number {
  * can argue with beats an unstated one, and it is labelled in the interface
  * as a rough read. Replace it with a real curve once Gather.rsvp is
  * connected and there is sales history to fit against.
+ *
+ * Exported so the sales-over-time chart's own caption states the same
+ * number `paceOf` actually used, rather than a copy that can drift from it.
  */
-const SOLD_BY_NOW = 0.56
+export const SOLD_BY_NOW = 0.56
 
 export type PaceTone = 'good' | 'warn' | 'stop' | 'plain'
 

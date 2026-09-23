@@ -244,14 +244,26 @@ export async function setLead(
   return said(`${person.name} owns ${role.toLowerCase()} on this one.`)
 }
 
+/** A person's account is fit to be the internal owner — a coordinator or an
+ *  administrator, on Connor's 23 Sep 2026 ruling. Any other role, or no
+ *  account at all, is not. */
+const OWNER_ROLES = ['COORDINATOR', 'ADMIN']
+
 /**
- * Name the event's owner, or clear it.
+ * Name the event's internal owner, or clear it.
  *
  * An outside promoter's enquiry arrives with nobody's name on it and sits in
  * the unclaimed queue on Home until somebody takes it. The enquiry form names
  * an owner when the venue starts a booking itself; once an event exists, this
  * is the only place its owner changes. Modelled on `setLead` just above: the
  * same refusal, the same scope, the same shape of read-then-write.
+ *
+ * "Change this to being 'internal owner', and that has to be someone within
+ * XCHC who has the event coordinator role" — Connor, 23 Sep 2026, who then
+ * decided administrators count too. `Person.user.role` is what carries a
+ * role; a person with no account at all has none. The picker on the event
+ * record already lists only coordinators and administrators — this is the
+ * refusal for whoever reaches the action some other way.
  *
  * On an internal night the booking contact string is kept in step with the
  * owner, in the same write, because it is what the "Booking contact named"
@@ -278,9 +290,12 @@ export async function setOwner(eventId: string, personId: string | null): Promis
 
   const person = await db.person.findFirst({
     where: { id: personId, active: true },
-    select: { id: true, name: true },
+    select: { id: true, name: true, user: { select: { role: true } } },
   })
   if (!person) return said('That person is not on the books.', 'stop')
+  if (!person.user || !OWNER_ROLES.includes(person.user.role)) {
+    return said('Only a coordinator or an administrator can be the internal owner.', 'stop')
+  }
 
   await db.event.update({
     where: { id },
@@ -293,6 +308,51 @@ export async function setOwner(eventId: string, personId: string | null): Promis
 
   refresh()
   return said(`${person.name} owns this one now — its gates come to them.`)
+}
+
+/**
+ * Name the event's external coordinator — the promoter organisation that
+ * brought it — or clear it back to none.
+ *
+ * "Then we can have an optional field for an external [coordinator]" —
+ * Connor, 23 Sep 2026, on the field beside the internal owner. The picker
+ * lists the promoter organisations on file, `Payee` of kind `PROMOTER`.
+ *
+ * `promoterId` is not a display field: it is the only thing `eventScope`
+ * (src/lib/scope.ts) matches on to let an outside account see this event at
+ * all, so this is a permission change as much as a naming one, and it is
+ * venue-only and refused for external users the same as `setOwner`.
+ * `promoter` is kept in step as the plain display string the pipeline and
+ * this record already show — `Payee.name`, unprefixed, exactly as an
+ * internal owner's name is prefixed "internal · " by `internalContact`.
+ */
+export async function setPromoterOrg(eventId: string, payeeId: string | null): Promise<Said> {
+  const { user } = await requireModule('pipeline')
+  const verdict = canChangeEventRecord(user)
+  if (!verdict.ok) return said(verdict.why, 'stop')
+  const id = await requireEvent(user, eventId)
+
+  if (!payeeId) {
+    await db.event.update({ where: { id }, data: { promoterId: null, promoter: null } })
+    await record(id, user, 'left this event without an external coordinator')
+    refresh()
+    return said('No external coordinator now — only the venue can see this one.', 'warn')
+  }
+
+  const payee = await db.payee.findFirst({
+    where: { id: payeeId, kind: 'PROMOTER' },
+    select: { id: true, name: true },
+  })
+  if (!payee) return said('That organisation is not on file.', 'stop')
+
+  await db.event.update({
+    where: { id },
+    data: { promoterId: payee.id, promoter: payee.name },
+  })
+  await record(id, user, `made ${payee.name} the external coordinator`)
+
+  refresh()
+  return said(`${payee.name} can now see this event.`)
 }
 
 /**
@@ -687,24 +747,33 @@ export async function setLicence(eventId: string, state: LicenceState): Promise<
  */
 function firstRunProblem(r: RunTimes): string | null {
   const problems = runProblems(r)
-  return problems.endDate ?? problems.allOut ?? problems.barClose ?? null
+  return (
+    problems.endDate ??
+    problems.allOut ??
+    problems.packOut ??
+    problems.barClose ??
+    problems.packIn ??
+    null
+  )
 }
 
 /**
  * Set a run time. Stored as the venue says it — "8:00pm", "1:00am" — from
  * whatever an `<input type="time">` sends ("20:15"), so the licence gate, the
  * roster and the till window can keep reading the label they always have.
+ * Pack-in and pack-out are set the same way — the amount of time the room is
+ * blocked out for, beyond doors and everyone-out.
  *
  * The end date is nobody's to type unless they choose to (`setEndDate`
- * below). Until then it just follows doors and everyone-out: while the
- * stored value is still exactly what `endNightFor` would have inferred from
- * the OLD times (or nothing was ever stored), a change here carries it
+ * below). Until then it just follows doors, everyone-out and pack-out: while
+ * the stored value is still exactly what `endNightFor` would have inferred
+ * from the OLD times (or nothing was ever stored), a change here carries it
  * forward with the new ones. The moment somebody picks a different night by
  * hand, it stops following and this leaves it alone.
  */
 export async function setRunTime(
   eventId: string,
-  field: 'doors' | 'barClose' | 'allOut',
+  field: 'doors' | 'barClose' | 'allOut' | 'packIn' | 'packOut',
   value: string,
 ): Promise<Said> {
   const { user } = await requireModule('pipeline')
@@ -717,7 +786,15 @@ export async function setRunTime(
 
   const row = await db.event.findUniqueOrThrow({
     where: { id },
-    select: { date: true, doors: true, barClose: true, allOut: true, endDate: true },
+    select: {
+      date: true,
+      doors: true,
+      barClose: true,
+      allOut: true,
+      endDate: true,
+      packIn: true,
+      packOut: true,
+    },
   })
 
   const next: RunTimes = {
@@ -726,16 +803,18 @@ export async function setRunTime(
     barClose: field === 'barClose' ? clock : row.barClose,
     allOut: field === 'allOut' ? clock : row.allOut,
     endDate: row.endDate,
+    packIn: field === 'packIn' ? clock : row.packIn,
+    packOut: field === 'packOut' ? clock : row.packOut,
   }
 
   let endDateChanged = false
-  if (field === 'doors' || field === 'allOut') {
-    const oldInferred = endNightFor(row.date, row.doors, row.allOut)
+  if (field === 'doors' || field === 'allOut' || field === 'packOut') {
+    const oldInferred = endNightFor(row.date, row.doors, row.allOut, row.packOut)
     const wasInferred =
       row.endDate === null ||
       (oldInferred !== null && row.endDate.getTime() === oldInferred.getTime())
     if (wasInferred) {
-      next.endDate = endNightFor(next.date, next.doors, next.allOut)
+      next.endDate = endNightFor(next.date, next.doors, next.allOut, next.packOut)
       endDateChanged = true
     }
   }
@@ -748,7 +827,16 @@ export async function setRunTime(
     data: endDateChanged ? { [field]: clock, endDate: next.endDate } : { [field]: clock },
   })
 
-  const label = field === 'barClose' ? 'bar close' : field === 'allOut' ? 'everyone out' : 'doors'
+  const label =
+    field === 'barClose'
+      ? 'bar close'
+      : field === 'allOut'
+        ? 'everyone out'
+        : field === 'packIn'
+          ? 'pack-in'
+          : field === 'packOut'
+            ? 'pack-out'
+            : 'doors'
   const Label = `${label[0]!.toUpperCase()}${label.slice(1)}`
   await record(id, user, clock === null ? `cleared ${label}` : `set ${label} to ${clock}`)
 
@@ -763,8 +851,8 @@ export async function setRunTime(
 }
 
 /**
- * Set the night an event ends, or clear it back to what doors and
- * everyone-out infer (`endNightFor`) — the same rule `setRunTime` uses to
+ * Set the night an event ends, or clear it back to what doors, everyone-out
+ * and pack-out infer (`endNightFor`) — the same rule `setRunTime` uses to
  * carry the date forward for itself, until a choice is made here.
  */
 export async function setEndDate(eventId: string, value: string): Promise<Said> {
@@ -781,15 +869,17 @@ export async function setEndDate(eventId: string, value: string): Promise<Said> 
 
   const row = await db.event.findUniqueOrThrow({
     where: { id },
-    select: { date: true, doors: true, barClose: true, allOut: true },
+    select: { date: true, doors: true, barClose: true, allOut: true, packIn: true, packOut: true },
   })
 
-  const resolved = night ?? endNightFor(row.date, row.doors, row.allOut)
+  const resolved = night ?? endNightFor(row.date, row.doors, row.allOut, row.packOut)
 
   const problem = firstRunProblem({
     date: row.date,
     doors: row.doors,
     barClose: row.barClose,
+    packIn: row.packIn,
+    packOut: row.packOut,
     allOut: row.allOut,
     endDate: resolved,
   })

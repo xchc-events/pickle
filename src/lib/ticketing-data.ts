@@ -4,8 +4,17 @@ import { eventScope } from './scope'
 import { dateLabel, money, timeLabel } from './format'
 import { financeVals } from './finance'
 import { financeInputFor, orgShareFor, scenarioOf } from './finance-input'
-import { capacityOf, mixProblem, normaliseMix, paceOf, sellThrough, tierTable } from './ticketing'
-import { readSales } from './gather'
+import {
+  capacityOf,
+  mixProblem,
+  normaliseMix,
+  paceOf,
+  sellThrough,
+  tierTable,
+  type MixKey,
+} from './ticketing'
+import { readSales, salesHistory } from './gather'
+import { earliestSaleDay } from './sales-chart'
 import { bookingStep, type BookingStatus } from './parts'
 import type { SessionUser } from './session'
 
@@ -40,6 +49,13 @@ export interface TicketQueueRow {
   onSale: boolean
 }
 
+/** One tier's ticket sales on one day — not a running total. Feeds the chart. */
+export interface TicketSalePoint {
+  day: Date
+  tier: MixKey
+  sold: number
+}
+
 export interface TicketEvent {
   id: string
   name: string
@@ -64,17 +80,19 @@ export interface TicketEvent {
   mixProblem: string | null
   average: string
 
-  sellThroughPct: number
   breakeven: number
-  breakevenPct: number
   fullPay: number
-  fullPayPct: number
 
-  projected: number
-  projectedPct: number
-  toBreakeven: number
-  paceTone: 'good' | 'warn' | 'stop' | 'plain'
-  paceNote: string
+  /** Daily sales by tier, for the sales-over-time chart. Empty means nothing has sold yet. */
+  salesHistory: TicketSalePoint[]
+  /** When tickets went live on Gather — the Gather channel push's time, else the first sale. */
+  onSaleAt: Date
+  /** The moment this page was loaded — the chart's "today", and where its projection starts. */
+  today: Date
+  /** The event's own night — "the door" the projection runs to. */
+  doorAt: Date
+  /** `paceOf(...).projected` — read here, not reworked; the chart only places it. */
+  projectedTotal: number
 
   /**
    * Ticket revenue so far: `sold` at the average ticket price. GST inclusive
@@ -97,7 +115,8 @@ const EVENT_INCLUDE = {
   shifts: { select: { hours: true, personId: true, person: { select: { employment: true } } } },
   tasks: { select: { est: true, actual: true } },
   addons: { select: { kind: true, cost: true, hours: true } },
-  channels: { where: { channel: 'gather' }, select: { live: true } },
+  // `at` is when the gather push went live — the chart's on-sale date.
+  channels: { where: { channel: 'gather' }, select: { live: true, at: true } },
 } as const
 
 export async function loadTicketing(
@@ -163,6 +182,19 @@ export async function loadTicketing(
   const sales = readSales(row)
   const pace = paceOf({ sold: sales.sold, breakeven: vals.breakeven })
 
+  // The sales-over-time chart's own data. `today` is fixed once here so the
+  // chart's "today" marker and its server-rendered HTML cannot disagree with
+  // whatever moment this request actually ran at.
+  const today = new Date()
+  const history = await salesHistory(row.id)
+  const salesPoints: TicketSalePoint[] = history.map((h) => ({
+    day: h.day,
+    tier: h.tier as MixKey,
+    sold: h.sold,
+  }))
+  const gatherPush = row.channels[0]
+  const onSaleAt = gatherPush?.at ?? earliestSaleDay(salesPoints) ?? row.date
+
   return {
     queue,
     event: {
@@ -192,17 +224,14 @@ export async function loadTicketing(
       mixProblem: mixProblem(row.mix),
       average: money(vals.avg),
 
-      sellThroughPct: sellThrough(sales.sold, capacity),
       breakeven: vals.breakeven,
-      breakevenPct: sellThrough(vals.breakeven, capacity),
       fullPay: vals.fullPay,
-      fullPayPct: sellThrough(vals.fullPay, capacity),
 
-      projected: pace.projected,
-      projectedPct: sellThrough(pace.projected, capacity),
-      toBreakeven: pace.toBreakeven,
-      paceTone: pace.tone,
-      paceNote: pace.note,
+      salesHistory: salesPoints,
+      onSaleAt,
+      today,
+      doorAt: row.date,
+      projectedTotal: pace.projected,
 
       revenue: money(sales.sold * vals.avg),
     },

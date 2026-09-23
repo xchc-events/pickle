@@ -1,0 +1,191 @@
+/* Ticket sales over time, by tier. Replaces the old room-diagram bar: a
+   cumulative line per tier, toggleable from the legend, breakeven and
+   full-pay drawn as labelled reference lines, and the projection continuing
+   dashed from today to the door. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.empty {
+  margin: 0;
+  padding: 22px 14px;
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+/* --- time scale ----------------------------------------------------- */
+
+.scales {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.scaleBtn {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: transparent;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.scaleBtn:hover {
+  color: var(--color-neutral-100);
+}
+
+.scaleOn {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-200);
+}
+
+/* --- the chart -------------------------------------------------------- */
+
+.svg {
+  width: 100%;
+  /* At least twice the 26px bar this replaces. */
+  height: 340px;
+}
+
+.axisLabel {
+  font-size: 10.5px;
+  fill: var(--color-neutral-600);
+}
+
+.refLabel {
+  font-size: 10.5px;
+  fill: var(--color-neutral-400);
+}
+
+.breakevenLine {
+  stroke: var(--st-warn);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.fullPayLine {
+  stroke: var(--st-good);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.todayLine {
+  stroke: var(--color-divider);
+  stroke-width: 1;
+}
+
+.projectionLine {
+  stroke: var(--color-neutral-300);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  fill: none;
+}
+
+.line {
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.point {
+  fill: currentColor;
+}
+
+/* One colour per tier, from the neutral and accent scales — never a status
+   token: `--st-warn` and `--st-good` already mean breakeven and full-pay on
+   this chart, and `--st-stop` reads as "blocked" everywhere else in the app,
+   not as a tier's identity. Each holds well against `--color-surface`
+   (#232532) — `--color-neutral-500`, the least contrasty of the four, still
+   clears ~5.3:1. The legend's swatch uses the same class as the line, so
+   they are always the same colour. */
+.tierSub {
+  color: var(--color-accent-2-400);
+}
+
+.tierStd {
+  color: var(--color-accent);
+}
+
+.tierSup {
+  color: var(--color-neutral-100);
+}
+
+.tierDoor {
+  color: var(--color-neutral-500);
+}
+
+/* --- legend ------------------------------------------------------------- */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 11.5px;
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  color: var(--color-neutral-300);
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.legendItem:hover {
+  color: var(--color-neutral-100);
+}
+
+.legendOff {
+  color: var(--color-neutral-700);
+}
+
+.legendOff .swatch {
+  opacity: 0.35;
+}
+
+.swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* --- kept figures --------------------------------------------------- */
+
+.figures {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+}
+
+.figures b {
+  font-weight: 500;
+  color: var(--color-neutral-100);
+}
+
+/* --- the projection's own caveat ----------------------------------------- */
+
+.caveat {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}

@@ -37,6 +37,7 @@ import { DEFAULT_PERMS, type RoleKey } from '../src/lib/constants'
 import { ASSET_SET } from '../src/lib/design'
 import { shiftPlan, type RosterEvent } from '../src/lib/roster'
 import { capacityOf } from '../src/lib/ticketing'
+import { plausibleSalesHistory } from '../src/lib/gather-seed'
 import { financeVals } from '../src/lib/finance'
 import { barBudgetFrom, isBarRole } from '../src/lib/bar'
 import { hashPassword } from '../src/lib/password'
@@ -569,6 +570,7 @@ async function main() {
   await db.actual.deleteMany()
   await db.barSale.deleteMany()
   await db.barBudget.deleteMany()
+  await db.ticketSaleDay.deleteMany()
   await db.event.deleteMany()
   await db.space.deleteMany()
   await db.availability.deleteMany()
@@ -906,6 +908,31 @@ async function main() {
       })
     }
 
+    // Ticket sales, by day and tier — a plausible history for every event
+    // that has sold anything, ending on the same total as `e.sold` so the
+    // sales-over-time chart and the revenue headline agree (see
+    // src/lib/gather-seed.ts and its test for the exactness guarantee). The
+    // window runs from the same on-sale moment the bar budget locks at to
+    // today, capped at the night itself for a concluded event — nothing
+    // sells to a door that has already passed.
+    if ((e.sold ?? 0) > 0) {
+      const historyEnd = date.getTime() < today.getTime() ? date : today
+      const history = plausibleSalesHistory({
+        sold: e.sold!,
+        mix: [0.2, 0.4, 0.15, 0.25],
+        since: onSaleAt,
+        today: historyEnd,
+      })
+      await db.ticketSaleDay.createMany({
+        data: history.map((r) => ({
+          eventId: created.id,
+          day: r.day,
+          tier: r.tier,
+          sold: r.sold,
+        })),
+      })
+    }
+
     await db.beat.createMany({
       data: BEATS.map((b, i) => ({
         eventId: created.id,
@@ -1026,6 +1053,7 @@ async function main() {
     channels: await db.channelPush.count(),
     beats: await db.beat.count(),
     leads: await db.eventLead.count(),
+    ticketSaleDays: await db.ticketSaleDay.count(),
   }
   console.log('seeded', counts)
 }

@@ -1,3 +1,4 @@
+import { dateLabel } from '@/lib/format'
 import { LICENCE_STATES, type DealState, type LicenceState } from '@/lib/event-record'
 import styles from './event.module.css'
 
@@ -11,31 +12,65 @@ import styles from './event.module.css'
  * page. Server components, so nothing here reaches the browser as a control.
  */
 
+/** The "When" block as text — the same shape Controls.tsx's RunTimes edits. */
 export function RunTimesReadout({
+  date,
+  dateTbc,
+  packIn,
   doors,
   barClose,
   allOut,
+  packOut,
+  endDate,
 }: {
+  date: string
+  dateTbc: boolean
+  packIn: string | null
   doors: string | null
   barClose: string | null
   allOut: string | null
+  packOut: string | null
+  endDate: Date | null
 }) {
   const times = [
+    { label: 'Pack-in', value: packIn },
     { label: 'Doors', value: doors },
     { label: 'Bar close', value: barClose },
     { label: 'Everyone out', value: allOut },
+    { label: 'Pack-out', value: packOut },
   ]
 
   return (
-    <div className={styles.times}>
-      {times.map((t) => (
-        <div key={t.label} className={styles.timeField}>
-          <span className={styles.factKey}>{t.label}</span>
+    <div>
+      <div className={styles.whenTop}>
+        <div className={styles.timeField}>
+          <span className={styles.factKey}>Starts</span>
           <span className={styles.factValue}>
-            {t.value ?? <span className={styles.plain}>not set</span>}
+            <span className={dateTbc ? styles.warn : undefined}>{date}</span>
+          </span>
+          <span className={styles.factNote}>
+            {dateTbc
+              ? 'still a best guess — an enquiry cannot move on until it is held'
+              : 'held in the calendar'}
           </span>
         </div>
-      ))}
+        <div className={styles.timeField}>
+          <span className={styles.factKey}>Ends</span>
+          <span className={styles.factValue}>
+            {endDate ? dateLabel(endDate) : <span className={styles.plain}>not set</span>}
+          </span>
+        </div>
+      </div>
+      <div className={styles.timesRow}>
+        {times.map((t) => (
+          <div key={t.label} className={styles.timeField}>
+            <span className={styles.factKey}>{t.label}</span>
+            <span className={styles.factValue}>
+              {t.value ?? <span className={styles.plain}>not set</span>}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

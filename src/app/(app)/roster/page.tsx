@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
-import { loadRoster } from '@/lib/roster-data'
+import { loadRoster, fiveTimesLine } from '@/lib/roster-data'
 import { money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
 import { Avatar } from '@/components/Avatar'
@@ -59,6 +59,9 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
               <span className={styles.eventMeta}>
                 {event.date} · {event.spaceName} · {event.format}
               </span>
+              {fiveTimesLine(event) ? (
+                <span className={styles.eventTimes}>{fiveTimesLine(event)}</span>
+              ) : null}
             </div>
             <div className={styles.figures}>
               <div className={styles.figure}>

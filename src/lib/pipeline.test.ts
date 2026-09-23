@@ -47,6 +47,8 @@ const ev = (over: Partial<PipelineEvent> = {}): PipelineEvent => ({
   endDate: null,
   doors: '7:00 pm',
   allOut: '11:30 pm',
+  packIn: null,
+  packOut: null,
   riskNote: null,
   riskKind: 'warn',
   ownerInitials: 'MT',
@@ -158,6 +160,43 @@ describe('runLine', () => {
     expect(runLine(ev({ date: new Date(2026, 8, 27), doors: null, allOut: null }))).toBe(
       'Sun 27 Sep',
     )
+  })
+
+  it('adds pack-in and pack-out after the doors line when both are set', () => {
+    expect(
+      runLine(
+        ev({
+          date: new Date(2026, 8, 27),
+          doors: '7:00 pm',
+          allOut: '11:30 pm',
+          packIn: '3:00 pm',
+          packOut: '1:30 am',
+        }),
+      ),
+    ).toBe('Sun 27 Sep · 7:00 pm – 11:30 pm · pack-in 3:00 pm – pack-out 1:30 am')
+  })
+
+  it('leaves pack-in and pack-out off while only one of them is set', () => {
+    expect(
+      runLine(ev({ date: new Date(2026, 8, 27), packIn: '3:00 pm', packOut: null })),
+    ).not.toContain('pack-in')
+    expect(
+      runLine(ev({ date: new Date(2026, 8, 27), packIn: null, packOut: '1:30 am' })),
+    ).not.toContain('pack-out')
+  })
+
+  it('adds pack-in and pack-out even when there is no doors or everyone-out line to follow', () => {
+    expect(
+      runLine(
+        ev({
+          date: new Date(2026, 8, 27),
+          doors: null,
+          allOut: null,
+          packIn: '3:00 pm',
+          packOut: '1:30 am',
+        }),
+      ),
+    ).toBe('Sun 27 Sep · pack-in 3:00 pm – pack-out 1:30 am')
   })
 })
 

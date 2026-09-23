@@ -53,6 +53,10 @@ export interface PipelineEvent {
   doors: string | null
   /** "1:00am" — printed exactly as the event stores it, never parsed. */
   allOut: string | null
+  /** When the room is blocked out from and until, beyond doors and everyone
+   *  out. Printed exactly as stored, same as doors and allOut. */
+  packIn: string | null
+  packOut: string | null
   /** The coordinator's own words for why this is flagged. Null = not at risk. */
   riskNote: string | null
   riskKind: RiskKind
@@ -137,16 +141,20 @@ export function metaLine(e: PipelineEvent): string {
 }
 
 /**
- * The second meta line under the event name: the date, and doors to
- * everyone-out. Doors and everyone-out print exactly as the event stores
- * them ("8:00pm") — this only arranges what is there, never parses or
- * recomputes a time. When `endDate` falls on a different calendar day from
- * `date`, the date itself spans both: "Sun 27 Sep – Mon 28 Sep". A missing
- * time prints only what there is, down to the date alone.
+ * The second meta line under the event name: the date, doors to everyone-out,
+ * and pack-in to pack-out where both are set. Every time prints exactly as
+ * the event stores it ("8:00pm") — this only arranges what is there, never
+ * parses or recomputes one. When `endDate` falls on a different calendar day
+ * from `date`, the date itself spans both: "Sun 27 Sep – Mon 28 Sep". A
+ * missing time prints only what there is, down to the date alone.
  *
- * Pack-in and pack-out times join this line once that wave lands.
+ * Pack-in and pack-out only join the line once both are decided — unlike
+ * doors and everyone-out, which each print alone rather than wait for the
+ * other, a lone pack time reads as one edge of a block nobody can place yet.
  */
-export function runLine(e: Pick<PipelineEvent, 'date' | 'endDate' | 'doors' | 'allOut'>): string {
+export function runLine(
+  e: Pick<PipelineEvent, 'date' | 'endDate' | 'doors' | 'allOut' | 'packIn' | 'packOut'>,
+): string {
   const when =
     e.endDate && daysBetween(e.date, e.endDate) !== 0
       ? `${dateLabel(e.date)} – ${dateLabel(e.endDate)}`
@@ -161,7 +169,11 @@ export function runLine(e: Pick<PipelineEvent, 'date' | 'endDate' | 'doors' | 'a
           ? `out ${e.allOut}`
           : null
 
-  return times ? `${when} · ${times}` : when
+  const line = times ? `${when} · ${times}` : when
+
+  const pack = e.packIn && e.packOut ? `pack-in ${e.packIn} – pack-out ${e.packOut}` : null
+
+  return pack ? `${line} · ${pack}` : line
 }
 
 export interface RowFilters {

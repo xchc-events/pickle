@@ -3,6 +3,7 @@ import { requireModule } from '@/lib/permissions'
 import { loadTicketing } from '@/lib/ticketing-data'
 import { SectionHeading } from '@/components/SectionHeading'
 import { TiersTable } from './Forms'
+import { SalesChart } from './SalesChart'
 import { setTiers } from './actions'
 import styles from './ticketing.module.css'
 
@@ -93,67 +94,25 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
             </p>
           </div>
 
-          {/* Sold, breakeven and full-pay against one capacity. The markers
-              are what make this a judgement rather than a number. */}
-          <div className={styles.room}>
-            <div className={styles.roomTrack}>
-              <div className={styles.roomSold} style={{ width: `${event.sellThroughPct}%` }} />
-              {event.projected > event.sold ? (
-                <div
-                  className={styles.roomProjected}
-                  style={{
-                    left: `${event.sellThroughPct}%`,
-                    width: `${Math.max(0, event.projectedPct - event.sellThroughPct)}%`,
-                  }}
-                  title={`Projected ${event.projected}`}
-                />
-              ) : null}
-              <div
-                className={styles.marker}
-                style={{ left: `${event.breakevenPct}%` }}
-                title={`Breakeven at ${event.breakeven}`}
-              />
-              <div
-                className={`${styles.marker} ${styles.markerFull}`}
-                style={{ left: `${event.fullPayPct}%` }}
-                title={`Everyone paid in full at ${event.fullPay}`}
-              />
-            </div>
-
-            <div className={styles.roomLegend}>
-              <span>
-                <b className={styles.sold}>{event.sold}</b> sold · read from Gather.rsvp · as of{' '}
-                {event.soldAsOf}
-              </span>
-              <span>
-                <b>{event.breakeven}</b> to break even
-              </span>
-              <span>
-                <b>{event.fullPay}</b> to pay everyone in full
-              </span>
-            </div>
-            <p className={styles.soldNote}>
-              Never typed by hand here — Gather.rsvp is the source of truth for how many have sold.
-            </p>
-
-            {/* Two different facts, so two sentences. The pace is about where
-                sales look like landing; the shortfall is about today. Running
-                them together reads as a contradiction — "clears breakeven with
-                59 to spare, 2 more would cover it". */}
-            <p className={`${styles.pace} ${styles[event.paceTone]}`}>{event.paceNote}</p>
-            {event.toBreakeven > 0 ? (
-              <p className={styles.paceToday}>
-                Today it is {event.toBreakeven} short of the {event.breakeven} that covers costs.
-              </p>
-            ) : (
-              <p className={styles.paceToday}>Breakeven is already covered by tickets sold.</p>
-            )}
-            <p className={styles.paceCaveat}>
-              The projection is a flat assumption that sales so far are 56% of the eventual total —
-              a rough read, not a model. It gets replaced by a real curve once Gather.rsvp is
-              connected.
-            </p>
-          </div>
+          {/* Cumulative sales over time, by tier: on by default, each
+              toggleable from the legend, with the time scale, breakeven,
+              full-pay and the projection to the door all on the graph
+              itself. Never typed by hand — Gather.rsvp is the source of
+              truth for how many have sold; `soldAsOf` is when it last said
+              so. */}
+          <SalesChart
+            history={event.salesHistory}
+            onSaleAt={event.onSaleAt}
+            today={event.today}
+            doorAt={event.doorAt}
+            breakeven={event.breakeven}
+            fullPay={event.fullPay}
+            projectedTotal={event.projectedTotal}
+            sold={event.sold}
+          />
+          <p className={styles.soldNote}>
+            Read from Gather.rsvp, as of {event.soldAsOf} — never typed by hand here.
+          </p>
 
           <SectionHeading note={`average ${event.average}`}>Tiers and the mix</SectionHeading>
 
