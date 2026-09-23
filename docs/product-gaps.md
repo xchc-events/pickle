@@ -416,6 +416,18 @@ the comps line to be checked against what actually happened.
 - Acts submit their own list through the existing `AccessGrant` token flow —
   they should not need an account, exactly as with payment details.
 
+**23 Sep 2026 — the list now exists.** A `DoorListEntry` per name (event,
+party size, kind — guest, comp, industry or act — note, who added it), a
+section on Ticketing grouped by kind with a running total, and a plain,
+printable view at `/ticketing/door-list?event=…` for the door itself. The
+comps P&L line reads its COMP entries, party sizes summed, in place of the
+typed `crew` figure once any exist (`compsCountFor` in
+`src/lib/door-list.ts`), so the first sentence of this gap — "two integers"
+— is no longer quite true. Still open: per-act allocation with a cap, the
+48–72h cutoff, door check-in reconciling arrivals against the list, and acts
+submitting their own list through `AccessGrant` rather than a venue account
+typing it in.
+
 ### PG-12 — Merch is entirely absent
 
 > As a coordinator, I want merch recorded, so the settlement is complete and the
