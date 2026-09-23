@@ -93,7 +93,9 @@ export function monthLabel(year: number, monthIndex: number): string {
  * "2026-09" → the month it names, or null for anything else — reads the
  * month view's query-string param. `monthIndex` comes back 0-based.
  */
-export function monthFromInput(value: string | undefined): { year: number; monthIndex: number } | null {
+export function monthFromInput(
+  value: string | undefined,
+): { year: number; monthIndex: number } | null {
   const m = /^(\d{4})-(\d{2})$/.exec(value ?? '')
   if (!m) return null
   const monthIndex = Number(m[2]) - 1
@@ -176,7 +178,9 @@ export interface RunWindow {
  * pack time reads as one edge of a block nobody can place yet, so it is
  * skipped the same way here, falling through to doors/everyone-out.
  */
-export function runWindow(e: Pick<PipelineEvent, 'doors' | 'allOut' | 'packIn' | 'packOut'>): RunWindow {
+export function runWindow(
+  e: Pick<PipelineEvent, 'doors' | 'allOut' | 'packIn' | 'packOut'>,
+): RunWindow {
   if (e.packIn && e.packOut) return { start: e.packIn, end: e.packOut, defaulted: false }
   if (e.doors && e.allOut) return { start: e.doors, end: e.allOut, defaulted: false }
   return { start: DEFAULT_START, end: DEFAULT_END, defaulted: true }
@@ -222,7 +226,12 @@ export function blockFraction(startLabel: string, endLabel: string): BlockFracti
  * or "Times not set" once it is the default window, so nobody mistakes a
  * placeholder for a decided time.
  */
-export function blockLabel(startLabel: string, endLabel: string, clipped: boolean, defaulted: boolean): string {
+export function blockLabel(
+  startLabel: string,
+  endLabel: string,
+  clipped: boolean,
+  defaulted: boolean,
+): string {
   if (defaulted) return 'Times not set'
   return clipped ? `→ ${endLabel}` : `${startLabel} – ${endLabel}`
 }

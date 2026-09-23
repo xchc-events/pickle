@@ -28,7 +28,7 @@ describe('monthGrid', () => {
     expect(grid.length % 7).toBe(0)
   })
 
-  it('marks only the target month\'s own days as inMonth', () => {
+  it("marks only the target month's own days as inMonth", () => {
     const grid = monthGrid(2026, 8, night(2026, 8, 23))
     expect(grid[0].inMonth).toBe(false) // 31 Aug, lead-in
     expect(grid.at(-1)!.inMonth).toBe(false) // 4 Oct, lead-out
@@ -110,7 +110,7 @@ describe('eventsOnDay', () => {
     expect(eventsOnDay([multiNight], night(2026, 8, 13))).toEqual([])
   })
 
-  it('is generic over whatever extra fields the caller\'s event carries', () => {
+  it("is generic over whatever extra fields the caller's event carries", () => {
     const withName = { date: night(2026, 8, 1), endDate: null, name: 'Kōura Records' }
     const [found] = eventsOnDay([withName], night(2026, 8, 1))
     expect(found.name).toBe('Kōura Records')
