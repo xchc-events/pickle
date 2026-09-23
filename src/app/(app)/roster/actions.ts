@@ -4,6 +4,8 @@ import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
+import { offsetFromClock } from '@/lib/roster-data'
+import { clockFromInput } from '@/lib/run-times'
 import { said, type Said } from '@/lib/toast'
 
 /**
@@ -20,6 +22,11 @@ import { said, type Said } from '@/lib/toast'
  *
  * `Shift.hourEntry` is a one-to-one, which is what makes this enforceable
  * rather than merely intended.
+ *
+ * The same rule holds for reshaping a shift, not just filling it: retiming
+ * moves the linked hour entry's hours in the same transaction below,
+ * deleting a shift takes its hours with it, and duplicating creates a shift
+ * with no hours to keep in step because it has nobody on it yet.
  */
 
 export async function assignShift(
@@ -133,4 +140,170 @@ export async function askAgain(eventId: string, shiftId: string): Promise<Said> 
       : `Marked as asked — ${asked} so far. Still counts as unfilled until somebody says yes.`,
     asked >= 5 ? 'stop' : 'warn',
   )
+}
+
+/**
+ * Rename a shift's role.
+ *
+ * Touches the shift's own start, hours, person and state not at all — those
+ * are exactly as they were. Retiming lives in `retimeShift` below; a single
+ * save that changes both calls each in turn.
+ *
+ * The linked hour entry's `note` carries the role name too, written once
+ * when `assignShift` created it. If nobody has touched it since — it still
+ * reads exactly the old role — the rename carries it forward in the same
+ * transaction, so Hours does not go on showing a name the roster dropped. A
+ * note somebody has hand-edited (to say who they're covering for, say) is
+ * left alone: that wording is theirs, not a copy of the role.
+ */
+export async function renameShift(eventId: string, shiftId: string, role: string): Promise<Said> {
+  const { user } = await requireModule('roster')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const name = role.trim()
+  if (!name) return said('A shift needs a role name.', 'stop')
+
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    include: { hourEntry: { select: { id: true, note: true } } },
+  })
+  if (!shift) return said('That shift is not on this event.', 'stop')
+  if (name === shift.role) return said('Nothing changed.', 'warn')
+
+  const followNote = shift.hourEntry != null && shift.hourEntry.note === shift.role
+
+  await db.$transaction([
+    db.shift.update({ where: { id: shift.id }, data: { role: name } }),
+    ...(followNote
+      ? [db.hourEntry.update({ where: { id: shift.hourEntry!.id }, data: { note: name } })]
+      : []),
+  ])
+  await record(id, user, `renamed ${shift.role} to ${name}`)
+
+  refresh()
+  return said(`Renamed to ${name}.`)
+}
+
+/**
+ * Move a shift's start and end, given as clock times on the night.
+ *
+ * Written back as `start` (offset from doors) and `hours`, since that is
+ * what `shiftPlan` and the P&L read — never as clock strings, which is why
+ * this is the only place that converts one to the other. The linked hour
+ * entry's `hours` moves with it, in the same transaction, for the same
+ * reason `assignShift` above keeps a shift and its hours from half-happening.
+ */
+export async function retimeShift(
+  eventId: string,
+  shiftId: string,
+  input: { start: string; end: string },
+): Promise<Said> {
+  const { user } = await requireModule('roster')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    include: {
+      hourEntry: { select: { id: true, paid: true } },
+      event: { select: { doors: true } },
+    },
+  })
+  if (!shift) return said('That shift is not on this event.', 'stop')
+
+  if (shift.hourEntry?.paid) {
+    return said(
+      `${shift.role}’s hours are already paid — a paid wage cannot be moved from the roster; Finance reverses a payment first.`,
+      'stop',
+    )
+  }
+
+  const startLabel = clockFromInput(input.start)
+  const endLabel = clockFromInput(input.end)
+  if (!startLabel || !endLabel) return said('That is not a time.', 'stop')
+
+  // Anchored on the shift's own current offset — see offsetFromClock — so an
+  // untouched field round-trips to the exact value it started at.
+  const newStart = offsetFromClock(startLabel, shift.event.doors, shift.start)
+  const newEnd = offsetFromClock(endLabel, shift.event.doors, shift.start + shift.hours)
+  if (newStart === null || newEnd === null) {
+    return said('Set doors on the event before editing shift times.', 'stop')
+  }
+
+  const newHours = Math.round((newEnd - newStart) * 60) / 60
+  if (newHours <= 0) return said('The end cannot be before the start.', 'stop')
+
+  await db.$transaction([
+    db.shift.update({ where: { id: shift.id }, data: { start: newStart, hours: newHours } }),
+    ...(shift.hourEntry
+      ? [db.hourEntry.update({ where: { id: shift.hourEntry.id }, data: { hours: newHours } })]
+      : []),
+  ])
+
+  await record(id, user, `changed ${shift.role}’s call to ${startLabel}–${endLabel}`)
+
+  refresh()
+  return said(`${shift.role} now runs ${startLabel}–${endLabel}.`)
+}
+
+/**
+ * Add another shift the same as this one — same role, hours and call — but
+ * open, with no person and no hour entry. Duplicating a set-up crew slot
+ * five times makes five shifts to fill, not one person carrying five times
+ * the hours.
+ */
+export async function duplicateShift(eventId: string, shiftId: string): Promise<Said> {
+  const { user } = await requireModule('roster')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    select: { role: true, hours: true, start: true },
+  })
+  if (!shift) return said('That shift is not on this event.', 'stop')
+
+  await db.shift.create({
+    data: { eventId: id, role: shift.role, hours: shift.hours, start: shift.start, state: 'OPEN' },
+  })
+  await record(id, user, `duplicated ${shift.role}`)
+
+  refresh()
+  return said(`Another ${shift.role} shift added, open.`)
+}
+
+/**
+ * Remove a shift outright.
+ *
+ * Its hour entry goes with it — those hours were never worked — unless the
+ * entry is already paid, in which case deleting the shift would quietly
+ * erase a wage that has actually gone out. That refuses instead.
+ */
+export async function deleteShift(eventId: string, shiftId: string): Promise<Said> {
+  const { user } = await requireModule('roster')
+  if (user.external) return said('Not something an external account can do.', 'stop')
+  const id = await requireEvent(user, eventId)
+
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    include: { hourEntry: { select: { id: true, paid: true } } },
+  })
+  if (!shift) return said('That shift is not on this event.', 'stop')
+
+  if (shift.hourEntry?.paid) {
+    return said(
+      `${shift.role} is already paid — that cannot be undone by deleting the shift.`,
+      'stop',
+    )
+  }
+
+  await db.$transaction([
+    ...(shift.hourEntry ? [db.hourEntry.delete({ where: { id: shift.hourEntry.id } })] : []),
+    db.shift.delete({ where: { id: shift.id } }),
+  ])
+  await record(id, user, `deleted ${shift.role}`)
+
+  refresh()
+  return said(`${shift.role} deleted.`)
 }
