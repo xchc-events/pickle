@@ -638,6 +638,8 @@ async function main() {
   await db.barSale.deleteMany()
   await db.barBudget.deleteMany()
   await db.ticketSaleDay.deleteMany()
+  await db.ticketCode.deleteMany()
+  await db.doorListEntry.deleteMany()
   await db.event.deleteMany()
   await db.space.deleteMany()
   await db.availability.deleteMany()
@@ -1006,6 +1008,66 @@ async function main() {
       })
     }
 
+    // Codes and the door list — T6, T7. Slow Fold is the worked example: a
+    // live percent-off code, and a door list whose COMP entries (5 people)
+    // stand in for the flat 6 typed as `crew` above, so Finance's comps
+    // line for this event is already reading the list, not the guess — see
+    // `compsCountFor` in src/lib/door-list.ts.
+    if (e.id === 'sf') {
+      await db.ticketCode.create({
+        data: {
+          eventId: created.id,
+          code: 'LOCALS10',
+          kind: 'PERCENT_OFF',
+          value: 10,
+          useLimit: 30,
+          uses: 12,
+          who: 'Mere Tapu',
+          createdById: 'mt',
+        },
+      })
+      await db.doorListEntry.createMany({
+        data: [
+          {
+            eventId: created.id,
+            name: 'Kōura Records guest list',
+            partySize: 2,
+            kind: 'COMP',
+            note: 'label guests',
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Harbour Static guest list',
+            partySize: 3,
+            kind: 'COMP',
+            note: 'opening act',
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Night Owl PR',
+            partySize: 1,
+            kind: 'INDUSTRY',
+            note: null,
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Aroha Ngata',
+            partySize: 2,
+            kind: 'GUEST',
+            note: null,
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+        ],
+      })
+    }
+
     await db.beat.createMany({
       data: BEATS.map((b, i) => ({
         eventId: created.id,
@@ -1127,6 +1189,8 @@ async function main() {
     beats: await db.beat.count(),
     leads: await db.eventLead.count(),
     ticketSaleDays: await db.ticketSaleDay.count(),
+    ticketCodes: await db.ticketCode.count(),
+    doorListEntries: await db.doorListEntry.count(),
     venueSpecComponents: await db.venueSpecComponent.count(),
   }
   console.log('seeded', counts)
