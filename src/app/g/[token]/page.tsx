@@ -73,7 +73,9 @@ export default async function GrantPage({ params }: PageProps<'/g/[token]'>) {
 
         {wantsFiles ? (
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>What the crew needs</h2>
+            <h2 className={styles.sectionTitle}>
+              What the crew needs{grant.artistName ? ` from ${grant.artistName}` : ''}
+            </h2>
             <GrantUploads
               begin={beginViaGrant.bind(null, token)}
               finish={finishViaGrant.bind(null, token)}

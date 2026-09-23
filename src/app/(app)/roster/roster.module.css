@@ -123,6 +123,47 @@
   color: var(--color-neutral-600);
 }
 
+/* headStats groups the sales strip with the two headline figures so both
+   sit "beside" each other, on the opposite side of .eventHead from the
+   event's own name and times. */
+.headStats {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+}
+
+/* Sold, likely turnout, capacity, shifts planned — read-only context for
+   whether the roster still needs everyone booked on it. Smaller than the
+   two headline figures beside it: this is context, not the headline. */
+.salesStrip {
+  display: flex;
+  gap: 14px;
+  padding-right: 20px;
+  border-right: 1px solid var(--color-divider);
+}
+
+.saleFigure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.saleLabel {
+  font-family: var(--font-heading);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+}
+
+.saleValue {
+  font-size: 13.5px;
+  color: var(--color-neutral-300);
+  white-space: nowrap;
+}
+
 /* Two headline figures, not one small corner one — "make that bigger and
    more obvious, rather than 'the call'." Connor, 23 Sep 2026. Same headline
    scale as the event record's own big numbers (event.module.css .splitBig). */
@@ -173,14 +214,23 @@
 }
 
 .shift {
-  display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(200px, 1.2fr) auto;
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: 8px 12px;
   background: var(--color-surface);
   border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
+}
+
+/* The row as it read before R1: role, who, state. The shift's own reshaping
+   editor (ShiftEditor) sits below it, collapsed to a small toggle until asked
+   for — see roster.tsx's ".shift > ShiftEditor" and ShiftEditor.tsx. */
+.shiftMain {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(200px, 1.2fr) auto;
+  align-items: center;
+  gap: 16px;
 }
 
 /* The only left edge on the page. An unfilled shift is the thing somebody
@@ -265,4 +315,142 @@
 
 .askButton:disabled {
   opacity: 0.5;
+}
+
+/* --- shift editor: rename, retime, duplicate, delete -------------------- */
+
+.editToggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: 10.5px;
+  color: var(--color-neutral-700);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.editToggle:hover {
+  color: var(--color-neutral-400);
+}
+
+.editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+}
+
+.editorRole {
+  flex: 1;
+  min-width: 120px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 7px;
+}
+
+.editorRole:hover:not(:disabled) {
+  border-color: var(--color-accent-600);
+}
+
+.editorTimes {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-neutral-600);
+}
+
+.editorTime {
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+}
+
+.editorTime:hover:not(:disabled) {
+  border-color: var(--color-accent-600);
+}
+
+/* Pack-in/pack-out, for reference only — a shift may run outside them. */
+.editorBounds {
+  font-size: 10.5px;
+  color: var(--color-neutral-700);
+  white-space: nowrap;
+}
+
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.editorSave {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.editorSave:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.editorDuplicate,
+.editorCancel {
+  font: inherit;
+  font-size: 11px;
+  color: var(--color-neutral-400);
+  background: none;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.editorDuplicate:hover:not(:disabled),
+.editorCancel:hover:not(:disabled) {
+  color: var(--color-neutral-200);
+  border-color: var(--color-neutral-700);
+}
+
+.editorDelete {
+  font: inherit;
+  font-size: 11px;
+  color: var(--st-stop);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--st-stop) 45%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  cursor: pointer;
+}
+
+.editorDelete:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--st-stop) 12%, transparent);
+}
+
+.editorDuplicate:disabled,
+.editorDelete:disabled,
+.editorCancel:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

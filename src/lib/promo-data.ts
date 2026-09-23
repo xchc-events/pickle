@@ -83,6 +83,7 @@ export async function loadPromo(user: SessionUser, wantedId?: string): Promise<P
       note: c.note,
       byName: c.by?.name ?? null,
       when: c.at ? ago(c.at, now) : null,
+      url: c.url,
     }))
 
   const queue = events.map((e) =>

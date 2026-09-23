@@ -297,7 +297,7 @@ export async function loadEventRecord(
           payee: { select: { name: true, files: { select: { kind: true } } } },
         },
       },
-      files: { select: { kind: true, assetId: true, current: true, scan: true } },
+      files: { select: { kind: true, assetId: true, artistId: true, current: true, scan: true } },
       // Overrides FINANCE_SELECT's narrower shifts select, so it has to keep
       // `personId` — that is what `financeInputFor` reads to decide whether a
       // shift carries wage cost. `person.employment` is what prices it: this
@@ -347,10 +347,17 @@ export async function loadEventRecord(
     !row.internal && externals.some((u) => u.promoter && (row.promoter ?? '').includes(u.promoter))
 
   // Per-act file presence. A file counts whether it arrived on the event or on
-  // the payee record — an act that sent their bio last time has sent their bio.
+  // the payee record — an act that sent their bio last time has sent their
+  // bio. Tech rider is the exception: Tech now attributes a rider to one act
+  // (StoredFile.artistId), so the blanket "anywhere on the event" match used
+  // below for the other four kinds would tick every act off a single rider.
+  // Reading the same artistId is what keeps this row agreeing with Tech.
   const eventKinds = new Set<string>(row.files.map((f) => f.kind))
   const artists: RecordArtist[] = row.artists.map((a) => {
     const payeeKinds = new Set<string>((a.payee?.files ?? []).map((f) => f.kind))
+    const ownFileKinds = new Set<string>(
+      row.files.filter((f) => f.artistId === a.id).map((f) => f.kind),
+    )
     return {
       id: a.id,
       name: a.name,
@@ -360,7 +367,9 @@ export async function loadEventRecord(
       payeeName: a.payee?.name ?? null,
       files: ARTIST_FILES.map((f) => ({
         ...f,
-        have: payeeKinds.has(f.kind) || eventKinds.has(f.kind),
+        have:
+          payeeKinds.has(f.kind) ||
+          (f.kind === 'RIDER_TECH' ? ownFileKinds.has(f.kind) : eventKinds.has(f.kind)),
       })),
     }
   })
@@ -554,6 +563,8 @@ export async function loadEventRecord(
         note: c.note,
         byName: null,
         when: null,
+        // Not selected above — this summary shows state, not the link itself.
+        url: null,
       })),
     ).map((c) => ({
       key: c.key,

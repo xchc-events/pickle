@@ -2,18 +2,20 @@ import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
 import { loadPipeline } from '@/lib/pipeline-data'
 import { mayStartEnquiry } from '@/lib/intake'
+import { addDays, mondayOf, monthFromInput, monthLabel, monthToInput } from '@/lib/calendar'
+import { dateLabel } from '@/lib/format'
+import { nightFromInput, nightInput, venueToday } from '@/lib/night'
 import {
-  metaLine,
   partHeads,
-  partTitle,
   pipelineRows,
   pipelineSubline,
-  runLine,
   type SortKey,
   type StatusFilter,
 } from '@/lib/pipeline'
-import { days as dayLabel } from '@/lib/format'
 import { NewEnquiry } from '@/components/NewEnquiry'
+import { MatrixView } from './MatrixView'
+import { MonthView } from './MonthView'
+import { WeekView } from './WeekView'
 import styles from './pipeline.module.css'
 
 const STATUS_CHIPS: { key: StatusFilter; label: string }[] = [
@@ -29,14 +31,16 @@ const SORTS: Record<SortKey, string> = {
   attention: 'Sorted by what needs attention',
 }
 
-/** The cell swatches, in the order a part usually moves through them. */
-const TONES = [
-  { tone: 'dim', label: 'not started, or nothing to do' },
-  { tone: 'plain', label: 'under way' },
-  { tone: 'good', label: 'finished' },
-  { tone: 'warn', label: 'wants attention' },
-  { tone: 'stop', label: 'blocked' },
-] as const
+type View = 'matrix' | 'month' | 'week'
+
+/** Matrix (today's page) is the default — Month and Week sit beside it,
+ *  carried in the query string the same way the filters are, so a bookmark
+ *  keeps it (Connor, 23 Sep 2026). */
+const VIEW_TABS: { key: View; label: string }[] = [
+  { key: 'matrix', label: 'Matrix' },
+  { key: 'month', label: 'Month' },
+  { key: 'week', label: 'Week' },
+]
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
 
@@ -50,13 +54,34 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
   // Anything else — including the "stuck" sort a bookmark may still carry
   // from when an event sat in one stage — reads as days to door.
   const sort: SortKey = one(sp.sort) === 'attention' ? 'attention' : 'door'
+  const viewParam = one(sp.view)
+  const view: View = viewParam === 'month' ? 'month' : viewParam === 'week' ? 'week' : 'matrix'
 
+  // Every view reads the same rows — an external user sees only their own
+  // events regardless of which one is on screen, since the scoping is in
+  // this query (src/lib/scope.ts), not in how a view chooses to draw them.
   const all = await loadPipeline(user)
   const rows = pipelineRows(all, { status, sort, meInitials: user.initials })
   const heads = partHeads(all)
 
-  const href = (next: Partial<{ status: string; sort: string }>) => {
-    const q = new URLSearchParams({ status, sort, ...next })
+  const today = venueToday()
+  const month = monthFromInput(one(sp.month)) ?? {
+    year: today.getUTCFullYear(),
+    monthIndex: today.getUTCMonth(),
+  }
+  const monday = mondayOf(nightFromInput(one(sp.week) ?? '') ?? today)
+
+  const href = (
+    next: Partial<{ view: string; status: string; sort: string; month: string; week: string }>,
+  ) => {
+    const q = new URLSearchParams({
+      view,
+      status,
+      sort,
+      month: monthToInput(month.year, month.monthIndex),
+      week: nightInput(monday),
+      ...next,
+    })
     return `/pipeline?${q.toString()}`
   }
 
@@ -71,126 +96,112 @@ export default async function PipelinePage({ searchParams }: PageProps<'/pipelin
                 <span className={styles.kicker}>{user.organisationName}</span> ·{' '}
               </>
             ) : null}
-            {pipelineSubline(all, rows.length)}
+            {pipelineSubline(all, view === 'matrix' ? rows.length : all.length)}
           </p>
         </div>
         {mayStartEnquiry(user).ok ? <NewEnquiry /> : null}
       </header>
 
       <div className={styles.filters}>
-        {STATUS_CHIPS.map((c) => (
+        {VIEW_TABS.map((v) => (
           <Link
-            key={c.key}
-            href={href({ status: c.key })}
-            className={`${styles.chip} ${status === c.key ? styles.chipOn : ''}`}
+            key={v.key}
+            href={href({ view: v.key })}
+            className={`${styles.chip} ${view === v.key ? styles.chipOn : ''}`}
           >
-            {c.label}
+            {v.label}
           </Link>
         ))}
-        <span className={styles.spacer} />
-        <Link href={href({ sort: sort === 'door' ? 'attention' : 'door' })} className={styles.sort}>
-          {SORTS[sort]}
-          <i className="ph ph-arrows-down-up" aria-hidden="true" />
-        </Link>
+
+        {view === 'matrix' ? (
+          <>
+            <span className={styles.chipDivider} />
+            {STATUS_CHIPS.map((c) => (
+              <Link
+                key={c.key}
+                href={href({ status: c.key })}
+                className={`${styles.chip} ${status === c.key ? styles.chipOn : ''}`}
+              >
+                {c.label}
+              </Link>
+            ))}
+            <span className={styles.spacer} />
+            <Link
+              href={href({ sort: sort === 'door' ? 'attention' : 'door' })}
+              className={styles.sort}
+            >
+              {SORTS[sort]}
+              <i className="ph ph-arrows-down-up" aria-hidden="true" />
+            </Link>
+          </>
+        ) : null}
+
+        {view === 'month' ? (
+          <>
+            <span className={styles.spacer} />
+            <nav className={styles.calNav} aria-label="Month">
+              <Link
+                href={href({ month: monthToInput(month.year, month.monthIndex - 1) })}
+                className={styles.calStep}
+                aria-label="Previous month"
+              >
+                <i className="ph ph-caret-left" aria-hidden="true" />
+              </Link>
+              <span className={styles.calTitle}>{monthLabel(month.year, month.monthIndex)}</span>
+              <Link
+                href={href({ month: monthToInput(month.year, month.monthIndex + 1) })}
+                className={styles.calStep}
+                aria-label="Next month"
+              >
+                <i className="ph ph-caret-right" aria-hidden="true" />
+              </Link>
+              <Link
+                href={href({ month: monthToInput(today.getUTCFullYear(), today.getUTCMonth()) })}
+                className={styles.calToday}
+              >
+                Today
+              </Link>
+            </nav>
+          </>
+        ) : null}
+
+        {view === 'week' ? (
+          <>
+            <span className={styles.spacer} />
+            <nav className={styles.calNav} aria-label="Week">
+              <Link
+                href={href({ week: nightInput(addDays(monday, -7)) })}
+                className={styles.calStep}
+                aria-label="Previous week"
+              >
+                <i className="ph ph-caret-left" aria-hidden="true" />
+              </Link>
+              <span className={styles.calTitle}>
+                {dateLabel(monday)} – {dateLabel(addDays(monday, 6))}
+              </span>
+              <Link
+                href={href({ week: nightInput(addDays(monday, 7)) })}
+                className={styles.calStep}
+                aria-label="Next week"
+              >
+                <i className="ph ph-caret-right" aria-hidden="true" />
+              </Link>
+              <Link href={href({ week: nightInput(mondayOf(today)) })} className={styles.calToday}>
+                Today
+              </Link>
+            </nav>
+          </>
+        ) : null}
       </div>
 
       <div className={styles.body}>
-        <div className={styles.scroller}>
-          <div className={styles.matrix}>
-            <div className={styles.headRow}>
-              <div className={styles.headEvent}>Event</div>
-              <div className={styles.track}>
-                {heads.map((h) => (
-                  <span
-                    key={h.key}
-                    className={styles.headStage}
-                    title={`${h.toGo} live ${h.toGo === 1 ? 'event' : 'events'} still to finish this part${h.nick ? ` — ${h.nick}` : ''}`}
-                  >
-                    {h.label}
-                    <br />
-                    <span className={styles.headCount}>{h.count}</span>
-                  </span>
-                ))}
-              </div>
-              <div className={styles.headRight}>Door</div>
-            </div>
-
-            {rows.map((e) => {
-              const atRisk = e.riskNote !== null
-              // A missing owner wants attention too, but it is not the
-              // coordinator's own flag — it only takes the tone when nothing
-              // louder is already claiming this line.
-              const noOwner = !atRisk && e.ownerName === null
-              const tone = e.riskKind === 'stop' ? styles.stop : styles.warn
-              return (
-                <div
-                  key={e.id}
-                  className={`${styles.row} ${atRisk ? tone : ''}`}
-                  data-testid="pipeline-row"
-                >
-                  <span className={styles.name}>
-                    <Link href={`/events/${e.id}`} className={styles.eventName}>
-                      {e.name}
-                    </Link>
-                    <span
-                      className={`${styles.meta} ${atRisk ? styles.metaRisk : noOwner ? styles.metaWarn : ''}`}
-                    >
-                      {atRisk ? (
-                        <i
-                          className={`ph ${e.riskKind === 'stop' ? 'ph-warning-octagon' : 'ph-warning'}`}
-                          aria-hidden="true"
-                        />
-                      ) : null}
-                      {metaLine(e)}
-                    </span>
-                    <span className={styles.runLine}>{runLine(e)}</span>
-                  </span>
-
-                  {/* Each part of the event, where it stands on its own. None of
-                      them waits on the one to its left. */}
-                  <span className={styles.track}>
-                    {e.parts.map((p) => (
-                      <span
-                        key={p.key}
-                        className={`${styles.cell} ${styles[`tone_${p.tone}`] ?? ''} tabular`}
-                        title={partTitle(p)}
-                        data-part={p.key}
-                      >
-                        <span className={styles.cellStatus}>
-                          {p.tone === 'good' ? (
-                            <i className="ph ph-check" aria-hidden="true" />
-                          ) : null}
-                          {p.status}
-                        </span>
-                        {p.detail ? <span className={styles.cellDetail}>{p.detail}</span> : null}
-                      </span>
-                    ))}
-                  </span>
-
-                  <span className={styles.right}>
-                    <span className={`${styles.days} tabular`}>
-                      {e.concluded ? 'done' : dayLabel(e.daysToDoor)}
-                    </span>
-                  </span>
-                </div>
-              )
-            })}
-
-            {rows.length === 0 ? <p className={styles.empty}>Nothing matches that.</p> : null}
-
-            <p className={styles.legend}>
-              {TONES.map((t) => (
-                <span key={t.tone} className={styles.legendItem}>
-                  <span className={`${styles.swatch} ${styles[`tone_${t.tone}`]}`} />
-                  {t.label}
-                </span>
-              ))}
-              <span className={styles.legendHint}>
-                Every part is worked out from its own records. Hover a cell for what holds it up.
-              </span>
-            </p>
-          </div>
-        </div>
+        {view === 'matrix' ? (
+          <MatrixView heads={heads} rows={rows} />
+        ) : view === 'month' ? (
+          <MonthView all={all} year={month.year} monthIndex={month.monthIndex} today={today} />
+        ) : (
+          <WeekView all={all} monday={monday} today={today} />
+        )}
       </div>
     </div>
   )
