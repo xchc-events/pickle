@@ -337,7 +337,7 @@ describe('acts to chase', () => {
     const designPart = partsFor(partsEvent).find((p) => p.key === 'design')
 
     expect(list.length).toBe(2)
-    expect(designPart?.detail).toBe(`${list.length} acts' bios and pics to chase`)
+    expect(designPart?.detail).toBe(`${list.length} acts to chase`)
   })
 })
 
