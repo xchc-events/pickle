@@ -55,6 +55,16 @@ export interface TimelineMark {
   fraction: number
 }
 
+export interface TimelineMarkRow extends TimelineMark {
+  /** 0 = the marks' own row, above the bars; 1 = staggered one row further
+   *  down because it sat too close to the previous mark to read. */
+  row: number
+}
+
+/** Below this, in pixels, two mark labels are assumed to overlap. Connor's
+ *  own report: "Bar close 11:00pm" and "Everyone out 11:30pm" (24 Sep 2026). */
+const MARK_COLLISION_PX = 70
+
 export interface TimelineTick {
   hours: number
   label: string
@@ -164,8 +174,17 @@ const MARK_DEFS: {
 /**
  * The axis, the five run-time marks and one bar a shift, all as plain
  * numbers and 0–1 fractions ready to draw. Bounds are "an hour before
- * pack-in (or doors) to an hour after pack-out (or everyone out)" (Connor);
- * when doors itself is not decided yet, none of the five clock marks can be
+ * pack-in (or doors) to an hour after pack-out (or everyone out)" (Connor),
+ * but a shift is allowed to run outside the marks — the night is not a hard
+ * rule (see roster-data.ts) — so the axis widens to the earliest shift start
+ * and the latest shift end plus 30 minutes whenever either falls outside
+ * that mark-based range. No bar is ever clipped.
+ *
+ * Sunday Slow Roast, seeded (Connor, 24 Sep 2026): with the marks-only
+ * bound, a clean-up crew shift running past everyone-out had no bar at all,
+ * and several others were clipped at the right edge.
+ *
+ * When doors itself is not decided yet, none of the five clock marks can be
  * placed relative to it, so the axis falls back to the shifts' own extent,
  * and then to a plain default so an empty, undecided roster still renders
  * an axis rather than nothing.
@@ -181,16 +200,19 @@ export function buildRosterTimeline(
 
   if (doorsM !== null) {
     const packInOffset = offsetNoCarry(event.packIn, doorsM) ?? 0 // 0 = doors itself
-    axisStart = packInOffset - 1
+    const markStart = packInOffset - 1
+    const earliestShiftStart = shifts.length > 0 ? Math.min(...shifts.map((s) => s.start)) : null
+    axisStart = earliestShiftStart !== null ? Math.min(markStart, earliestShiftStart) : markStart
 
     const rightAnchor =
       offsetWithCarry(event.packOut, doorsM) ?? offsetWithCarry(event.allOut, doorsM)
+    const markEnd = rightAnchor !== null ? rightAnchor + 1 : null
+    const latestShiftEnd =
+      shifts.length > 0 ? Math.max(...shifts.map((s) => s.start + s.hours)) + 0.5 : null
     axisEnd =
-      rightAnchor !== null
-        ? rightAnchor + 1
-        : shifts.length > 0
-          ? Math.max(...shifts.map((s) => s.start + s.hours)) + 1
-          : axisStart + 9
+      markEnd !== null && latestShiftEnd !== null
+        ? Math.max(markEnd, latestShiftEnd)
+        : (markEnd ?? latestShiftEnd ?? axisStart + 9)
   } else if (shifts.length > 0) {
     axisStart = Math.min(0, ...shifts.map((s) => s.start)) - 1
     axisEnd = Math.max(0, ...shifts.map((s) => s.start + s.hours)) + 1
@@ -250,4 +272,28 @@ export function buildRosterTimeline(
   })
 
   return { axisStart, axisEnd, marks, ticks, bars }
+}
+
+/**
+ * Which row each of the five run-time marks' labels draws on: row 0 sits
+ * above the bars, same as before; a mark within `MARK_COLLISION_PX` of the
+ * previous one (in rendered pixels, left to right) staggers onto row 1 so
+ * the two labels don't overlap. `trackWidthPx` is the timeline track's own
+ * measured width -- 0 or less (no measurement yet, e.g. the first render
+ * before a ResizeObserver has run) means nothing is staggered, rather than
+ * guessing every mark collides.
+ */
+export function layoutMarkRows(marks: TimelineMark[], trackWidthPx: number): TimelineMarkRow[] {
+  const sorted = [...marks].sort((a, b) => a.fraction - b.fraction)
+  if (trackWidthPx <= 0) return sorted.map((m) => ({ ...m, row: 0 }))
+
+  let lastRow0Fraction: number | null = null
+  return sorted.map((mark) => {
+    const collidesWithRow0 =
+      lastRow0Fraction !== null &&
+      (mark.fraction - lastRow0Fraction) * trackWidthPx < MARK_COLLISION_PX
+    if (collidesWithRow0) return { ...mark, row: 1 }
+    lastRow0Fraction = mark.fraction
+    return { ...mark, row: 0 }
+  })
 }
