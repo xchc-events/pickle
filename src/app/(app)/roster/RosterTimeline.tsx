@@ -142,6 +142,13 @@ export function RosterTimeline({
   }
 
   function onDragMove(e: ReactPointerEvent<HTMLElement>) {
+    // A handle sits inside the bar, and pointer capture keeps move/up events
+    // targeted at whichever element started the drag, but they still bubble
+    // through their DOM ancestors -- without this, a drag started on a
+    // handle would also re-trigger the bar's own move/end handler on every
+    // event. Stopped unconditionally: nothing above these three elements
+    // needs pointer events that belong to a drag.
+    e.stopPropagation()
     if (!drag || e.pointerId !== drag.pointerId || drag.trackWidthPx <= 0) return
     const span = timeline.axisEnd - timeline.axisStart
     const deltaHours = ((e.clientX - drag.pointerStartX) / drag.trackWidthPx) * span
@@ -164,6 +171,9 @@ export function RosterTimeline({
   }
 
   function endDrag(e: ReactPointerEvent<HTMLElement>) {
+    // Same bubbling concern as onDragMove above — without this a release on
+    // a handle would also fire the bar's own onPointerUp and commit twice.
+    e.stopPropagation()
     if (!drag || e.pointerId !== drag.pointerId) return
     commit(drag.id, drag.liveStart, drag.liveEnd)
   }
