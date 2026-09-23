@@ -103,6 +103,13 @@ export function monthFromInput(
   return { year: Number(m[1]), monthIndex }
 }
 
+/** The inverse of `monthFromInput`: "2026-09". Normalised through `nightOf`,
+ *  so prev/next links can pass `monthIndex - 1` or `+ 1` straight through. */
+export function monthToInput(year: number, monthIndex: number): string {
+  const d = nightOf(year, monthIndex, 1)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
 /**
  * Which of `events` fall on `day`, by `date`..`endDate` inclusive (`endDate`
  * defaults to `date` for a one-night event) — so a run that crosses a
@@ -133,6 +140,12 @@ export function weekDays(monday: Date, today: Date): WeekDay[] {
     const date = new Date(monday.getTime() + i * DAY_MS)
     return { date, isToday: sameNight(date, today) }
   })
+}
+
+/** `date` stepped by whole nights — negative to go back, for the week
+ *  view's previous/next links. */
+export function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * DAY_MS)
 }
 
 /** The Monday on or before `date` — normalises any night to its week. */

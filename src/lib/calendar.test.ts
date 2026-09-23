@@ -3,6 +3,7 @@ import { nightOf } from './night'
 import {
   DEFAULT_END,
   DEFAULT_START,
+  addDays,
   blockFraction,
   blockLabel,
   dayBlocks,
@@ -12,6 +13,7 @@ import {
   monthFromInput,
   monthGrid,
   monthLabel,
+  monthToInput,
   runWindow,
   weekDays,
 } from './calendar'
@@ -92,6 +94,18 @@ describe('monthFromInput', () => {
   })
 })
 
+describe('monthToInput', () => {
+  it('is the inverse of monthFromInput for a normal month', () => {
+    expect(monthToInput(2026, 8)).toBe('2026-09')
+    expect(monthFromInput(monthToInput(2026, 8))).toEqual({ year: 2026, monthIndex: 8 })
+  })
+
+  it('normalises overflow the same way monthGrid and monthLabel do', () => {
+    expect(monthToInput(2026, 12)).toBe('2027-01')
+    expect(monthToInput(2026, -1)).toBe('2025-12')
+  })
+})
+
 describe('eventsOnDay', () => {
   const oneNight = { date: night(2026, 8, 10), endDate: null }
   const multiNight = { date: night(2026, 8, 10), endDate: night(2026, 8, 12) }
@@ -136,6 +150,18 @@ describe('weekDays', () => {
   it('marks exactly the day matching today', () => {
     const days = weekDays(night(2026, 8, 21), night(2026, 8, 23))
     expect(days.map((d) => d.isToday)).toEqual([false, false, true, false, false, false, false])
+  })
+})
+
+describe('addDays', () => {
+  it('steps forward and backward by whole nights', () => {
+    expect(addDays(night(2026, 8, 21), 7)).toEqual(night(2026, 8, 28))
+    expect(addDays(night(2026, 8, 21), -7)).toEqual(night(2026, 8, 14))
+    expect(addDays(night(2026, 8, 21), 0)).toEqual(night(2026, 8, 21))
+  })
+
+  it('crosses a month boundary', () => {
+    expect(addDays(night(2026, 8, 28), 7)).toEqual(night(2026, 9, 5))
   })
 })
 
