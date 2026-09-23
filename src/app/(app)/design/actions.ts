@@ -4,7 +4,9 @@ import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
-import { ASSET_SET, allApproved, assetSpec, type EventAsset } from '@/lib/design'
+import { assetSpec } from '@/lib/design'
+import { reopenAsset, sendBackAsset, signOffAsset } from '@/lib/design-signoff'
+import { postComment } from '@/lib/comments-data'
 import * as files from '@/lib/files-data'
 import { said, type Said } from '@/lib/toast'
 
@@ -14,90 +16,86 @@ import { said, type Said } from '@/lib/toast'
  * Each one re-checks the module permission and the event scope for itself:
  * an action is a POST endpoint, and the page that rendered the button is not
  * a security boundary. See src/lib/permissions.ts.
+ *
+ * `approveAsset`, `requestChange` and `reopenPiece` are thin wrappers over
+ * src/lib/design-signoff.ts, which the portal's own actions share — see the
+ * note there for why sign-off itself is not decided in either actions file.
  */
 
-async function assetsOf(eventId: string): Promise<EventAsset[]> {
-  const rows = await db.asset.findMany({ where: { eventId } })
-  return ASSET_SET.map((s) => {
-    const row = rows.find((r) => r.key === s.key)
-    return {
-      key: s.key,
-      state: (row?.state.toLowerCase() ?? 'draft') as EventAsset['state'],
-      promoterSigned: row?.promoterSigned ?? false,
-    }
-  })
-}
-
 /**
- * Sign a piece off.
- *
- * Approving pulls the next piece in house order up for sign-off, so exactly
- * one thing is ever waiting on somebody.
- *
- * Approving the last one finishes the Design part and nothing else. It used
- * to move the event to On sale and push every self-syncing listing, Gather.rsvp
- * among them — but each part of an event moves on its own now, tickets can be
- * on sale long before the artwork is done, and a push from here would walk
- * past the rule that tickets wait for a confirmed booking. Listings go out
- * from Promotion. See src/lib/parts.ts.
+ * Sign a piece off. Design staff no longer reach this — see
+ * `readyForSignOff` below — because D6 (23 Sep 2026) made Approve the event
+ * owner's call, or the promoter's, not design's. Refused in words rather
+ * than hidden, since an action is reachable however the page draws it.
  */
 export async function approveAsset(eventId: string, key: string): Promise<Said> {
   const { user } = await requireModule('design')
   const id = await requireEvent(user, eventId)
-  const spec = assetSpec(key)
-  if (!spec) return said('That is not a piece of the set.', 'stop')
-
-  await db.asset.upsert({
-    where: { eventId_key: { eventId: id, key } },
-    create: { eventId: id, key, state: 'APPROVED' },
-    update: { state: 'APPROVED' },
-  })
-
-  const assets = await assetsOf(id)
-
-  // The next draft in house order comes up for sign-off.
-  const next = ASSET_SET.find((s) => assets.find((a) => a.key === s.key)?.state === 'draft')
-  if (next) {
-    await db.asset.upsert({
-      where: { eventId_key: { eventId: id, key: next.key } },
-      create: { eventId: id, key: next.key, state: 'REVIEW' },
-      update: { state: 'REVIEW' },
-    })
-  }
-
-  await record(id, user, `approved ${spec.name}`)
-
-  if (!allApproved(assets)) {
-    refresh()
-    return said(`${spec.name} approved.`)
-  }
-
-  // Nothing is outstanding on the creative any more, so whatever the
-  // coordinator flagged about it no longer describes the event.
-  await db.event.update({ where: { id }, data: { riskNote: null } })
-
-  refresh()
-  return said(
-    `${spec.name} approved — that was the last piece, so the design is signed off. The listings go out from Promotion.`,
-  )
+  const out = await signOffAsset(id, key, user)
+  if (out.kind !== 'stop') refresh()
+  return out
 }
 
-/** Send a piece back. It lands in Design's own queue, not in somebody's inbox. */
-export async function requestChange(eventId: string, key: string): Promise<Said> {
+/** Ask for a change. Their words become a comment design sees, and the piece goes back to draft. */
+export async function requestChange(eventId: string, key: string, words: string): Promise<Said> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+  const out = await sendBackAsset(id, key, user, words)
+  if (out.kind !== 'stop') refresh()
+  return out
+}
+
+/** D3 — reopen a signed-off piece. Same signers as Approve; the reason becomes a comment. */
+export async function reopenPiece(eventId: string, key: string, reason: string): Promise<Said> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+  const out = await reopenAsset(id, key, user, reason)
+  if (out.kind !== 'stop') refresh()
+  return out
+}
+
+/**
+ * Put a piece up for review. This is design staff's half of sign-off since
+ * D6: they no longer decide whether a piece is right, only that it is ready
+ * for somebody who can to look at it.
+ */
+export async function readyForSignOff(eventId: string, key: string): Promise<Said> {
   const { user } = await requireModule('design')
   const id = await requireEvent(user, eventId)
   const spec = assetSpec(key)
   if (!spec) return said('That is not a piece of the set.', 'stop')
 
+  const existing = await db.asset.findUnique({ where: { eventId_key: { eventId: id, key } } })
+  if (existing && existing.state !== 'DRAFT') {
+    return said('That piece is already up for review, or signed off.', 'stop')
+  }
+
   await db.asset.upsert({
     where: { eventId_key: { eventId: id, key } },
-    create: { eventId: id, key, state: 'DRAFT' },
-    update: { state: 'DRAFT' },
+    create: { eventId: id, key, state: 'REVIEW' },
+    update: { state: 'REVIEW' },
   })
-  await record(id, user, `sent ${spec.name} back for a change`)
+  await record(id, user, `put ${spec.name} up for review`)
 
   refresh()
-  return said('Sent back. Design gets it in their queue, not in an email.', 'warn')
+  return said(`${spec.name} is up for sign-off.`)
+}
+
+/**
+ * D5 — a comment, either on one piece (`key`) or on the event's general
+ * design thread (`key` is null).
+ */
+export async function postDesignComment(
+  eventId: string,
+  key: string | null,
+  body: string,
+): Promise<Said> {
+  const { user } = await requireModule('design')
+  const id = await requireEvent(user, eventId)
+  const res = await postComment(id, key, user, body)
+  if (!res.ok) return said(res.why, 'stop')
+  refresh()
+  return said('Posted.')
 }
 
 /**

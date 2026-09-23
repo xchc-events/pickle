@@ -3,6 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel } from './format'
 import { ROLE_LABEL } from './constants'
+import { commentsFor, type CommentRow } from './comments-data'
 import type { SessionUser } from './session'
 import {
   DESIGN_TASK,
@@ -16,6 +17,7 @@ import {
   copyFit,
   designHours,
   designQueueRow,
+  maySignOff,
   missingBiosList,
   verticalCuts,
   type AssetCard,
@@ -69,6 +71,15 @@ export interface DesignEvent {
   missingBios: MissingBioRow[]
   caption: string
   copy: CopyFit[]
+  /**
+   * D6 — whether the signed-in user may Approve, Ask for a change or Reopen
+   * on this event: its owner, or a promoter of its organisation. One flag
+   * for the whole event, not per piece, because `maySignOff` never looks at
+   * the piece — see src/lib/design.ts.
+   */
+  maySignOff: boolean
+  /** D5 — the general design thread, under the brief rather than a piece. */
+  generalComments: CommentRow[]
 }
 
 export interface DesignView {
@@ -80,11 +91,14 @@ export interface DesignView {
   storageReady: boolean
 }
 
-const flatten = (assets: { key: string; state: string; promoterSigned: boolean }[]): EventAsset[] =>
+const flatten = (
+  assets: { key: string; state: string; promoterSigned: boolean; signedById: string | null }[],
+): EventAsset[] =>
   assets.map((a) => ({
     key: a.key,
     state: a.state.toLowerCase() as EventAsset['state'],
     promoterSigned: a.promoterSigned,
+    signedById: a.signedById,
   }))
 
 export async function loadDesign(
@@ -166,9 +180,10 @@ export async function loadDesign(
   const assets = flatten(row.assets)
   const portal = hasPortal(row.promoter)
 
-  // The artwork attached to each piece, and the hours the design team has
-  // logged against this event — independent queries, fetched together.
-  const [artworkFiles, loggedHours] = await Promise.all([
+  // The artwork attached to each piece, the hours the design team has logged
+  // against this event, and its comment threads — independent queries,
+  // fetched together.
+  const [artworkFiles, loggedHours, comments] = await Promise.all([
     db.storedFile.findMany({
       where: { eventId: row.id, kind: 'ARTWORK', current: true, scan: 'CLEAN' },
       include: { asset: { select: { key: true } } },
@@ -177,6 +192,7 @@ export async function loadDesign(
       where: { eventId: row.id, role: DESIGN_TEAM },
       select: { personId: true, hours: true, person: { select: { name: true } } },
     }),
+    commentsFor(row.id),
   ])
 
   const artwork = new Map(
@@ -184,9 +200,16 @@ export async function loadDesign(
       .filter((f) => f.asset)
       .map((f) => [f.asset!.key, { id: f.id, name: f.name, size: f.size, version: f.version }]),
   )
+  // `comments.byAsset` is keyed by Asset.id; row.assets is what maps a
+  // house key back to the row it came from.
+  const commentsByKey = new Map(row.assets.map((a) => [a.key, comments.byAsset.get(a.id) ?? []]))
 
-  const withArtwork = (cards: AssetCard[]): AssetCard[] =>
-    cards.map((c) => ({ ...c, file: artwork.get(c.key) ?? null }))
+  const withExtras = (cards: AssetCard[]): AssetCard[] =>
+    cards.map((c) => ({
+      ...c,
+      file: artwork.get(c.key) ?? null,
+      comments: commentsByKey.get(c.key) ?? [],
+    }))
   const facts = {
     brief: row.brief,
     name: row.name,
@@ -226,9 +249,9 @@ export async function loadDesign(
       leadEmail: lead?.person.user?.email ?? null,
       leadPhone: lead?.person.user?.phone ?? null,
       approved: approvedLine(assets),
-      hero: withArtwork(assetCards(assets, 'hero', { hasPortal: portal })),
-      lead: withArtwork(assetCards(assets, 'lead', { hasPortal: portal })),
-      support: withArtwork(assetCards(assets, 'support', { hasPortal: portal })),
+      hero: withExtras(assetCards(assets, 'hero', { hasPortal: portal })),
+      lead: withExtras(assetCards(assets, 'lead', { hasPortal: portal })),
+      support: withExtras(assetCards(assets, 'support', { hasPortal: portal })),
       verticals: verticalCuts(assets),
       brief: {
         line: briefLine(facts),
@@ -243,6 +266,8 @@ export async function loadDesign(
       missingBios: missingBiosList(liveActs, portal),
       caption: caption(facts),
       copy: copyFit(caption(facts), `${row.name} — ${dateLabel(row.date)}`),
+      maySignOff: maySignOff(user, { ownerId: row.ownerId, promoterId: row.promoterId }),
+      generalComments: comments.general,
     },
   }
 }

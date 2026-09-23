@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SessionUser } from '@/lib/session'
 
+vi.mock('server-only', () => ({}))
+
 /**
  * Putting a design lead on an event, and taking one off.
  *

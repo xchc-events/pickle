@@ -158,7 +158,7 @@ export const GATE_ACTION: Readonly<Record<string, string>> = {
   'Both vertical cuts signed off': 'Sign off the vertical cuts',
   'Event cover signed off': 'Sign off the event cover',
   'Listing copy signed off': 'Sign off the listing copy',
-  'Promoter signed off the creative': 'Chase the promoter’s sign-off',
+  'Signed off by the owner or the promoter': 'Chase the sign-off',
   // promo
   'Promo lead assigned': 'Find a promo lead',
   'Every channel listed or ticked off': 'Get the listings out',
@@ -360,9 +360,9 @@ function draftsFor(e: HomeEvent, p: PartState): Draft[] {
         const gates: Gate[] = [{ label: 'review', ok: false, why: sub, screen: 'design' }]
         return [{ ...base, kind: 'review', gates, title: 'Approve artwork', sub }]
       }
-      // Waiting on the promoter is what makes the part ask; lead with it.
+      // Waiting on a signature is what makes the part ask; lead with it.
       const gates =
-        p.tone === 'warn' ? toFront(failing, 'Promoter signed off the creative') : failing
+        p.tone === 'warn' ? toFront(failing, 'Signed off by the owner or the promoter') : failing
       return [{ ...base, kind: 'design', gates }]
     }
 
