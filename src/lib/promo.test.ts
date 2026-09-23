@@ -8,7 +8,9 @@ import {
   beatsWorkedLine,
   channelCards,
   channelSummary,
+  isHttpUrl,
   promoQueueRow,
+  stubPushUrl,
   type EventChannel,
 } from './promo'
 
@@ -19,6 +21,7 @@ const push = (channel: string, over: Partial<EventChannel> = {}): EventChannel =
   note: null,
   byName: null,
   when: null,
+  url: null,
   ...over,
 })
 
@@ -100,6 +103,40 @@ describe('channel cards', () => {
     const linktree = channelCards([push('linktree')]).find((c) => c.key === 'linktree')!
     expect(linktree.state).toBe('in sync')
     expect(linktree.note).toBeNull()
+  })
+
+  it('carries the link through for the card to show', () => {
+    const fb = channelCards([push('facebook-event', { url: 'https://example.com/fb/evt_1' })]).find(
+      (c) => c.key === 'facebook-event',
+    )!
+    expect(fb.url).toBe('https://example.com/fb/evt_1')
+  })
+
+  it('has no link for a channel that has never gone out', () => {
+    expect(channelCards([]).find((c) => c.key === 'gather')!.url).toBeNull()
+  })
+})
+
+describe('the live link', () => {
+  it('accepts http and https', () => {
+    expect(isHttpUrl('https://example.com/foo')).toBe(true)
+    expect(isHttpUrl('http://example.com/foo')).toBe(true)
+  })
+
+  it('refuses anything that is not a link, or not that scheme', () => {
+    expect(isHttpUrl('not a link')).toBe(false)
+    expect(isHttpUrl('example.com/foo')).toBe(false)
+    expect(isHttpUrl('ftp://example.com/foo')).toBe(false)
+    expect(isHttpUrl('javascript:alert(1)')).toBe(false)
+    expect(isHttpUrl('')).toBe(false)
+  })
+
+  it('stubs a placeholder shaped like the real thing, saying so', () => {
+    const url = stubPushUrl('facebook-event', 'evt_1')
+    expect(isHttpUrl(url)).toBe(true)
+    expect(url).toContain('example')
+    expect(url).toContain('facebook-event')
+    expect(url).toContain('evt_1')
   })
 })
 

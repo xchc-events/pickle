@@ -3,16 +3,19 @@ import { requireModule } from '@/lib/permissions'
 import { loadTech, TECH_SET } from '@/lib/tech-data'
 import { isConfigured } from '@/lib/r2'
 import { SectionHeading } from '@/components/SectionHeading'
-import { FileUpload } from '@/components/FileUpload'
 import { OpenFile } from './FileRowActions'
-import { beginTechUpload, finishTechUpload, linkToFile } from './actions'
+import { FileSlot } from './FileSlot'
+import { AttachFile } from './AttachFile'
+import {
+  assignFileToArtist,
+  beginPromoterUpload,
+  beginTechUpload,
+  finishTechUpload,
+  linkToFile,
+} from './actions'
 import styles from './tech.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
-
-const KB = 1024
-const size = (bytes: number) =>
-  bytes < KB * KB ? `${Math.round(bytes / KB)} KB` : `${(bytes / (KB * KB)).toFixed(1)} MB`
 
 const NAME_OF = Object.fromEntries(TECH_SET.map((s) => [s.kind, s.name]))
 
@@ -71,52 +74,115 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
             </span>
           </div>
 
-          <SectionHeading note="what the crew needs before the day">On this event</SectionHeading>
+          <SectionHeading note="tech rider and stage plot, one slot each per act">
+            Acts
+          </SectionHeading>
 
-          {event.files.length === 0 ? (
-            <p className={styles.none}>
-              Nothing has arrived yet. Chase the act for it, or add it yourself below once it is in
-              hand — a rider in somebody’s inbox is a rider the crew cannot see.
-            </p>
+          {event.acts.length === 0 ? (
+            <p className={styles.none}>No live act on this event yet.</p>
           ) : (
-            <ul className={styles.files}>
-              {event.files.map((f) => (
-                <li key={f.id} className={styles.file}>
-                  <div className={styles.fileMain}>
-                    <span className={styles.fileKind}>{NAME_OF[f.kind] ?? f.kind}</span>
-                    <span className={styles.fileName}>{f.name}</span>
+            <ul className={styles.acts}>
+              {event.acts.map((a) => (
+                <li key={a.id} className={styles.act}>
+                  <span className={styles.actName}>{a.name}</span>
+                  <div className={styles.actSlots}>
+                    <FileSlot
+                      label="Tech rider"
+                      file={a.rider}
+                      storageReady={storageReady}
+                      begin={beginTechUpload.bind(null, event.id, 'RIDER_TECH', a.id)}
+                      finish={finishTechUpload.bind(null, event.id)}
+                      link={linkToFile.bind(null, event.id)}
+                    />
+                    <FileSlot
+                      label="Stage plot"
+                      file={a.stagePlot}
+                      storageReady={storageReady}
+                      begin={beginTechUpload.bind(null, event.id, 'STAGE_PLOT', a.id)}
+                      finish={finishTechUpload.bind(null, event.id)}
+                      link={linkToFile.bind(null, event.id)}
+                    />
                   </div>
-                  <span className={styles.fileMeta}>
-                    {size(f.size)}
-                    {f.version > 1 ? ` · v${f.version}` : ''}
-                    {f.uploadedBy ? ` · ${f.uploadedBy}` : ' · from the act'}
-                  </span>
-                  <OpenFile fileId={f.id} link={linkToFile.bind(null, event.id)}>
-                    Open
-                  </OpenFile>
                 </li>
               ))}
             </ul>
           )}
 
-          {event.missing.length ? (
-            <ul className={styles.missing}>
-              {event.missing.map((m) => (
-                <li key={m.kind} className={styles.missingItem}>
-                  <div>
-                    <span className={styles.missingName}>{m.name}</span>
-                    <span className={styles.missingWhy}>{m.why}</span>
-                  </div>
-                  {storageReady ? (
-                    <FileUpload
-                      label="Add it yourself"
-                      begin={beginTechUpload.bind(null, event.id, m.kind)}
-                      finish={finishTechUpload.bind(null, event.id)}
-                    />
-                  ) : null}
-                </li>
-              ))}
+          <SectionHeading note="riders and plots the promoter sends for themselves">
+            Promoter
+          </SectionHeading>
+
+          {event.promoter ? (
+            <ul className={styles.acts}>
+              <li className={styles.act}>
+                <span className={styles.actName}>{event.promoter.name}</span>
+                <div className={styles.actSlots}>
+                  <FileSlot
+                    label="Tech rider"
+                    file={event.promoter.rider}
+                    storageReady={storageReady}
+                    begin={beginPromoterUpload.bind(null, event.id, 'RIDER_TECH')}
+                    finish={finishTechUpload.bind(null, event.id)}
+                    link={linkToFile.bind(null, event.id)}
+                  />
+                  <FileSlot
+                    label="Stage plot"
+                    file={event.promoter.stagePlot}
+                    storageReady={storageReady}
+                    begin={beginPromoterUpload.bind(null, event.id, 'STAGE_PLOT')}
+                    finish={finishTechUpload.bind(null, event.id)}
+                    link={linkToFile.bind(null, event.id)}
+                  />
+                </div>
+              </li>
             </ul>
+          ) : (
+            <p className={styles.none}>No promoter payee on this event to file against.</p>
+          )}
+
+          <SectionHeading note="what XCHC sends every act before they arrive">
+            Venue spec
+          </SectionHeading>
+
+          <ul className={styles.acts}>
+            <li className={styles.act}>
+              <span className={styles.actName}>{NAME_OF.TECH_SPEC}</span>
+              <div className={styles.actSlots}>
+                <FileSlot
+                  label={NAME_OF.TECH_SPEC}
+                  file={event.venueSpec}
+                  storageReady={storageReady}
+                  begin={beginTechUpload.bind(null, event.id, 'TECH_SPEC', null)}
+                  finish={finishTechUpload.bind(null, event.id)}
+                  link={linkToFile.bind(null, event.id)}
+                />
+              </div>
+            </li>
+          </ul>
+
+          {event.unassigned.length > 0 ? (
+            <>
+              <SectionHeading note="uploaded before riders were per act — say whose each one is">
+                Unassigned
+              </SectionHeading>
+              <ul className={styles.files}>
+                {event.unassigned.map((f) => (
+                  <li key={f.id} className={styles.file}>
+                    <div className={styles.fileMain}>
+                      <span className={styles.fileKind}>{NAME_OF[f.kind] ?? f.kind}</span>
+                      <span className={styles.fileName}>{f.name}</span>
+                    </div>
+                    <OpenFile fileId={f.id} link={linkToFile.bind(null, event.id)}>
+                      Open
+                    </OpenFile>
+                    <AttachFile
+                      acts={event.acts.map((a) => ({ id: a.id, name: a.name }))}
+                      attach={assignFileToArtist.bind(null, event.id, f.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : null}
         </div>
       )}

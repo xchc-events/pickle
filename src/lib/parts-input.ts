@@ -41,7 +41,7 @@ export interface PartsRow {
   sold: number
   space: { name: string; capacity: number; seatedCapacity: number }
   leads: { role: string }[]
-  assets: { key: string; state: string; promoterSigned: boolean }[]
+  assets: { key: string; state: string; promoterSigned: boolean; signedById: string | null }[]
   channels: { channel: string; live: boolean; stale: boolean }[]
   beats: { done: boolean }[]
   artists: { status: string; payee: { files: { kind: string }[] } | null }[]
@@ -75,7 +75,7 @@ export const PARTS_SELECT = {
   sold: true,
   space: { select: { name: true, capacity: true, seatedCapacity: true } },
   leads: { select: { role: true } },
-  assets: { select: { key: true, state: true, promoterSigned: true } },
+  assets: { select: { key: true, state: true, promoterSigned: true, signedById: true } },
   channels: { select: { channel: true, live: true, stale: true } },
   beats: { select: { done: true } },
   artists: { select: { status: true, payee: { select: { files: { select: { kind: true } } } } } },
@@ -151,6 +151,7 @@ export function partsInputFor(row: PartsRow, x: PartsExtras): PartsEvent {
       key: a.key,
       state: lower<AssetState>(a.state),
       promoterSigned: a.promoterSigned,
+      signedById: a.signedById,
     })),
     // A file still being scanned has arrived, which is all "assets in" means;
     // one the scan blocked is not artwork anybody can use.

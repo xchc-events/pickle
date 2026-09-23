@@ -8,12 +8,17 @@ import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { LeadPicker } from '@/components/LeadPicker'
 import { FileUpload } from '@/components/FileUpload'
-import { OpenArtwork } from './OpenArtwork'
+import { ReasonAction } from '@/components/ReasonAction'
+import { CommentThread } from '@/components/CommentThread'
+import { OpenArtwork } from '@/components/OpenArtwork'
 import {
   approveAsset,
   beginArtworkUpload,
   finishArtworkUpload,
   linkToArtwork,
+  postDesignComment,
+  readyForSignOff,
+  reopenPiece,
   requestChange,
   setDesignLead,
 } from './actions'
@@ -191,6 +196,15 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                   </div>
                 </div>
               </div>
+
+              <div className={styles.generalThread}>
+                <div className={styles.fieldLabel}>Design comments</div>
+                <CommentThread
+                  comments={event.generalComments}
+                  post={postDesignComment.bind(null, event.id, null)}
+                  placeholder="Comment on the brief"
+                />
+              </div>
             </div>
 
             <aside className={styles.hoursCard}>
@@ -246,6 +260,7 @@ export default async function DesignPage({ searchParams }: PageProps<'/design'>)
                       eventId={event.id}
                       asset={a}
                       storageReady={storageReady}
+                      maySignOff={event.maySignOff}
                     />
                   ))}
                 </div>
@@ -293,11 +308,15 @@ function AssetTile({
   eventId,
   asset,
   storageReady,
+  maySignOff,
 }: {
   eventId: string
   asset: AssetCard
   storageReady: boolean
+  /** D6 — whether the signed-in user is this event's owner or its promoter. */
+  maySignOff: boolean
 }) {
+  const comments = asset.comments ?? []
   return (
     <article className={`${styles.card} ${asset.state === 'review' ? styles.cardReview : ''}`}>
       <div className={`${styles.thumb} ${asset.state === 'review' ? styles.thumbReview : ''}`}>
@@ -350,14 +369,34 @@ function AssetTile({
           </div>
         ) : null}
 
-        {/* Only the piece actually up for sign-off is actionable. Drafts are
-            somebody's work in progress, not a decision waiting to be taken. */}
-        {asset.state === 'approved' ? (
-          <div className={`${styles.done} ${styles.good}`}>
-            <i className="ph ph-check-circle" aria-hidden="true" />
-            signed off
+        {/* Design's own half of sign-off (D6): put a piece up for review.
+            Deciding it, once it is there, belongs to the owner or the
+            promoter — see the branches below. */}
+        {asset.state === 'draft' ? (
+          <div className={styles.actions}>
+            <ActionButton
+              className={`btn btn-secondary ${styles.act} ${styles.actWide}`}
+              action={readyForSignOff.bind(null, eventId, asset.key)}
+            >
+              Ready for sign-off
+            </ActionButton>
           </div>
-        ) : asset.state === 'review' ? (
+        ) : asset.state === 'approved' ? (
+          <div className={styles.doneRow}>
+            <div className={`${styles.done} ${styles.good}`}>
+              <i className="ph ph-check-circle" aria-hidden="true" />
+              signed off
+            </div>
+            {maySignOff ? (
+              <ReasonAction
+                className={`btn btn-ghost ${styles.act}`}
+                label="Reopen"
+                placeholder="Why does this need to reopen?"
+                action={reopenPiece.bind(null, eventId, asset.key)}
+              />
+            ) : null}
+          </div>
+        ) : maySignOff ? (
           <div className={styles.actions}>
             <ActionButton
               className={`btn btn-primary ${styles.act} ${styles.actWide}`}
@@ -365,14 +404,33 @@ function AssetTile({
             >
               Approve
             </ActionButton>
-            <ActionButton
+            <ReasonAction
               className={`btn btn-ghost ${styles.act}`}
+              label="Ask for a change"
+              placeholder="What needs to change?"
               action={requestChange.bind(null, eventId, asset.key)}
-            >
-              Change
-            </ActionButton>
+            />
           </div>
-        ) : null}
+        ) : (
+          <p className={styles.waiting}>
+            <i className="ph ph-hourglass-medium" aria-hidden="true" />
+            waiting on the owner or the promoter to sign off
+          </p>
+        )}
+
+        {/* D5 — a thread per piece, collapsed so a quiet piece stays quiet. */}
+        <details className={styles.thread}>
+          <summary className={styles.threadSummary}>
+            {comments.length
+              ? `${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}`
+              : 'Comment'}
+          </summary>
+          <CommentThread
+            comments={comments}
+            post={postDesignComment.bind(null, eventId, asset.key)}
+            placeholder={`Comment on ${asset.name}`}
+          />
+        </details>
       </div>
     </article>
   )

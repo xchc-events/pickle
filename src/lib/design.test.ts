@@ -12,13 +12,19 @@ import {
   copyFit,
   designHours,
   designQueueRow,
+  maySignOff,
   missingBiosList,
   verticalCuts,
   type EventAsset,
 } from './design'
 
 const set = (states: Partial<Record<string, EventAsset['state']>>): EventAsset[] =>
-  ASSET_SET.map((s) => ({ key: s.key, state: states[s.key] ?? 'draft', promoterSigned: false }))
+  ASSET_SET.map((s) => ({
+    key: s.key,
+    state: states[s.key] ?? 'draft',
+    promoterSigned: false,
+    signedById: null,
+  }))
 
 const brief = {
   brief: null,
@@ -305,6 +311,7 @@ describe('acts to chase', () => {
         key: a.key,
         state: 'approved' as const,
         promoterSigned: true,
+        signedById: 'user_test_signer',
       })),
       artworkFiles: 0,
       channels: [{ live: true, stale: false }],
@@ -331,5 +338,53 @@ describe('acts to chase', () => {
 
     expect(list.length).toBe(2)
     expect(designPart?.detail).toBe(`${list.length} acts' bios and pics to chase`)
+  })
+})
+
+// -------------------------------------------------------------- sign-off ---
+
+/**
+ * D6, Connor 23 Sep 2026: "sign-off can happen from either the external
+ * promoter or the internal event owner" — and nobody else. Design staff put
+ * a piece up for review; they do not decide whether it is right.
+ */
+describe('who may sign a piece off', () => {
+  const owner = { external: false, personId: 'person_owner', organisationId: null }
+  const otherStaff = { external: false, personId: 'person_other', organisationId: null }
+  const noPerson = { external: false, personId: null, organisationId: null }
+  const promoter = { external: true, personId: null, organisationId: 'payee_koura' }
+  const otherPromoter = { external: true, personId: null, organisationId: 'payee_wheke' }
+  const promoterNoOrg = { external: true, personId: null, organisationId: null }
+
+  const event = { ownerId: 'person_owner', promoterId: 'payee_koura' }
+
+  it('allows the event’s internal owner', () => {
+    expect(maySignOff(owner, event)).toBe(true)
+  })
+
+  it('allows a promoter of the event’s own organisation', () => {
+    expect(maySignOff(promoter, event)).toBe(true)
+  })
+
+  it('refuses an internal user who is not this event’s owner', () => {
+    expect(maySignOff(otherStaff, event)).toBe(false)
+  })
+
+  it('refuses an internal user with no person record', () => {
+    expect(maySignOff(noPerson, event)).toBe(false)
+  })
+
+  it('refuses a promoter from another organisation', () => {
+    expect(maySignOff(otherPromoter, event)).toBe(false)
+  })
+
+  it('refuses an external user with no organisation, even if the event has none either', () => {
+    expect(maySignOff(promoterNoOrg, { ownerId: null, promoterId: null })).toBe(false)
+  })
+
+  it('refuses everyone once an event has neither an owner nor a promoter set', () => {
+    const orphan = { ownerId: null, promoterId: null }
+    expect(maySignOff(owner, orphan)).toBe(false)
+    expect(maySignOff(promoter, orphan)).toBe(false)
   })
 })

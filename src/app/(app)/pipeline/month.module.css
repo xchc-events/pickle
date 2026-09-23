@@ -1,0 +1,107 @@
+/* The Pipeline's month view: a seven-column, Monday-first grid. Same
+   density as the matrix — see the note at the top of pipeline.module.css. */
+
+.scroller {
+  overflow-x: auto;
+}
+
+.grid {
+  min-width: 900px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid var(--color-divider);
+  border-left: 1px solid var(--color-divider);
+}
+
+.dowHead {
+  padding: var(--space-2) var(--space-3);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-neutral-700);
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.cell {
+  min-height: 96px;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+/* Lead-in/lead-out days from the months either side. */
+.cellOut {
+  opacity: 0.45;
+}
+
+.cellToday {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.dateNum {
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  color: var(--color-neutral-400);
+}
+
+.cellToday .dateNum {
+  color: var(--color-accent);
+}
+
+.events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* One event's card: name and doors time, linking to the record. A
+   multi-day event gets one of these on every date it covers — see
+   `eventsOnDay` in src/lib/calendar.ts. */
+.event {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-accent-700);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent-100);
+  text-decoration: none;
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.eventName {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eventTime {
+  flex: none;
+  font-size: 9px;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+}
+
+.eventConcluded {
+  opacity: 0.5;
+}
+
+.eventWarn {
+  border-color: var(--st-warn);
+  background: var(--st-warn-dim);
+  color: var(--st-warn);
+}
+
+.eventStop {
+  border-color: var(--st-stop);
+  background: var(--st-stop-dim);
+  color: var(--st-stop);
+}

@@ -30,6 +30,10 @@ export interface BeginInput {
   eventId?: string | null
   payeeId?: string | null
   assetId?: string | null
+  /** Which act's slot this is — a rider or stage plot for one act on this
+   *  event. Leave unset for the venue spec, the promoter's own row (which
+   *  uses payeeId instead) or a file nobody has attached to an act yet. */
+  artistId?: string | null
   grantId?: string | null
   uploadedById?: string | null
 }
@@ -71,6 +75,7 @@ export async function begin(input: BeginInput): Promise<BeginResult> {
       eventId: input.eventId ?? null,
       payeeId: input.payeeId ?? null,
       assetId: input.assetId ?? null,
+      artistId: input.artistId ?? null,
       grantId: input.grantId ?? null,
       uploadedById: input.uploadedById ?? null,
     },
@@ -108,11 +113,18 @@ export async function finish(fileId: string, actor?: SessionUser): Promise<Finis
 
   // Replacing a rider supersedes the old one rather than overwriting it: the
   // tech who printed last week's copy needs the old one to still exist.
+  //
+  // eventId/payeeId/assetId are mutually exclusive owners, so each is only
+  // compared when this file has one. artistId is different — a sub-scope
+  // *within* an event, where many acts each keep their own current rider —
+  // so it is always compared, including null against null, or an unassigned
+  // upload would supersede (and hide) an act's already-attributed one.
   const supersedes = await db.storedFile.findMany({
     where: {
       id: { not: fileId },
       current: true,
       kind: row.kind,
+      artistId: row.artistId,
       ...(row.eventId ? { eventId: row.eventId } : {}),
       ...(row.payeeId ? { payeeId: row.payeeId } : {}),
       ...(row.assetId ? { assetId: row.assetId } : {}),
@@ -157,6 +169,11 @@ export interface FileRow {
   version: number
   at: Date
   uploadedBy: string | null
+  /** Which act's slot this is on, when it is on one. See StoredFile.artistId. */
+  artistId: string | null
+  /** The payee it is filed against, if any — an act's persistent record, or
+   *  the promoter's own documents. */
+  payeeId: string | null
 }
 
 /** The current files on an event, newest kind-group first. */
@@ -176,6 +193,8 @@ export async function filesForEvent(eventId: string): Promise<FileRow[]> {
     version: r.version,
     at: r.createdAt,
     uploadedBy: r.uploadedBy?.name ?? null,
+    artistId: r.artistId,
+    payeeId: r.payeeId,
   }))
 }
 
@@ -190,4 +209,24 @@ export async function linkTo(fileId: string): Promise<string | null> {
   const row = await db.storedFile.findUnique({ where: { id: fileId } })
   if (!row || row.scan !== 'CLEAN') return null
   return r2.downloadUrl(row.key, row.name, row.mime)
+}
+
+export type AttachResult = { ok: true } | { ok: false; why: string }
+
+/**
+ * Pick which act an unassigned file belongs to.
+ *
+ * Only ever moves a file *out* of "unassigned" — the caller is expected to
+ * have already checked the file and the act both belong to the event in
+ * question, which is a permissions question and not this function's to
+ * answer. Refuses a file that is already on an act rather than silently
+ * reassigning it: that is a different, louder mistake to make from a picker.
+ */
+export async function attachToArtist(fileId: string, artistId: string): Promise<AttachResult> {
+  const row = await db.storedFile.findUnique({ where: { id: fileId } })
+  if (!row) return { ok: false, why: 'That file no longer exists.' }
+  if (row.artistId) return { ok: false, why: 'That file is already on an act.' }
+
+  await db.storedFile.update({ where: { id: fileId }, data: { artistId } })
+  return { ok: true }
 }

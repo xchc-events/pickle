@@ -79,6 +79,47 @@
   color: var(--color-neutral-200);
 }
 
+/* --- Month/Week's prev/next, beside the same filter row ------------- */
+
+.calNav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--color-neutral-500);
+}
+
+.calStep {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-400);
+}
+
+.calStep:hover {
+  color: var(--color-neutral-100);
+  background: color-mix(in srgb, var(--color-neutral-100) 8%, transparent);
+}
+
+.calTitle {
+  min-width: 11ch;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 12.5px;
+  color: var(--color-neutral-200);
+}
+
+.calToday {
+  color: var(--color-accent);
+}
+
+.calToday:hover {
+  color: var(--color-accent-2);
+}
+
 /* --- the matrix ----------------------------------------------------- */
 
 .body {
