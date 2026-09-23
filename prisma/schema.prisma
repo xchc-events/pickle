@@ -58,6 +58,7 @@ model Person {
   channelPosts ChannelPush[]
   uploads      StoredFile[]
   grantsIssued AccessGrant[]
+  shiftOffers  ShiftOffer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -600,6 +601,9 @@ model EventArtist {
 enum ShiftState {
   OPEN
   ASKED
+  /// Picked, not yet confirmed — see `ShiftOffer`. No hour entry exists
+  /// while a shift sits here; one is booked only on confirming.
+  OFFERED
   ASSIGNED
   DONE
 }
@@ -620,6 +624,40 @@ model Shift {
   asked    Int        @default(0)
 
   hourEntry HourEntry?
+  offers    ShiftOffer[]
+}
+
+enum ShiftOfferResponse {
+  CONFIRMED
+  DECLINED
+}
+
+/// An emailed offer of a shift, to a person who may or may not have a User.
+/// The shift's own `state` is what the roster and Home trust; this row is
+/// only the email's record of when it went out and how it was answered — see
+/// `src/lib/shift-offers.ts` and `src/app/s/[token]`.
+///
+/// Modelled on `AccessGrant`: 32 random bytes, only the SHA-256 stored,
+/// meant for one reply.
+model ShiftOffer {
+  id       String @id @default(cuid())
+  shiftId  String
+  shift    Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person @relation(fields: [personId], references: [id])
+
+  tokenHash String   @unique
+  expires   DateTime
+  sentAt    DateTime @default(now())
+
+  /// Set together, the moment somebody uses the link (or the shift is
+  /// confirmed or declined some other way while this offer was still live).
+  respondedAt DateTime?
+  response    ShiftOfferResponse?
+
+  @@index([shiftId])
+  @@index([personId])
+  @@index([expires])
 }
 
 model Task {
