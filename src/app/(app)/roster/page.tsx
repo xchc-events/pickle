@@ -6,7 +6,15 @@ import { SectionHeading } from '@/components/SectionHeading'
 import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
 import { ShiftPicker } from './ShiftPicker'
-import { askAgain, assignShift } from './actions'
+import { ShiftEditor } from './ShiftEditor'
+import {
+  askAgain,
+  assignShift,
+  deleteShift,
+  duplicateShift,
+  renameShift,
+  retimeShift,
+} from './actions'
 import styles from './roster.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -63,14 +71,36 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
                 <span className={styles.eventTimes}>{fiveTimesLine(event)}</span>
               ) : null}
             </div>
-            <div className={styles.figures}>
-              <div className={styles.figure}>
-                <span className={styles.figureLabel}>Rostered hours</span>
-                <span className={`${styles.figureValue} tabular`}>{event.callHours}</span>
+            <div className={styles.headStats}>
+              <div className={styles.salesStrip}>
+                <div className={styles.saleFigure}>
+                  <span className={styles.saleLabel}>Sold</span>
+                  <span className={`${styles.saleValue} tabular`}>{event.sales.sold}</span>
+                </div>
+                <div className={styles.saleFigure}>
+                  <span className={styles.saleLabel}>Likely</span>
+                  <span className={`${styles.saleValue} tabular`}>{event.sales.likely}</span>
+                </div>
+                <div className={styles.saleFigure}>
+                  <span className={styles.saleLabel}>Capacity</span>
+                  <span className={`${styles.saleValue} tabular`}>{event.sales.capacity}</span>
+                </div>
+                <div className={styles.saleFigure}>
+                  <span className={styles.saleLabel}>Shifts planned</span>
+                  <span className={`${styles.saleValue} tabular`}>
+                    {event.shifts.length} of {event.sales.planned}
+                  </span>
+                </div>
               </div>
-              <div className={styles.figure}>
-                <span className={styles.figureLabel}>Projected cost</span>
-                <span className={`${styles.figureValue} tabular`}>{money(event.callCost)}</span>
+              <div className={styles.figures}>
+                <div className={styles.figure}>
+                  <span className={styles.figureLabel}>Rostered hours</span>
+                  <span className={`${styles.figureValue} tabular`}>{event.callHours}</span>
+                </div>
+                <div className={styles.figure}>
+                  <span className={styles.figureLabel}>Projected cost</span>
+                  <span className={`${styles.figureValue} tabular`}>{money(event.callCost)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -84,49 +114,63 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
               const open = s.state === 'OPEN' || s.state === 'ASKED'
               return (
                 <li key={s.id} className={`${styles.shift} ${open ? styles.shiftOpen : ''}`}>
-                  <div className={styles.role}>
-                    <span className={styles.roleName}>{s.role}</span>
-                    <span className={styles.roleCall}>
-                      {s.hours}h · {call(s.start)}
-                    </span>
-                  </div>
-
-                  <div className={styles.who}>
-                    <Avatar
-                      initials={s.personInitials ?? '?'}
-                      title={s.personName ?? 'Unfilled'}
-                      accent={s.personInitials !== null}
-                    />
-                    <ShiftPicker
-                      value={s.personId ?? ''}
-                      candidates={s.candidates}
-                      // Bound, not wrapped: a closure created here cannot
-                      // cross into a client component.
-                      assign={assignShift.bind(null, event.id, s.id)}
-                    />
-                  </div>
-
-                  <div className={styles.state}>
-                    {open ? (
-                      <>
-                        <span className={styles.asked}>
-                          {s.asked === 0 ? 'not asked yet' : `asked ${s.asked}`}
-                        </span>
-                        <ActionButton
-                          className={styles.askButton}
-                          action={askAgain.bind(null, event.id, s.id)}
-                          title="Record another ask without filling it"
-                        >
-                          Ask again
-                        </ActionButton>
-                      </>
-                    ) : (
-                      <span className={styles.good}>
-                        <i className="ph ph-check-circle" aria-hidden="true" />
-                        covered
+                  <div className={styles.shiftMain}>
+                    <div className={styles.role}>
+                      <span className={styles.roleName}>{s.role}</span>
+                      <span className={styles.roleCall}>
+                        {s.hours}h · {call(s.start)}
                       </span>
-                    )}
+                    </div>
+
+                    <div className={styles.who}>
+                      <Avatar
+                        initials={s.personInitials ?? '?'}
+                        title={s.personName ?? 'Unfilled'}
+                        accent={s.personInitials !== null}
+                      />
+                      <ShiftPicker
+                        value={s.personId ?? ''}
+                        candidates={s.candidates}
+                        // Bound, not wrapped: a closure created here cannot
+                        // cross into a client component.
+                        assign={assignShift.bind(null, event.id, s.id)}
+                      />
+                    </div>
+
+                    <div className={styles.state}>
+                      {open ? (
+                        <>
+                          <span className={styles.asked}>
+                            {s.asked === 0 ? 'not asked yet' : `asked ${s.asked}`}
+                          </span>
+                          <ActionButton
+                            className={styles.askButton}
+                            action={askAgain.bind(null, event.id, s.id)}
+                            title="Record another ask without filling it"
+                          >
+                            Ask again
+                          </ActionButton>
+                        </>
+                      ) : (
+                        <span className={styles.good}>
+                          <i className="ph ph-check-circle" aria-hidden="true" />
+                          covered
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  <ShiftEditor
+                    role={s.role}
+                    startInput={s.startInput}
+                    endInput={s.endInput}
+                    // Bound, not wrapped: a closure created here cannot cross
+                    // into a client component.
+                    rename={renameShift.bind(null, event.id, s.id)}
+                    retime={retimeShift.bind(null, event.id, s.id)}
+                    duplicate={duplicateShift.bind(null, event.id, s.id)}
+                    del={deleteShift.bind(null, event.id, s.id)}
+                  />
                 </li>
               )
             })}
