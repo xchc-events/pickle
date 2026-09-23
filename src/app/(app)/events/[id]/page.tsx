@@ -79,7 +79,6 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         select: { id: true, name: true },
       })
     : []
-  const ownerOptions = owners.map((p) => ({ personId: p.id, name: p.name }))
 
   // The external coordinator picker: every promoter organisation on file.
   const promoterOrgs = canChange
@@ -121,6 +120,16 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
   // the editor gets one `paid` flag per act without carrying a second shape.
   const paidById = new Map(ownerRow?.artists.map((a) => [a.id, a.paid]) ?? [])
   const acts = ev.artists.map((a) => ({ ...a, paid: paidById.get(a.id) ?? false }))
+
+  // The current owner stays in the picker even when their account carries
+  // no qualifying role (the seed's Ana Kelliher owns nights from the Bar
+  // role), so the field says who owns the night rather than "Unassigned".
+  // Choosing them again changes nothing; choosing anyone else still goes
+  // through setOwner's own check.
+  const ownerOptions = owners.map((p) => ({ personId: p.id, name: p.name }))
+  if (ownerRow?.ownerId && ev.ownerName && !owners.some((p) => p.id === ownerRow.ownerId)) {
+    ownerOptions.push({ personId: ownerRow.ownerId, name: `${ev.ownerName} (not a coordinator)` })
+  }
 
   // A concrete Figures even for somebody who cannot change the record —
   // simpler than threading a null through, and never rendered for them since
