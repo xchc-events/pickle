@@ -1,0 +1,124 @@
+/* Codes — T6. Below the tiers table, its own section, its own list. */
+
+.note {
+  margin: 0 0 var(--space-3);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--color-neutral-600);
+  max-width: 68ch;
+}
+
+.empty {
+  margin: 0 0 var(--space-3);
+  font-size: 12px;
+  color: var(--color-neutral-500);
+}
+
+.list {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 8px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--color-neutral-100);
+  font-size: 13px;
+}
+
+.value {
+  color: var(--color-neutral-200);
+}
+
+.tier {
+  color: var(--color-neutral-600);
+  font-size: 11px;
+}
+
+.state {
+  font-size: 11px;
+}
+
+.active {
+  color: var(--st-good);
+}
+
+.scheduled {
+  color: var(--st-warn);
+}
+
+.expired,
+.exhausted,
+.off {
+  color: var(--color-neutral-600);
+}
+
+.uses {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-600);
+  font-size: 11px;
+}
+
+.who {
+  margin-left: auto;
+  color: var(--color-neutral-600);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.doneNote {
+  font-size: 11px;
+  color: var(--color-neutral-700);
+}
+
+/* --- the add form --------------------------------------------------------- */
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--color-neutral-600);
+}
+
+.input {
+  width: 108px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-neutral-100);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-accent-500);
+}
+
+.submit {
+  height: 30px;
+}

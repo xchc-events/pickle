@@ -61,6 +61,73 @@ const connectionString = process.env.DATABASE_URL
 if (!connectionString) throw new Error('DATABASE_URL is not set')
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 
+/**
+ * Connor, 23 Sep 2026, on Tech production: "It'd be better to have a more
+ * full-featured option where you can select which components of a venue
+ * spec sheet you're sending out, as not all of them are relevant to all
+ * people." His own list of sections, seeded in this order — the wording is
+ * a starting point for an administrator to correct in Admin, "Venue spec",
+ * not a finished spec; nothing here is a fact about the room that has not
+ * already been established elsewhere in this file.
+ */
+const VENUE_SPEC_COMPONENTS: { key: string; title: string; body: string }[] = [
+  {
+    key: 'room',
+    title: 'Room dimensions and capacity',
+    body: `${MAIN_SPACE.name}: capacity ${MAIN_SPACE.capacity} standing, ${MAIN_SPACE.seatedCapacity} seated. Floor dimensions to be added here.`,
+  },
+  {
+    key: 'stage',
+    title: 'Stage',
+    body: 'Dimensions, height and access to be added here.',
+  },
+  {
+    key: 'pa',
+    title: 'PA and monitors',
+    body: 'The house PA, monitor count and mix positions to be added here.',
+  },
+  {
+    key: 'lighting',
+    title: 'Lighting rig',
+    body: 'What is rigged, and what a visiting LD can plug into, to be added here.',
+  },
+  {
+    key: 'backline',
+    title: 'Backline',
+    body: 'What the venue can provide, and what every act still needs to bring, to be added here.',
+  },
+  {
+    key: 'power',
+    title: 'Power',
+    body: 'Available power on stage and front of house to be added here.',
+  },
+  {
+    key: 'load_in',
+    title: 'Load-in and parking',
+    body: 'Where to pull up, the route in, and any lift or stairs, to be added here.',
+  },
+  {
+    key: 'green_room',
+    title: 'Green room',
+    body: 'What the green room offers, and where it is relative to the stage, to be added here.',
+  },
+  {
+    key: 'bar_catering',
+    title: 'Bar and catering',
+    body: 'What the house bar covers, and any hospitality provided to acts, to be added here.',
+  },
+  {
+    key: 'house_rules',
+    title: 'House rules',
+    body: 'Curfew, noise limits and anything else every act needs to know before they arrive, to be added here.',
+  },
+  {
+    key: 'contacts',
+    title: 'Contacts',
+    body: 'Who to call on the day — duty manager and tech lead — to be added here.',
+  },
+]
+
 // ------------------------------------------------------------------ people ---
 
 const PEOPLE = [
@@ -571,6 +638,8 @@ async function main() {
   await db.barSale.deleteMany()
   await db.barBudget.deleteMany()
   await db.ticketSaleDay.deleteMany()
+  await db.ticketCode.deleteMany()
+  await db.doorListEntry.deleteMany()
   await db.event.deleteMany()
   await db.space.deleteMany()
   await db.availability.deleteMany()
@@ -578,6 +647,7 @@ async function main() {
   await db.person.deleteMany()
   await db.payee.deleteMany()
   await db.modulePermission.deleteMany()
+  await db.venueSpecComponent.deleteMany()
 
   console.log('permissions…')
   for (const [role, mods] of Object.entries(DEFAULT_PERMS)) {
@@ -586,6 +656,11 @@ async function main() {
         data: { role: role.toUpperCase() as Role, module: m },
       })
     }
+  }
+
+  console.log('venue spec…')
+  for (const [i, c] of VENUE_SPEC_COMPONENTS.entries()) {
+    await db.venueSpecComponent.create({ data: { ...c, order: i } })
   }
 
   console.log('people…')
@@ -933,6 +1008,66 @@ async function main() {
       })
     }
 
+    // Codes and the door list — T6, T7. Slow Fold is the worked example: a
+    // live percent-off code, and a door list whose COMP entries (5 people)
+    // stand in for the flat 6 typed as `crew` above, so Finance's comps
+    // line for this event is already reading the list, not the guess — see
+    // `compsCountFor` in src/lib/door-list.ts.
+    if (e.id === 'sf') {
+      await db.ticketCode.create({
+        data: {
+          eventId: created.id,
+          code: 'LOCALS10',
+          kind: 'PERCENT_OFF',
+          value: 10,
+          useLimit: 30,
+          uses: 12,
+          who: 'Mere Tapu',
+          createdById: 'mt',
+        },
+      })
+      await db.doorListEntry.createMany({
+        data: [
+          {
+            eventId: created.id,
+            name: 'Kōura Records guest list',
+            partySize: 2,
+            kind: 'COMP',
+            note: 'label guests',
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Harbour Static guest list',
+            partySize: 3,
+            kind: 'COMP',
+            note: 'opening act',
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Night Owl PR',
+            partySize: 1,
+            kind: 'INDUSTRY',
+            note: null,
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+          {
+            eventId: created.id,
+            name: 'Aroha Ngata',
+            partySize: 2,
+            kind: 'GUEST',
+            note: null,
+            who: 'Mere Tapu',
+            addedById: 'mt',
+          },
+        ],
+      })
+    }
+
     await db.beat.createMany({
       data: BEATS.map((b, i) => ({
         eventId: created.id,
@@ -1054,6 +1189,9 @@ async function main() {
     beats: await db.beat.count(),
     leads: await db.eventLead.count(),
     ticketSaleDays: await db.ticketSaleDay.count(),
+    ticketCodes: await db.ticketCode.count(),
+    doorListEntries: await db.doorListEntry.count(),
+    venueSpecComponents: await db.venueSpecComponent.count(),
   }
   console.log('seeded', counts)
 }

@@ -399,7 +399,10 @@ function design(e: PartsEvent): PartState {
   const open = [
     e.leads.design ? null : 'no lead',
     missingBios > 0
-      ? `${missingBios} ${plural(missingBios, "act's", "acts'")} bios and pics to chase`
+      ? // Short enough for the cell; the Design page lists which acts and
+        // what is missing, and the hover names the gate ("artist bios and
+        // pics in"). "6 acts' bios and pics to chase" truncated in the cell.
+        `${missingBios} ${plural(missingBios, 'act', 'acts')} to chase`
       : null,
   ].filter((s) => s !== null)
 

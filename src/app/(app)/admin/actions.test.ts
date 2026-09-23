@@ -24,6 +24,7 @@ const db = {
   person: { update: vi.fn() },
   session: { deleteMany: vi.fn() },
   authToken: { deleteMany: vi.fn() },
+  venueSpecComponent: { findUnique: vi.fn(), update: vi.fn() },
   $transaction: vi.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
 }
 vi.mock('@/lib/db', () => ({ db }))
@@ -49,7 +50,7 @@ const mere = {
 
 beforeEach(() => {
   permissions.requireModule.mockReset().mockResolvedValue({ user: sione, modules: ['admin'] })
-  for (const table of [db.user, db.person, db.session, db.authToken]) {
+  for (const table of [db.user, db.person, db.session, db.authToken, db.venueSpecComponent]) {
     for (const fn of Object.values(table)) fn.mockReset()
   }
   // Cleared rather than reset: it keeps running the operations it is given.
@@ -361,5 +362,84 @@ describe('setPhone', () => {
     const said = await actions.setPhone('u_mere', '021 555 0134')
     expect(said.kind).toBe('stop')
     expect(db.user.update).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Editing the venue spec's components.
+ *
+ * Connor, 23 Sep 2026: X2 — the venue spec is "Edited in Admin ('Venue
+ * spec') by administrators." Content and whether it is offered on Tech at
+ * all, not the seeded list itself.
+ */
+describe('updateVenueSpecComponent', () => {
+  const stage = { id: 'vsc_stage', key: 'stage', title: 'Stage', body: '6m x 4m.', active: true }
+
+  beforeEach(() => {
+    db.venueSpecComponent.findUnique.mockResolvedValue(stage)
+    db.venueSpecComponent.update.mockResolvedValue(stage)
+  })
+
+  it('saves a new title and body', async () => {
+    const said = await actions.updateVenueSpecComponent('vsc_stage', 'Stage', '8m x 5m now.')
+
+    expect(said.kind).toBe('good')
+    expect(db.venueSpecComponent.update).toHaveBeenCalledWith({
+      where: { id: 'vsc_stage' },
+      data: { title: 'Stage', body: '8m x 5m now.' },
+    })
+  })
+
+  it('is for administrators only', async () => {
+    permissions.requireModule.mockResolvedValue({ user: { ...sione, role: 'COORDINATOR' } })
+
+    const said = await actions.updateVenueSpecComponent('vsc_stage', 'Stage', '8m x 5m now.')
+
+    expect(said.kind).toBe('stop')
+    expect(db.venueSpecComponent.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty title', async () => {
+    const said = await actions.updateVenueSpecComponent('vsc_stage', '   ', '8m x 5m now.')
+
+    expect(said.kind).toBe('stop')
+    expect(db.venueSpecComponent.update).not.toHaveBeenCalled()
+  })
+
+  it('says when the component does not exist', async () => {
+    db.venueSpecComponent.findUnique.mockResolvedValue(null)
+
+    const said = await actions.updateVenueSpecComponent('vsc_ghost', 'Stage', 'x')
+
+    expect(said.kind).toBe('stop')
+    expect(db.venueSpecComponent.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('setVenueSpecComponentActive', () => {
+  const backline = { id: 'vsc_backline', key: 'backline', title: 'Backline', active: true }
+
+  beforeEach(() => {
+    db.venueSpecComponent.findUnique.mockResolvedValue(backline)
+    db.venueSpecComponent.update.mockResolvedValue({ ...backline, active: false })
+  })
+
+  it('turns a component off so Tech stops offering it', async () => {
+    const said = await actions.setVenueSpecComponentActive('vsc_backline', false)
+
+    expect(said.kind).toBe('good')
+    expect(db.venueSpecComponent.update).toHaveBeenCalledWith({
+      where: { id: 'vsc_backline' },
+      data: { active: false },
+    })
+  })
+
+  it('is for administrators only', async () => {
+    permissions.requireModule.mockResolvedValue({ user: { ...sione, role: 'COORDINATOR' } })
+
+    const said = await actions.setVenueSpecComponentActive('vsc_backline', false)
+
+    expect(said.kind).toBe('stop')
+    expect(db.venueSpecComponent.update).not.toHaveBeenCalled()
   })
 })

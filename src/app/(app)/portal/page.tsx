@@ -129,6 +129,24 @@ function PortalEventRow({ event: e }: { event: PortalEvent }) {
         </div>
       ) : null}
 
+      {e.runSheet ? (
+        <details className={styles.thread}>
+          <summary className={styles.threadSummary}>Run sheet</summary>
+          <ul className={styles.runSheet}>
+            {e.runSheet.map((r, i) => (
+              <li key={r.id ?? i} className={styles.runSheetRow}>
+                <span className={styles.runSheetTime}>{r.time ?? '—'}</span>
+                <span className={styles.runSheetItem}>
+                  {r.item}
+                  {r.who ? <span className={styles.runSheetWho}> · {r.who}</span> : null}
+                </span>
+                {r.note ? <span className={styles.runSheetNote}>{r.note}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+
       <details className={styles.thread}>
         <summary className={styles.threadSummary}>
           {e.generalComments.length

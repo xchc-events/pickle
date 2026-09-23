@@ -257,3 +257,39 @@
 .thread[open] .threadSummary {
   margin-bottom: 6px;
 }
+
+/* --- X3, the run sheet, read-only ---------------------------------------- */
+
+.runSheet {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.runSheetRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11.5px;
+}
+
+.runSheetTime {
+  flex: 0 0 52px;
+  color: var(--color-neutral-600);
+}
+
+.runSheetItem {
+  color: var(--color-neutral-200);
+}
+
+.runSheetWho {
+  color: var(--color-neutral-600);
+}
+
+.runSheetNote {
+  color: var(--color-neutral-600);
+  font-style: italic;
+}
