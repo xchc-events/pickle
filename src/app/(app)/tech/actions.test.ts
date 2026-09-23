@@ -71,7 +71,14 @@ describe('starting an act’s rider or stage plot', () => {
   it('passes the act straight through once it checks out', async () => {
     findArtist.mockResolvedValue({ eventId: EVENT })
 
-    const out = await beginTechUpload(EVENT, 'RIDER_TECH', 'art_1', 'rider.pdf', 'application/pdf', 1024)
+    const out = await beginTechUpload(
+      EVENT,
+      'RIDER_TECH',
+      'art_1',
+      'rider.pdf',
+      'application/pdf',
+      1024,
+    )
 
     expect(out.ok).toBe(true)
     expect(begin).toHaveBeenCalledWith(
@@ -82,7 +89,14 @@ describe('starting an act’s rider or stage plot', () => {
   it('refuses an act that belongs to a different event', async () => {
     findArtist.mockResolvedValue({ eventId: OTHER_EVENT })
 
-    const out = await beginTechUpload(EVENT, 'RIDER_TECH', 'art_1', 'rider.pdf', 'application/pdf', 1024)
+    const out = await beginTechUpload(
+      EVENT,
+      'RIDER_TECH',
+      'art_1',
+      'rider.pdf',
+      'application/pdf',
+      1024,
+    )
 
     expect(out.ok).toBe(false)
     expect(out.why).toMatch(/not on this event/)
@@ -92,7 +106,14 @@ describe('starting an act’s rider or stage plot', () => {
   it('refuses an act id that does not exist at all', async () => {
     findArtist.mockResolvedValue(null)
 
-    const out = await beginTechUpload(EVENT, 'RIDER_TECH', 'art_ghost', 'rider.pdf', 'application/pdf', 1024)
+    const out = await beginTechUpload(
+      EVENT,
+      'RIDER_TECH',
+      'art_ghost',
+      'rider.pdf',
+      'application/pdf',
+      1024,
+    )
 
     expect(out.ok).toBe(false)
     expect(begin).not.toHaveBeenCalled()
@@ -114,7 +135,9 @@ describe('starting the promoter’s own upload', () => {
     const out = await beginPromoterUpload(EVENT, 'RIDER_TECH', 'rider.pdf', 'application/pdf', 1024)
 
     expect(out.ok).toBe(true)
-    expect(begin).toHaveBeenCalledWith(expect.objectContaining({ payeeId: 'pay_promo', eventId: EVENT }))
+    expect(begin).toHaveBeenCalledWith(
+      expect.objectContaining({ payeeId: 'pay_promo', eventId: EVENT }),
+    )
   })
 
   it('refuses when the event has no promoter payee to file it against', async () => {

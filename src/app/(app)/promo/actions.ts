@@ -186,7 +186,12 @@ export async function pushStale(eventId: string): Promise<Said> {
     auto.map((c) =>
       db.channelPush.update({
         where: { id: c.id },
-        data: { stale: false, note: 'updated just now', at: new Date(), url: stubPushUrl(c.channel, id) },
+        data: {
+          stale: false,
+          note: 'updated just now',
+          at: new Date(),
+          url: stubPushUrl(c.channel, id),
+        },
       }),
     ),
   )

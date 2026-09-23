@@ -36,7 +36,10 @@ export async function beginTechUpload(
   const id = await requireEvent(user, eventId)
 
   if (artistId) {
-    const act = await db.eventArtist.findUnique({ where: { id: artistId }, select: { eventId: true } })
+    const act = await db.eventArtist.findUnique({
+      where: { id: artistId },
+      select: { eventId: true },
+    })
     if (!act || act.eventId !== id) return { ok: false, why: 'That act is not on this event.' }
   }
 

@@ -74,7 +74,9 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
             </span>
           </div>
 
-          <SectionHeading note="tech rider and stage plot, one slot each per act">Acts</SectionHeading>
+          <SectionHeading note="tech rider and stage plot, one slot each per act">
+            Acts
+          </SectionHeading>
 
           {event.acts.length === 0 ? (
             <p className={styles.none}>No live act on this event yet.</p>
@@ -106,7 +108,9 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
             </ul>
           )}
 
-          <SectionHeading note="riders and plots the promoter sends for themselves">Promoter</SectionHeading>
+          <SectionHeading note="riders and plots the promoter sends for themselves">
+            Promoter
+          </SectionHeading>
 
           {event.promoter ? (
             <ul className={styles.acts}>
@@ -136,7 +140,9 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
             <p className={styles.none}>No promoter payee on this event to file against.</p>
           )}
 
-          <SectionHeading note="what XCHC sends every act before they arrive">Venue spec</SectionHeading>
+          <SectionHeading note="what XCHC sends every act before they arrive">
+            Venue spec
+          </SectionHeading>
 
           <ul className={styles.acts}>
             <li className={styles.act}>

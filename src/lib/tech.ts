@@ -24,8 +24,11 @@ export interface ActFiles {
   stagePlot: FileRow | null
 }
 
-const slotOf = (files: readonly FileRow[], kind: string, match: (f: FileRow) => boolean): FileRow | null =>
-  files.find((f) => f.kind === kind && match(f)) ?? null
+const slotOf = (
+  files: readonly FileRow[],
+  kind: string,
+  match: (f: FileRow) => boolean,
+): FileRow | null => files.find((f) => f.kind === kind && match(f)) ?? null
 
 /** One row per live act, each carrying only its own rider and stage plot. */
 export function actFileRows(acts: readonly LiveArtist[], files: readonly FileRow[]): ActFiles[] {
@@ -68,7 +71,10 @@ export function promoterFileRow(
  * on an act's row just because it landed on the event. Whichever of these the
  * promoter's own row just claimed is excluded, so nothing shows twice.
  */
-export function unassignedFiles(files: readonly FileRow[], promoterPayeeId: string | null): FileRow[] {
+export function unassignedFiles(
+  files: readonly FileRow[],
+  promoterPayeeId: string | null,
+): FileRow[] {
   return files.filter((f) => {
     if (f.kind !== 'RIDER_TECH' && f.kind !== 'STAGE_PLOT') return false
     if (f.artistId !== null) return false

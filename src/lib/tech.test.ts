@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { actFileRows, actFileTally, promoterFileRow, unassignedFiles, type LiveArtist } from './tech'
+import {
+  actFileRows,
+  actFileTally,
+  promoterFileRow,
+  unassignedFiles,
+  type LiveArtist,
+} from './tech'
 import type { FileRow } from './files-data'
 
 /**
