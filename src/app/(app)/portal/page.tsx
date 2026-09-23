@@ -1,10 +1,21 @@
 import Link from 'next/link'
 import { requireModule } from '@/lib/permissions'
-import { loadPortal } from '@/lib/portal-data'
+import { loadPortal, type PortalAssetCard, type PortalEvent } from '@/lib/portal-data'
 import { mayStartEnquiry } from '@/lib/intake'
 import { SectionHeading } from '@/components/SectionHeading'
 import { PaymentDetailsForm } from '@/components/PaymentDetailsForm'
-import { saveOwnDetails } from './actions'
+import { ActionButton } from '@/components/ActionButton'
+import { ReasonAction } from '@/components/ReasonAction'
+import { CommentThread } from '@/components/CommentThread'
+import { OpenArtwork } from '@/components/OpenArtwork'
+import {
+  approvePiece,
+  askForChange,
+  linkToArtwork,
+  postPortalComment,
+  reopenPiece,
+  saveOwnDetails,
+} from './actions'
 import styles from './portal.module.css'
 
 /**
@@ -82,22 +93,120 @@ export default async function PortalPage() {
         ) : (
           <ul className={styles.events}>
             {events.map((e) => (
-              <li key={e.id} className={styles.event}>
-                <div className={styles.eventMain}>
-                  <span className={styles.eventName}>{e.name}</span>
-                  <span className={styles.eventDate}>{e.date}</span>
-                </div>
-                <span className={styles.eventStage}>{e.bookingLabel}</span>
-                <span className={e.awaitingSignOff ? styles.warn : styles.quiet}>
-                  {e.awaitingSignOff
-                    ? `${e.awaitingSignOff} waiting on you`
-                    : 'nothing waiting on you'}
-                </span>
-              </li>
+              <PortalEventRow key={e.id} event={e} />
             ))}
           </ul>
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * D6/D3/D5 — one show: its summary row, unchanged, then the pieces of its
+ * set that are past draft (each with Approve/Ask for a change, or Reopen
+ * once it is signed off) and the event's general design thread.
+ */
+function PortalEventRow({ event: e }: { event: PortalEvent }) {
+  return (
+    <li className={styles.event}>
+      <div className={styles.eventSummary}>
+        <div className={styles.eventMain}>
+          <span className={styles.eventName}>{e.name}</span>
+          <span className={styles.eventDate}>{e.date}</span>
+        </div>
+        <span className={styles.eventStage}>{e.bookingLabel}</span>
+        <span className={e.awaitingSignOff ? styles.warn : styles.quiet}>
+          {e.awaitingSignOff ? `${e.awaitingSignOff} waiting on you` : 'nothing waiting on you'}
+        </span>
+      </div>
+
+      {e.pieces.length ? (
+        <div className={styles.pieces}>
+          {e.pieces.map((p) => (
+            <PortalPiece key={p.key} eventId={e.id} piece={p} />
+          ))}
+        </div>
+      ) : null}
+
+      <details className={styles.thread}>
+        <summary className={styles.threadSummary}>
+          {e.generalComments.length
+            ? `${e.generalComments.length} ${e.generalComments.length === 1 ? 'comment' : 'comments'} on ${e.name}`
+            : `Comment on ${e.name}`}
+        </summary>
+        <CommentThread
+          comments={e.generalComments}
+          post={postPortalComment.bind(null, e.id, null)}
+          placeholder={`Comment on ${e.name}`}
+        />
+      </details>
+    </li>
+  )
+}
+
+function PortalPiece({ eventId, piece: p }: { eventId: string; piece: PortalAssetCard }) {
+  return (
+    <article className={styles.piece}>
+      <div className={styles.pieceHead}>
+        <div>
+          <span className={styles.pieceName}>{p.name}</span>
+          <span className={styles.pieceSpec}>{p.spec}</span>
+        </div>
+        <span className={`tag ${p.state === 'approved' ? 'tag-neutral' : styles.tagWarn}`}>
+          {p.state === 'approved' ? 'signed off' : 'needs sign-off'}
+        </span>
+      </div>
+
+      {p.file ? (
+        <div className={styles.pieceFile}>
+          <OpenArtwork eventId={eventId} fileId={p.file.id} link={linkToArtwork}>
+            {p.file.name}
+          </OpenArtwork>
+          {p.file.version > 1 ? (
+            <span className={styles.fileVersion}>v{p.file.version}</span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {p.state === 'review' ? (
+        <div className={styles.pieceActions}>
+          <ActionButton
+            className={`btn btn-primary ${styles.act}`}
+            action={approvePiece.bind(null, eventId, p.key)}
+          >
+            Approve
+          </ActionButton>
+          <ReasonAction
+            className={`btn btn-ghost ${styles.act}`}
+            label="Ask for a change"
+            placeholder="What needs to change?"
+            action={askForChange.bind(null, eventId, p.key)}
+          />
+        </div>
+      ) : (
+        <div className={styles.pieceActions}>
+          <ReasonAction
+            className={`btn btn-ghost ${styles.act}`}
+            label="Reopen"
+            placeholder="Why does this need to reopen?"
+            action={reopenPiece.bind(null, eventId, p.key)}
+          />
+        </div>
+      )}
+
+      <details className={styles.thread}>
+        <summary className={styles.threadSummary}>
+          {p.comments.length
+            ? `${p.comments.length} ${p.comments.length === 1 ? 'comment' : 'comments'}`
+            : 'Comment'}
+        </summary>
+        <CommentThread
+          comments={p.comments}
+          post={postPortalComment.bind(null, eventId, p.key)}
+          placeholder={`Comment on ${p.name}`}
+        />
+      </details>
+    </article>
   )
 }

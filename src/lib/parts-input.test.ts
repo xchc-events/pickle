@@ -34,7 +34,7 @@ const row = (over: Partial<PartsRow> = {}): PartsRow => ({
   sold: 12,
   space: { name: 'Main', capacity: 220, seatedCapacity: 150 },
   leads: [{ role: 'DESIGN' }, { role: 'TECH' }],
-  assets: [{ key: 'cover', state: 'REVIEW', promoterSigned: false }],
+  assets: [{ key: 'cover', state: 'REVIEW', promoterSigned: false, signedById: null }],
   channels: [
     { channel: 'gather', live: false, stale: false },
     { channel: 'facebook-event', live: true, stale: true },
@@ -66,7 +66,9 @@ describe('partsInputFor', () => {
     expect(e.dealState).toBe('sent')
     expect(e.licence).toBe('applied_for')
     expect(e.techStatus).toBe('draft')
-    expect(e.assets).toEqual([{ key: 'cover', state: 'review', promoterSigned: false }])
+    expect(e.assets).toEqual([
+      { key: 'cover', state: 'review', promoterSigned: false, signedById: null },
+    ])
   })
 
   it('knows a lead by the presence of a row, not by who it is', () => {
