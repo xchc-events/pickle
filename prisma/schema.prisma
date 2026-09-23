@@ -139,8 +139,10 @@ model User {
   authActs   AuthEvent[] @relation("AuthEventActor")
   /// Design assets this account has signed off — the owner's or a
   /// promoter's, never design staff's. See `Asset.signedById`.
-  signedAssets Asset[]
-  comments     Comment[]
+  signedAssets    Asset[]
+  comments        Comment[]
+  ticketCodes     TicketCode[]
+  doorListEntries DoorListEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -553,9 +555,11 @@ model Event {
   files       StoredFile[]
   grants      AccessGrant[]
   holds       Hold[]
-  barBudget   BarBudget?
-  barSales    BarSale[]
-  ticketSales TicketSaleDay[]
+  barBudget       BarBudget?
+  barSales        BarSale[]
+  ticketSales     TicketSaleDay[]
+  ticketCodes     TicketCode[]
+  doorListEntries DoorListEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -983,6 +987,95 @@ model TicketSaleDay {
   sold    Int
 
   @@unique([eventId, day, tier])
+}
+
+enum TicketCodeKind {
+  PERCENT_OFF
+  AMOUNT_OFF
+  FREE
+  UNLOCKS_TIER
+}
+
+/// A discount, free-ticket or tier-access code for one event. Connor, 23 Sep
+/// 2026: "a field for discount codes, and completely free ticket codes ...
+/// access codes: codes that allow you to access certain ticket types." Built
+/// in Pickle now, pushed to Gather.rsvp with the listing once its API exists
+/// (docs/gather-rsvp-api.md, section 5.1) — `kind` maps onto Gather's
+/// `percent`/`amount`; FREE and UNLOCKS_TIER are Pickle's own, for a code
+/// that grants a ticket outright or unlocks a tier that is otherwise not on
+/// sale. `uses` is Gather's redemption count, read back once that client
+/// exists — always 0 until then, and a code changes nothing in the
+/// projection before it: `Event.sold` still comes from src/lib/gather.ts.
+model TicketCode {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Upper case, no spaces. See `normaliseCode` in src/lib/ticket-codes.ts.
+  code String
+
+  kind TicketCodeKind
+  /// The percent or the dollar amount off. Null for FREE and UNLOCKS_TIER,
+  /// which carry no figure of their own.
+  value Float?
+  /// sub | std | sup | door — MixKey in src/lib/ticketing.ts. Null = any
+  /// tier for PERCENT_OFF/AMOUNT_OFF/FREE; required for UNLOCKS_TIER, which
+  /// names the one tier it opens.
+  tierKey String?
+
+  /// Null = unlimited.
+  useLimit Int?
+  /// Written by Gather once redemptions are read back. Always 0 until then.
+  uses Int @default(0)
+
+  activeFrom DateTime?
+  activeTo   DateTime?
+  active     Boolean   @default(true)
+
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  who         String
+  createdAt   DateTime @default(now())
+
+  @@unique([eventId, code])
+  @@index([eventId])
+}
+
+enum DoorListEntryKind {
+  GUEST
+  COMP
+  INDUSTRY
+  ACT
+}
+
+/// A name on the door for one event — the guest list PG-11 asks for.
+/// Connor, 23 Sep 2026: "Door lists as well should be able to be entered in
+/// this section." Built in Pickle now, pushed to Gather.rsvp once its comps
+/// and door APIs exist (docs/gather-rsvp-api.md, sections 5.2, 6.1). COMP
+/// entries are what the comps P&L line reads instead of the typed
+/// `Event.crew` count, once any exist for the event — see `compsCountFor` in
+/// src/lib/door-list.ts, read by the loader in src/lib/ticketing-data.ts.
+model DoorListEntry {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  name      String
+  /// How many this one entry covers — "Half Hexagon guest list · 3" is one
+  /// row with partySize 3, not three rows.
+  partySize Int               @default(1)
+  kind      DoorListEntryKind @default(GUEST)
+  note      String?
+
+  addedById String?
+  addedBy   User?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  who       String
+  addedAt   DateTime @default(now())
+
+  /// Written by the door once check-in exists (PG-11). Always 0 until then.
+  checkedIn Int @default(0)
+
+  @@index([eventId])
 }
 
 // ---------------------------------------------------------------- payees ---
