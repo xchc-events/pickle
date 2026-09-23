@@ -164,6 +164,8 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
                     role={s.role}
                     startInput={s.startInput}
                     endInput={s.endInput}
+                    packIn={event.packIn}
+                    packOut={event.packOut}
                     // Bound, not wrapped: a closure created here cannot cross
                     // into a client component.
                     rename={renameShift.bind(null, event.id, s.id)}

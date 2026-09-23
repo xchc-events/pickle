@@ -385,6 +385,13 @@
   border-color: var(--color-accent-600);
 }
 
+/* Pack-in/pack-out, for reference only — a shift may run outside them. */
+.editorBounds {
+  font-size: 10.5px;
+  color: var(--color-neutral-700);
+  white-space: nowrap;
+}
+
 .editorActions {
   display: flex;
   align-items: center;

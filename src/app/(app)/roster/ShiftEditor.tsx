@@ -23,6 +23,8 @@ export function ShiftEditor({
   role,
   startInput,
   endInput,
+  packIn,
+  packOut,
   rename,
   retime,
   duplicate,
@@ -31,6 +33,10 @@ export function ShiftEditor({
   role: string
   startInput: string
   endInput: string
+  /** The night's bounds, shown for reference only — a shift may run
+   *  outside them; the night is not a hard rule. */
+  packIn: string | null
+  packOut: string | null
   rename: (role: string) => Promise<Said>
   retime: (input: { start: string; end: string }) => Promise<Said>
   duplicate: () => Promise<Said>
@@ -65,6 +71,15 @@ export function ShiftEditor({
   const roleChanged = roleValue.trim() !== role && roleValue.trim() !== ''
   const timesChanged = startValue !== startInput || endValue !== endInput
   const canSave = (roleChanged || timesChanged) && !pending
+
+  const nightBounds =
+    packIn && packOut
+      ? `night ${packIn}\u2013${packOut}`
+      : packIn
+        ? `night from ${packIn}`
+        : packOut
+          ? `night to ${packOut}`
+          : null
 
   const save = () => {
     start(async () => {
@@ -121,6 +136,7 @@ export function ShiftEditor({
           aria-label="End"
         />
       </span>
+      {nightBounds ? <span className={styles.editorBounds}>{nightBounds}</span> : null}
       <span className={styles.editorActions}>
         <button type="submit" className={styles.editorSave} disabled={!canSave}>
           Save
