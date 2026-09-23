@@ -2,9 +2,12 @@ import 'server-only'
 import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs } from './format'
-import { dayPeriod, fitFor, shortfall, type FitTone } from './roster'
+import { dayPeriod, fitFor, shiftPlan, shortfall, type FitTone } from './roster'
 import { minutesOfDay } from './run-times'
 import { PLANNED_HOUR_COST } from './finance'
+import { capacityOf, type SpaceCapacity } from './ticketing'
+import { readSales } from './gather'
+import { isLate } from './event-record'
 import type { SessionUser } from './session'
 
 /**
@@ -94,6 +97,83 @@ export function fiveTimesLine(v: {
     .join(' · ')
 }
 
+/**
+ * The `<input type="time">` value for a clock-of-night reading — doors plus
+ * an offset in hours, signed the same way `Shift.start` and `crewCallStart`
+ * both are. '' when doors is not decided yet, the same case `crewCallStart`
+ * falls back on — there is nothing to offset from.
+ */
+export function clockInputFor(doors: string | null, offsetHours: number): string {
+  const doorsM = minutesOfDay(doors)
+  if (doorsM === null) return ''
+
+  const totalMin = Math.round(doorsM + offsetHours * 60)
+  const wrapped = ((totalMin % 1440) + 1440) % 1440
+  const hh = String(Math.floor(wrapped / 60)).padStart(2, '0')
+  const mm = String(wrapped % 60).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+/**
+ * The reverse of `clockInputFor`: the offset from doors, in hours, that a
+ * clock-of-night reading represents.
+ *
+ * A bare clock reading cannot say which calendar day it falls on — "6:00pm"
+ * is two hours before an 8pm doors time and twenty-two hours after it, and
+ * both are the same clock face. `anchorHours` is the shift's own current
+ * offset (its start, or its start plus its hours, for the end), so nudging a
+ * time by an hour or two — the realistic edit — always resolves to the
+ * nearby reading rather than jumping a full day; left untouched, the same
+ * clock string round-trips to the exact offset it came from. Null when doors
+ * or the reading itself is not a real time.
+ */
+export function offsetFromClock(
+  clockLabel: string | null,
+  doors: string | null,
+  anchorHours: number,
+): number | null {
+  const doorsM = minutesOfDay(doors)
+  const clockM = minutesOfDay(clockLabel)
+  if (doorsM === null || clockM === null) return null
+
+  const base = (clockM - doorsM) / 60
+  const k = Math.round((anchorHours - base) / 24)
+  // Rounded to the minute: every offset in this codebase is derived from
+  // whole-minute clock readings, and this keeps float noise out of `Shift.hours`.
+  return Math.round((base + 24 * k) * 60) / 60
+}
+
+/**
+ * The sales strip's four figures: what has sold, the likely turnout the
+ * event is staffed to, what the room holds, and how many shifts the
+ * standard plan wants at that turnout. A pure composition over exactly the
+ * sources named for it — `readSales`, `Event.att[1]`, `capacityOf`,
+ * `shiftPlan` — factored out of `loadRoster`'s database read so it is
+ * provable without one.
+ */
+export function salesStripFor(event: {
+  sold: number
+  updatedAt: Date
+  att: readonly number[]
+  format: string
+  kind: string
+  barClose: string | null
+  space: SpaceCapacity
+}): RosterSales {
+  return {
+    sold: readSales(event).sold,
+    likely: event.att[1] ?? 0,
+    capacity: capacityOf(event.space, event.format),
+    planned: shiftPlan({
+      space: event.space,
+      format: event.format,
+      kind: event.kind,
+      att: event.att,
+      lateBar: isLate(event.barClose),
+    }).length,
+  }
+}
+
 export interface Candidate {
   personId: string
   name: string
@@ -117,6 +197,22 @@ export interface RosterShift {
   personInitials: string | null
   /** Everyone who could take it, best fit first. */
   candidates: Candidate[]
+  /** This shift's start and end as `<input type="time">` values, derived
+   *  from doors and the offset. '' when doors is not decided yet. */
+  startInput: string
+  endInput: string
+}
+
+export interface RosterSales {
+  /** Paid tickets sold so far, from Gather.rsvp (`readSales`). */
+  sold: number
+  /** The likely-turnout scenario the event is staffed to (`Event.att[1]`). */
+  likely: number
+  /** What the room holds at this event's layout (`capacityOf`). */
+  capacity: number
+  /** How many shifts the standard plan wants at that turnout
+   *  (`shiftPlan(event).length`). */
+  planned: number
 }
 
 export interface RosterQueueRow {
@@ -147,6 +243,9 @@ export interface RosterEventView {
   barClose: string | null
   allOut: string | null
   packOut: string | null
+  /** Sold, likely turnout, capacity and the standard plan's shift count —
+   *  read-only context for whether the roster still needs everyone on it. */
+  sales: RosterSales
 }
 
 export interface RosterLoad {
@@ -190,7 +289,7 @@ export async function loadRoster(
   const row = await db.event.findUniqueOrThrow({
     where: { id: chosen },
     include: {
-      space: { select: { name: true } },
+      space: { select: { name: true, capacity: true, seatedCapacity: true } },
       shifts: {
         orderBy: [{ start: 'asc' }, { role: 'asc' }],
         include: { person: { select: { id: true, name: true, initials: true } } },
@@ -227,6 +326,8 @@ export async function loadRoster(
     personId: s.personId,
     personName: s.person?.name ?? null,
     personInitials: s.person?.initials ?? null,
+    startInput: clockInputFor(row.doors, s.start),
+    endInput: clockInputFor(row.doors, s.start + s.hours),
     candidates: people
       .map((p): Candidate => {
         const avail = p.availability ?? { weekly: 0, volunteer: 0, yes: [], no: [] }
@@ -271,6 +372,7 @@ export async function loadRoster(
       barClose: row.barClose,
       allOut: row.allOut,
       packOut: row.packOut,
+      sales: salesStripFor(row),
     },
   }
 }
