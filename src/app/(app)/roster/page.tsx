@@ -7,6 +7,7 @@ import { ActionButton } from '@/components/ActionButton'
 import { ContactAvatar } from './ContactAvatar'
 import { ShiftPicker } from './ShiftPicker'
 import { ShiftEditor } from './ShiftEditor'
+import { RosterTimeline } from './RosterTimeline'
 import {
   askAgain,
   confirmOffer,
@@ -111,6 +112,25 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
           <SectionHeading note={event.shortfall ?? 'fully crewed'}>
             Who is on — {event.shifts.length} shifts
           </SectionHeading>
+
+          <RosterTimeline
+            packIn={event.packIn}
+            doors={event.doors}
+            barClose={event.barClose}
+            allOut={event.allOut}
+            packOut={event.packOut}
+            shifts={event.shifts.map((s) => ({
+              id: s.id,
+              role: s.role,
+              start: s.start,
+              hours: s.hours,
+              state: s.state,
+              personInitials: s.personInitials,
+              // Bound, not wrapped: a closure created here cannot cross
+              // into a client component.
+              retime: retimeShift.bind(null, event.id, s.id),
+            }))}
+          />
 
           <ul className={styles.shifts}>
             {event.shifts.map((s) => {

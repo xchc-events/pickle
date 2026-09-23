@@ -104,9 +104,23 @@ describe('buildRosterTimeline', () => {
   }
 
   const shifts: TimelineShiftInput[] = [
-    { id: 'covered', role: 'Bar staff', start: 3.5, hours: 5, state: 'ASSIGNED', personInitials: 'JD' },
+    {
+      id: 'covered',
+      role: 'Bar staff',
+      start: 3.5,
+      hours: 5,
+      state: 'ASSIGNED',
+      personInitials: 'JD',
+    },
     { id: 'open', role: 'Door', start: 0, hours: 6, state: 'OPEN', personInitials: null },
-    { id: 'offered', role: 'Sound — Lead', start: -1, hours: 2, state: 'OFFERED', personInitials: 'AB' },
+    {
+      id: 'offered',
+      role: 'Sound — Lead',
+      start: -1,
+      hours: 2,
+      state: 'OFFERED',
+      personInitials: 'AB',
+    },
   ]
 
   it('sets the axis an hour before pack-in and an hour after pack-out', () => {

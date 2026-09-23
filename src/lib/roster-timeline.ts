@@ -93,7 +93,9 @@ export function snapQuarterHour(hours: number): number {
  *  refuse. */
 export function clampEdges(start: number, end: number): { start: number; end: number } {
   if (end - start >= MIN_SPAN_HOURS) return { start, end }
-  return start <= end ? { start, end: start + MIN_SPAN_HOURS } : { start: end - MIN_SPAN_HOURS, end }
+  return start <= end
+    ? { start, end: start + MIN_SPAN_HOURS }
+    : { start: end - MIN_SPAN_HOURS, end }
 }
 
 export function fractionForOffset(offsetHours: number, axisStart: number, axisEnd: number): number {
@@ -181,7 +183,8 @@ export function buildRosterTimeline(
     const packInOffset = offsetNoCarry(event.packIn, doorsM) ?? 0 // 0 = doors itself
     axisStart = packInOffset - 1
 
-    const rightAnchor = offsetWithCarry(event.packOut, doorsM) ?? offsetWithCarry(event.allOut, doorsM)
+    const rightAnchor =
+      offsetWithCarry(event.packOut, doorsM) ?? offsetWithCarry(event.allOut, doorsM)
     axisEnd =
       rightAnchor !== null
         ? rightAnchor + 1
@@ -206,7 +209,13 @@ export function buildRosterTimeline(
           if (!clock) return []
           const offset = carry ? offsetWithCarry(clock, doorsM) : offsetNoCarry(clock, doorsM)
           if (offset === null) return []
-          return [{ key, label: `${label} ${clock}`, fraction: fractionForOffset(offset, axisStart, axisEnd) }]
+          return [
+            {
+              key,
+              label: `${label} ${clock}`,
+              fraction: fractionForOffset(offset, axisStart, axisEnd),
+            },
+          ]
         })
 
   const ticks: TimelineTick[] = []
@@ -222,7 +231,11 @@ export function buildRosterTimeline(
   const bars: TimelineBar[] = shifts.map((s) => {
     const end = s.start + s.hours
     const tone: ShiftTimelineTone =
-      s.state === 'OPEN' || s.state === 'ASKED' ? 'open' : s.state === 'OFFERED' ? 'offered' : 'covered'
+      s.state === 'OPEN' || s.state === 'ASKED'
+        ? 'open'
+        : s.state === 'OFFERED'
+          ? 'offered'
+          : 'covered'
 
     return {
       id: s.id,
