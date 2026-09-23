@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from './db'
 import { hashToken } from './grants'
 import { recordAs } from './activity'
+import { callTimes } from './roster-data'
 import { offerUnavailableMessage, shiftOfferOutcome } from './shift-offers'
 import { said, type Said } from './toast'
 
@@ -27,9 +28,10 @@ import { said, type Said } from './toast'
 export interface ShiftOfferView {
   role: string
   hours: number
-  start: number
   eventName: string
   eventDate: Date
+  /** As clock times, when doors is decided; null otherwise — see `callTimes`. */
+  times: string | null
   personName: string
   live: boolean
   /** Why it is not live, in words for the page — set only when `live` is false. */
@@ -62,7 +64,7 @@ export async function resolveShiftOfferToken(
           start: true,
           state: true,
           personId: true,
-          event: { select: { name: true, date: true } },
+          event: { select: { name: true, date: true, doors: true } },
         },
       },
       person: { select: { name: true } },
@@ -85,9 +87,9 @@ export async function resolveShiftOfferToken(
   return {
     role: offer.shift.role,
     hours: offer.shift.hours,
-    start: offer.shift.start,
     eventName: offer.shift.event.name,
     eventDate: offer.shift.event.date,
+    times: callTimes(offer.shift.event.doors, offer.shift.start, offer.shift.hours),
     personName: offer.person.name,
     live: outcome.live,
     message: outcome.live ? null : offerUnavailableMessage(outcome.reason),

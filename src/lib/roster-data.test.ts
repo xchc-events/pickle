@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 vi.mock('./db', () => ({ db: {} }))
 
-const { crewCallStart, fiveTimesLine, clockInputFor, offsetFromClock, salesStripFor } =
+const { crewCallStart, fiveTimesLine, clockInputFor, offsetFromClock, callTimes, salesStripFor } =
   await import('./roster-data')
 
 describe('crewCallStart', () => {
@@ -178,6 +178,17 @@ describe('offsetFromClock', () => {
     expect(offsetFromClock('3:00pm', '8:00pm', -5)).toBe(-5)
     // The same clock reading, anchored the other side, reads as +19.
     expect(offsetFromClock('3:00pm', '8:00pm', 19)).toBe(19)
+  })
+})
+
+describe('callTimes', () => {
+  it('reads as clock times once doors is decided', () => {
+    // Doors 8pm, start 3.5h on (11:30pm), runs 6h — to 5:30am.
+    expect(callTimes('8:00pm', 3.5, 6)).toBe('11:30pm–5:30am')
+  })
+
+  it('is null while doors is not decided yet', () => {
+    expect(callTimes(null, 3.5, 6)).toBeNull()
   })
 })
 

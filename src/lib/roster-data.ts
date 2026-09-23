@@ -3,7 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs } from './format'
 import { dayPeriod, fitFor, shiftPlan, shortfall, type FitTone } from './roster'
-import { minutesOfDay } from './run-times'
+import { clockFromInput, minutesOfDay } from './run-times'
 import { PLANNED_HOUR_COST } from './finance'
 import { capacityOf, type SpaceCapacity } from './ticketing'
 import { readSales } from './gather'
@@ -141,6 +141,19 @@ export function offsetFromClock(
   // Rounded to the minute: every offset in this codebase is derived from
   // whole-minute clock readings, and this keeps float noise out of `Shift.hours`.
   return Math.round((base + 24 * k) * 60) / 60
+}
+
+/**
+ * A shift's call as clock times — "11:30pm–5:30am" — for whoever reads it
+ * outside the roster's own doors-relative shorthand: the offer email and the
+ * offer page both use this, so a crew member is never asked to work out
+ * "doors +3.5h" for themself. Null while doors is not decided yet, the same
+ * case `clockInputFor` and `crewCallStart` both fall back on.
+ */
+export function callTimes(doors: string | null, start: number, hours: number): string | null {
+  const startClock = clockFromInput(clockInputFor(doors, start))
+  const endClock = clockFromInput(clockInputFor(doors, start + hours))
+  return startClock && endClock ? `${startClock}–${endClock}` : null
 }
 
 /**

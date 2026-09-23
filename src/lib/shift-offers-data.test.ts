@@ -219,7 +219,7 @@ describe('resolveShiftOfferToken', () => {
       start: 0,
       state: 'OFFERED',
       personId: 'person_ari',
-      event: { name: 'Static Bloom', date: NIGHT },
+      event: { name: 'Static Bloom', date: NIGHT, doors: null },
     },
     person: { name: 'Ari Ngata' },
     ...over,
@@ -234,6 +234,27 @@ describe('resolveShiftOfferToken', () => {
     expect(view?.live).toBe(true)
     expect(view?.role).toBe('Door')
     expect(view?.personName).toBe('Ari Ngata')
+  })
+
+  it('carries the call as clock times once doors is decided on the event', async () => {
+    // Doors 8pm, start 3.5h on (11:30pm), runs 6h — to 5:30am — the same
+    // fixture src/lib/roster-data.test.ts's own callTimes tests use.
+    offerFindUnique.mockResolvedValue(
+      row({
+        shift: {
+          role: 'Door',
+          hours: 6,
+          start: 3.5,
+          state: 'OFFERED',
+          personId: 'person_ari',
+          event: { name: 'Static Bloom', date: NIGHT, doors: '8:00pm' },
+        },
+      }),
+    )
+
+    const view = await resolveShiftOfferToken('a-token-value', NOW)
+
+    expect(view?.times).toBe('11:30pm–5:30am')
   })
 
   it('is null for a token nothing matches — not found, not "expired"', async () => {

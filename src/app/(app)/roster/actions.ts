@@ -8,7 +8,7 @@ import { sendMail } from '@/lib/email'
 import { dateLabel } from '@/lib/format'
 import { hashToken, mintToken } from '@/lib/grants'
 import { requireEvent, requireModule } from '@/lib/permissions'
-import { clockInputFor, offsetFromClock } from '@/lib/roster-data'
+import { callTimes, offsetFromClock } from '@/lib/roster-data'
 import { clockFromInput } from '@/lib/run-times'
 import { shiftOfferEmail } from '@/lib/shift-offer-email'
 import { confirmOfferedShift, declineOfferedShift } from '@/lib/shift-offers-data'
@@ -202,10 +202,6 @@ export async function emailOffer(eventId: string, shiftId: string): Promise<Said
     },
   })
 
-  const startClock = clockFromInput(clockInputFor(shift.event.doors, shift.start))
-  const endClock = clockFromInput(clockInputFor(shift.event.doors, shift.start + shift.hours))
-  const times = startClock && endClock ? `${startClock}–${endClock}` : null
-
   await sendMail(
     shift.person.email,
     shiftOfferEmail({
@@ -213,7 +209,7 @@ export async function emailOffer(eventId: string, shiftId: string): Promise<Said
       role: shift.role,
       eventName: shift.event.name,
       when: dateLabel(shift.event.date),
-      times,
+      times: callTimes(shift.event.doors, shift.start, shift.hours),
       hours: shift.hours,
       url: `${base}/s/${token}`,
     }),
