@@ -1,0 +1,163 @@
+/* The door list's print view — T7. Plain on screen, plain on paper: no
+   colour is load-bearing here, only the grouping and the type scale. */
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 26px var(--page-gutter) 40px;
+  color: var(--color-text);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.title {
+  margin: 0 0 3px;
+  font-size: 20px;
+  letter-spacing: -0.015em;
+}
+
+.meta {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+}
+
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.printButton {
+  font-size: 12px;
+}
+
+.backLink {
+  font-size: 11.5px;
+  color: var(--color-accent);
+}
+
+.total {
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-200);
+}
+
+.empty {
+  font-size: 12.5px;
+  color: var(--color-neutral-500);
+}
+
+.group {
+  margin-bottom: var(--space-6);
+}
+
+.groupTitle {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-neutral-300);
+}
+
+.groupCount {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-neutral-600);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.th,
+.thNarrow,
+.thTick {
+  text-align: left;
+  font-weight: var(--font-heading-weight);
+  color: var(--color-neutral-600);
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.thNarrow {
+  width: 56px;
+}
+
+.thTick {
+  width: 32px;
+  text-align: center;
+}
+
+.td,
+.tdNarrow,
+.tdTick {
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-divider) 55%, transparent);
+  color: var(--color-neutral-200);
+}
+
+.tdNarrow {
+  font-variant-numeric: tabular-nums;
+}
+
+.tdTick {
+  width: 32px;
+}
+
+/* A blank box to tick by hand — a pen mark on paper, not app state. */
+.tdTick::before {
+  content: '';
+  display: block;
+  width: 11px;
+  height: 11px;
+  margin: 0 auto;
+  border: 1px solid var(--color-neutral-600);
+  border-radius: 2px;
+}
+
+@media print {
+  .page {
+    max-width: none;
+    padding: 0;
+    color: #000;
+  }
+
+  .headActions {
+    display: none;
+  }
+
+  .meta,
+  .total,
+  .groupCount {
+    color: #444;
+  }
+
+  .th,
+  .thNarrow,
+  .thTick,
+  .groupTitle {
+    color: #000;
+  }
+
+  .td,
+  .tdNarrow,
+  .tdTick {
+    color: #000;
+    border-bottom-color: #ccc;
+  }
+
+  .tdTick::before {
+    border-color: #000;
+  }
+}
