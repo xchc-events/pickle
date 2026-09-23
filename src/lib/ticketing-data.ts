@@ -332,3 +332,43 @@ export async function loadTicketing(
     },
   }
 }
+
+export interface DoorListPrintLoad {
+  eventName: string
+  eventDate: string
+  groups: DoorListGroup[]
+  totalPeople: number
+}
+
+/**
+ * The door list's print view — T7. Takes an already-`requireEvent`-checked
+ * id, the same way `setTiers` (actions.ts) operates once it has one, so the
+ * scope check happens exactly once per request rather than twice.
+ */
+export async function loadDoorListPrint(eventId: string): Promise<DoorListPrintLoad> {
+  const event = await db.event.findUniqueOrThrow({
+    where: { id: eventId },
+    select: { name: true, date: true },
+  })
+  const rows = await db.doorListEntry.findMany({
+    where: { eventId },
+    orderBy: { name: 'asc' },
+  })
+  const entries: DoorListRow[] = rows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    partySize: d.partySize,
+    kind: d.kind,
+    note: d.note,
+    who: d.who,
+    addedAt: d.addedAt,
+    checkedIn: d.checkedIn,
+  }))
+
+  return {
+    eventName: event.name,
+    eventDate: dateLabel(event.date),
+    groups: groupDoorList(entries),
+    totalPeople: totalPeople(entries),
+  }
+}

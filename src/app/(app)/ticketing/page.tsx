@@ -4,7 +4,11 @@ import { loadTicketing } from '@/lib/ticketing-data'
 import { SectionHeading } from '@/components/SectionHeading'
 import { TiersTable } from './Forms'
 import { SalesChart } from './SalesChart'
+import { Codes } from './Codes'
+import { DoorList } from './DoorList'
 import { setTiers } from './actions'
+import { addCode, deactivateCode } from './codes-actions'
+import { addDoorListEntry, removeDoorListEntry } from './door-list-actions'
 import styles from './ticketing.module.css'
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v)
@@ -122,6 +126,25 @@ export default async function TicketingPage({ searchParams }: PageProps<'/ticket
             mix={event.mix}
             save={setTiers.bind(null, event.id)}
           />
+
+          {/* Codes and the door list are the venue's own — an external
+              promoter sees their tiers and sales above, but not these. */}
+          {!user.external ? (
+            <>
+              <Codes
+                codes={event.codes}
+                add={addCode.bind(null, event.id)}
+                deactivate={deactivateCode.bind(null, event.id)}
+              />
+
+              <DoorList
+                eventId={event.id}
+                doorList={event.doorList}
+                add={addDoorListEntry.bind(null, event.id)}
+                remove={removeDoorListEntry.bind(null, event.id)}
+              />
+            </>
+          ) : null}
         </div>
       )}
     </div>

@@ -18,9 +18,7 @@ import {
  * the number the settlement actually counts.
  */
 
-const rowsOf = (
-  kinds: { kind: DoorListRow['kind']; partySize: number }[],
-): DoorListRow[] =>
+const rowsOf = (kinds: { kind: DoorListRow['kind']; partySize: number }[]): DoorListRow[] =>
   kinds.map((k, i) => ({
     id: `d${i}`,
     name: `Row ${i}`,
