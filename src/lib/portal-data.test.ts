@@ -28,6 +28,11 @@ interface FakeEvent {
   concluded: boolean
   bookingStatus: string
   assets: FakeAsset[]
+  packIn?: string | null
+  doors?: string | null
+  barClose?: string | null
+  allOut?: string | null
+  packOut?: string | null
 }
 
 let events: FakeEvent[] = []
@@ -39,6 +44,16 @@ let comments: {
   who: string
   body: string
   at: Date
+}[] = []
+let runSheetSends: { eventId: string }[] = []
+let runSheetItems: {
+  id: string
+  eventId: string
+  time: string | null
+  item: string
+  who: string | null
+  note: string | null
+  order: number
 }[] = []
 
 const matches = (event: FakeEvent, where: Record<string, unknown> | undefined): boolean => {
@@ -92,6 +107,20 @@ const db = {
       Promise.resolve(comments.filter((c) => c.eventId === args.where.eventId)),
     ),
   },
+  runSheetSend: {
+    findFirst: vi.fn((args: { where: { eventId: string } }) =>
+      Promise.resolve(runSheetSends.find((s) => s.eventId === args.where.eventId) ?? null),
+    ),
+  },
+  runSheetItem: {
+    findMany: vi.fn((args: { where: { eventId: string } }) =>
+      Promise.resolve(
+        runSheetItems
+          .filter((r) => r.eventId === args.where.eventId)
+          .sort((a, b) => a.order - b.order),
+      ),
+    ),
+  },
 }
 vi.mock('./db', () => ({ db }))
 
@@ -116,6 +145,8 @@ beforeEach(() => {
   db.event.findMany.mockClear()
   files = []
   comments = []
+  runSheetSends = []
+  runSheetItems = []
   events = [
     {
       id: 'ev_a',
@@ -216,5 +247,44 @@ describe('comment threads', () => {
     // ev_b was never in the scoped result, so its comments were never
     // fetched — not merely filtered out afterwards.
     expect(db.comment.findMany).not.toHaveBeenCalledWith({ where: { eventId: 'ev_b' } })
+  })
+})
+
+/**
+ * X3 — the run sheet, read-only.
+ *
+ * Connor, 23 Sep 2026: "sending that to the promoter" is what makes a run
+ * sheet theirs to see at all — nothing is shown before Tech has sent one.
+ */
+describe('the run sheet', () => {
+  it('is null until Tech has sent one', async () => {
+    const { events: rows } = await loadPortal(orgAUser)
+    expect(rows[0]!.runSheet).toBeNull()
+  })
+
+  it('reads the event’s rows, in order, once something has been sent', async () => {
+    runSheetSends = [{ eventId: 'ev_a' }]
+    runSheetItems = [
+      { id: 'r1', eventId: 'ev_a', time: '8:00pm', item: 'Doors', who: null, note: null, order: 1 },
+      {
+        id: 'r2',
+        eventId: 'ev_a',
+        time: '3:00pm',
+        item: 'Pack-in',
+        who: 'Crew',
+        note: null,
+        order: 0,
+      },
+    ]
+
+    const { events: rows } = await loadPortal(orgAUser)
+
+    expect(rows[0]!.runSheet?.map((r) => r.item)).toEqual(['Pack-in', 'Doors'])
+  })
+
+  it('never reads another organisation’s run sheet — ev_b is out of scope before this even runs', async () => {
+    runSheetSends = [{ eventId: 'ev_b' }]
+    const { events: rows } = await loadPortal(orgAUser)
+    expect(rows[0]!.runSheet).toBeNull()
   })
 })

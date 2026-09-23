@@ -337,3 +337,70 @@
   color: var(--color-neutral-400);
   cursor: pointer;
 }
+
+/* --- the venue spec's components ----------------------------------------- */
+
+.specRows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.specRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+}
+
+.specHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.specKey {
+  flex: 0 0 96px;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--color-neutral-600);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.specHead .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.specBody {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-neutral-200);
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  padding: 7px 9px;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.specBody:hover:not(:disabled) {
+  border-color: var(--color-neutral-700);
+}
+
+.specBody:focus {
+  border-color: var(--color-accent-600);
+  outline: none;
+}
+
+.specBody:disabled {
+  opacity: 0.5;
+}

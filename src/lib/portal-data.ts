@@ -6,6 +6,8 @@ import { maskedPayee, type MaskedPayee } from './payments-data'
 import { ASSET_KEYS, assetSpec } from './design'
 import { commentsFor, type CommentRow } from './comments-data'
 import { bookingStep, type BookingStatus } from './parts'
+import type { RunSheetRow } from './run-sheet'
+import { runSheetEverSent, runSheetFor } from './run-sheet-data'
 import type { SessionUser } from './session'
 
 /**
@@ -66,6 +68,15 @@ export interface PortalEvent {
   pieces: PortalAssetCard[]
   /** D5 — this event's general design thread, not tied to one piece. */
   generalComments: CommentRow[]
+  /**
+   * The tech run sheet, read-only — null until Tech has sent it at least
+   * once (`runSheetEverSent`), so a promoter never sees a sheet nobody has
+   * decided to share with them yet. Once shared, this reads live: the same
+   * rows Tech's own page would show, seeded from the event's times when
+   * nobody has saved one — not a snapshot frozen at whatever the sheet said
+   * the moment it was last sent.
+   */
+  runSheet: RunSheetRow[] | null
 }
 
 export interface PortalLoad {
@@ -90,6 +101,11 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
       name: true,
       date: true,
       bookingStatus: true,
+      packIn: true,
+      doors: true,
+      barClose: true,
+      allOut: true,
+      packOut: true,
       assets: {
         where: { state: { not: 'DRAFT' } },
         select: { id: true, key: true, state: true },
@@ -99,7 +115,7 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
   })
 
   const assetIds = rows.flatMap((e) => e.assets.map((a) => a.id))
-  const [files, commentsByEvent] = await Promise.all([
+  const [files, commentsByEvent, runSheetsByEvent] = await Promise.all([
     assetIds.length
       ? db.storedFile.findMany({
           where: { assetId: { in: assetIds }, kind: 'ARTWORK', current: true, scan: 'CLEAN' },
@@ -107,6 +123,18 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
         })
       : Promise.resolve([]),
     Promise.all(rows.map((e) => commentsFor(e.id))),
+    Promise.all(
+      rows.map(async (e): Promise<RunSheetRow[] | null> => {
+        if (!(await runSheetEverSent(e.id))) return null
+        return runSheetFor(e.id, {
+          packIn: e.packIn,
+          doors: e.doors,
+          barClose: e.barClose,
+          allOut: e.allOut,
+          packOut: e.packOut,
+        })
+      }),
+    ),
   ])
   const fileByAsset = new Map(files.filter((f) => f.assetId).map((f) => [f.assetId!, f]))
 
@@ -143,6 +171,7 @@ export async function loadPortal(user: SessionUser): Promise<PortalLoad> {
         awaitingSignOff: pieces.filter((p) => p.state === 'review').length,
         pieces,
         generalComments: comments.general,
+        runSheet: runSheetsByEvent[i]!,
       }
     }),
   }
