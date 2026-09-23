@@ -28,6 +28,20 @@ export function tickableComponents(
 }
 
 /**
+ * Exactly the components a send with these ticked keys actually carries —
+ * active, house order, ticked only. What `assembleVenueSpecText` turns into
+ * text and what a send's own `componentKeys` records are meant to agree,
+ * so both are built from this rather than filtering separately.
+ */
+export function includedComponents(
+  components: readonly VenueSpecComponentRow[],
+  tickedKeys: readonly string[],
+): VenueSpecComponentRow[] {
+  const ticked = new Set(tickedKeys)
+  return tickableComponents(components).filter((c) => ticked.has(c.key))
+}
+
+/**
  * The assembled text: exactly the ticked components, in house order — never
  * the order they happened to be ticked in, and never an inactive one even if
  * an old send's `componentKeys` still names it. Blank line between a title
@@ -38,9 +52,7 @@ export function assembleVenueSpecText(
   components: readonly VenueSpecComponentRow[],
   tickedKeys: readonly string[],
 ): string {
-  const ticked = new Set(tickedKeys)
-  return tickableComponents(components)
-    .filter((c) => ticked.has(c.key))
+  return includedComponents(components, tickedKeys)
     .map((c) => `${c.title}\n${c.body}`)
     .join('\n\n')
 }

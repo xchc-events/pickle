@@ -4,6 +4,10 @@ import { eventScope } from './scope'
 import { dateLabel } from './format'
 import { filesForEvent, type FileRow } from './files-data'
 import { actFileRows, actFileTally, promoterFileRow, unassignedFiles, type ActFiles } from './tech'
+import { tickableComponents, type VenueSpecComponentRow } from './venue-spec'
+import { loadVenueSpecComponents, latestVenueSpecSend, type VenueSpecSendSummary } from './venue-spec-data'
+import type { EventRunTimes, RunSheetRow } from './run-sheet'
+import { runSheetFor, latestRunSheetSend, type RunSheetSendSummary } from './run-sheet-data'
 import type { SessionUser } from './session'
 
 /**
@@ -16,8 +20,13 @@ import type { SessionUser } from './session'
  */
 
 /** What the crew needs, in the order they need it. Tech rider and stage plot
- *  are per act now (see `ActFiles`); this still names all three kinds for
- *  the venue spec row and for labelling an unassigned file's kind. */
+ *  are per act now (see `ActFiles`); this still names both kinds for
+ *  labelling an unassigned file's kind.
+ *
+ *  Changed 23 Sep 2026: `TECH_SPEC` — "Venue spec sent" — dropped out of this
+ *  set with the upload it named. The venue spec is composed and emailed now;
+ *  see `VenueSpecComponent` and `sendVenueSpec` in
+ *  src/app/(app)/tech/actions.ts. */
 export const TECH_SET = [
   {
     kind: 'RIDER_TECH',
@@ -28,11 +37,6 @@ export const TECH_SET = [
     kind: 'STAGE_PLOT',
     name: 'Stage plot',
     why: 'Where people stand. Decides the monitor count and the cable run.',
-  },
-  {
-    kind: 'TECH_SPEC',
-    name: 'Venue spec sent',
-    why: 'What XCHC sends them. Proof the act knew the room before they arrived.',
   },
 ] as const
 
@@ -58,16 +62,75 @@ export interface TechEvent {
   /** The promoter's own rider and stage plot, when this event has a
    *  promoter payee to ask. */
   promoter: ActFiles | null
-  /** TECH_SPEC — what XCHC sent them. Unchanged from wave one. */
-  venueSpec: FileRow | null
   /** Riders and stage plots nobody has attached to an act yet. */
   unassigned: FileRow[]
+  /** The active components Tech may tick to send, house order. */
+  venueSpecComponents: VenueSpecComponentRow[]
+  /** Who a venue spec or a run sheet can go to: every live act with an
+   *  email on its payee, then the promoter. */
+  recipients: EventRecipient[]
+  /** What "sent" means now — the most recent send, or null for none yet. */
+  latestVenueSpecSend: VenueSpecSendSummary | null
+  /** Saved rows, or — for an event nobody has touched a run sheet on yet —
+   *  the seed built from the event's own times. */
+  runSheet: RunSheetRow[]
+  latestRunSheetSend: RunSheetSendSummary | null
 }
 
 export interface TechLoad {
   queue: TechQueueRow[]
   event: TechEvent | null
   storageReady: boolean
+}
+
+export interface EventRecipient {
+  payeeId: string
+  /** The act's own display name, or the promoter's payee name — not
+   *  necessarily the payee's own `name`, which Tech does not otherwise
+   *  show; see `tech.ts` on why an act is shown by its own name. */
+  name: string
+  email: string | null
+  kind: 'act' | 'promoter'
+}
+
+/**
+ * Who a venue spec or a run sheet can go to on this event: every live act
+ * with an email on its payee, then the promoter, if this event has one.
+ *
+ * Connor, 23 Sep 2026: "tick the components, pick the recipients (each act
+ * with an email on its payee, the promoter)." An act with no payee linked,
+ * or a payee with no email, is not offered — see `recipientsMissingEmail`
+ * in src/lib/venue-spec.ts for the send action's own re-check, since a
+ * candidate list here is not itself the security boundary.
+ */
+export async function eventRecipients(eventId: string): Promise<EventRecipient[]> {
+  const [acts, event] = await Promise.all([
+    db.eventArtist.findMany({
+      where: { eventId, status: { not: 'DECLINED' }, payeeId: { not: null } },
+      select: { name: true, payee: { select: { id: true, email: true } } },
+    }),
+    db.event.findUnique({
+      where: { id: eventId },
+      select: { promoterPayee: { select: { id: true, name: true, email: true } } },
+    }),
+  ])
+
+  const recipients: EventRecipient[] = []
+  const seen = new Set<string>()
+  for (const a of acts) {
+    if (!a.payee || seen.has(a.payee.id)) continue
+    seen.add(a.payee.id)
+    recipients.push({ payeeId: a.payee.id, name: a.name, email: a.payee.email, kind: 'act' })
+  }
+  if (event?.promoterPayee && !seen.has(event.promoterPayee.id)) {
+    recipients.push({
+      payeeId: event.promoterPayee.id,
+      name: event.promoterPayee.name,
+      email: event.promoterPayee.email,
+      kind: 'promoter',
+    })
+  }
+  return recipients
 }
 
 /**
@@ -145,7 +208,23 @@ export async function loadTech(
     },
   })
 
-  const files = await filesForEvent(chosen)
+  const times: EventRunTimes = {
+    packIn: row.packIn,
+    doors: row.doors,
+    barClose: row.barClose,
+    allOut: row.allOut,
+    packOut: row.packOut,
+  }
+
+  const [files, venueSpecComponents, recipients, venueSpecSend, runSheet, runSheetSend] =
+    await Promise.all([
+      filesForEvent(chosen),
+      loadVenueSpecComponents(),
+      eventRecipients(chosen),
+      latestVenueSpecSend(chosen),
+      runSheetFor(chosen, times),
+      latestRunSheetSend(chosen),
+    ])
   const promoterId = row.promoterPayee?.id ?? null
 
   return {
@@ -159,8 +238,12 @@ export async function loadTech(
       format: row.format,
       acts: actFileRows(row.artists, files),
       promoter: promoterFileRow(promoterId, row.promoterPayee?.name ?? '', files),
-      venueSpec: files.find((f) => f.kind === 'TECH_SPEC') ?? null,
       unassigned: unassignedFiles(files, promoterId),
+      venueSpecComponents: tickableComponents(venueSpecComponents),
+      recipients,
+      latestVenueSpecSend: venueSpecSend,
+      runSheet,
+      latestRunSheetSend: runSheetSend,
     },
   }
 }
