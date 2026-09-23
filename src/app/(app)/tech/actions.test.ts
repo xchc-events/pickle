@@ -240,11 +240,22 @@ describe('attaching an unassigned file to an act', () => {
  */
 describe('sending the venue spec', () => {
   const COMPONENTS = [
-    { key: 'room', title: 'Room dimensions and capacity', body: '12m x 8m.', order: 0, active: true },
+    {
+      key: 'room',
+      title: 'Room dimensions and capacity',
+      body: '12m x 8m.',
+      order: 0,
+      active: true,
+    },
     { key: 'stage', title: 'Stage', body: '6m x 4m.', order: 1, active: true },
   ]
   const RECIPIENTS = [
-    { payeeId: 'pay_act', name: 'Static Bloom', email: 'static@example.test', kind: 'act' as const },
+    {
+      payeeId: 'pay_act',
+      name: 'Static Bloom',
+      email: 'static@example.test',
+      kind: 'act' as const,
+    },
     { payeeId: 'pay_promo', name: 'Kōura Records', email: null, kind: 'promoter' as const },
   ]
 
@@ -372,8 +383,18 @@ describe('sending the run sheet to the promoter', () => {
     { id: '2', time: '8:00pm', item: 'Doors', who: null, note: null, order: 1 },
   ]
   const RECIPIENTS = [
-    { payeeId: 'pay_act', name: 'Static Bloom', email: 'static@example.test', kind: 'act' as const },
-    { payeeId: 'pay_promo', name: 'Kōura Records', email: 'promo@example.test', kind: 'promoter' as const },
+    {
+      payeeId: 'pay_act',
+      name: 'Static Bloom',
+      email: 'static@example.test',
+      kind: 'act' as const,
+    },
+    {
+      payeeId: 'pay_promo',
+      name: 'Kōura Records',
+      email: 'promo@example.test',
+      kind: 'promoter' as const,
+    },
   ]
 
   beforeEach(() => {
@@ -436,10 +457,7 @@ describe('sending the run sheet to the promoter', () => {
   })
 
   it('refuses a ticked act with no email on file, naming them', async () => {
-    eventRecipients.mockResolvedValue([
-      { ...RECIPIENTS[0]!, email: null },
-      RECIPIENTS[1]!,
-    ])
+    eventRecipients.mockResolvedValue([{ ...RECIPIENTS[0]!, email: null }, RECIPIENTS[1]!])
 
     const out = await sendRunSheet(EVENT, ['pay_act'])
 

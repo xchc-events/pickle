@@ -19,11 +19,23 @@ import {
  */
 
 const COMPONENTS: VenueSpecComponentRow[] = [
-  { key: 'room', title: 'Room dimensions and capacity', body: '12m x 8m, 250 capacity.', order: 0, active: true },
+  {
+    key: 'room',
+    title: 'Room dimensions and capacity',
+    body: '12m x 8m, 250 capacity.',
+    order: 0,
+    active: true,
+  },
   { key: 'stage', title: 'Stage', body: '6m x 4m, 600mm high.', order: 1, active: true },
   { key: 'pa', title: 'PA and monitors', body: 'd&b Y-series, 4 wedges.', order: 2, active: true },
   { key: 'power', title: 'Power', body: 'retired — folded into Stage.', order: 3, active: false },
-  { key: 'contacts', title: 'Contacts', body: 'Duty manager on the night.', order: 4, active: true },
+  {
+    key: 'contacts',
+    title: 'Contacts',
+    body: 'Duty manager on the night.',
+    order: 4,
+    active: true,
+  },
 ]
 
 describe('tickableComponents', () => {
@@ -42,7 +54,12 @@ describe('tickableComponents', () => {
 
   it('sorts by order even when the rows arrive out of order', () => {
     const shuffled = [COMPONENTS[4]!, COMPONENTS[0]!, COMPONENTS[2]!, COMPONENTS[1]!]
-    expect(tickableComponents(shuffled).map((c) => c.key)).toEqual(['room', 'stage', 'pa', 'contacts'])
+    expect(tickableComponents(shuffled).map((c) => c.key)).toEqual([
+      'room',
+      'stage',
+      'pa',
+      'contacts',
+    ])
   })
 })
 
@@ -51,8 +68,10 @@ describe('assembleVenueSpecText', () => {
     const text = assembleVenueSpecText(COMPONENTS, ['contacts', 'room', 'pa'])
     const order = ['room', 'pa', 'contacts'].map((k) => COMPONENTS.find((c) => c.key === k)!.title)
     // Ticked out of order ("contacts, room, pa") still reads room, pa, contacts.
-    expect(order.every((title, i) => text.indexOf(title) >= 0)).toBe(true)
-    expect(text.indexOf('Room dimensions and capacity')).toBeLessThan(text.indexOf('PA and monitors'))
+    expect(order.every((title) => text.indexOf(title) >= 0)).toBe(true)
+    expect(text.indexOf('Room dimensions and capacity')).toBeLessThan(
+      text.indexOf('PA and monitors'),
+    )
     expect(text.indexOf('PA and monitors')).toBeLessThan(text.indexOf('Contacts'))
   })
 
@@ -96,7 +115,9 @@ describe('recipientsMissingEmail', () => {
   })
 
   it('ignores a recipient with no email who was never ticked', () => {
-    expect(recipientsMissingEmail(recipients, ['pay_1']).map((r) => r.payeeId)).not.toContain('pay_3')
+    expect(recipientsMissingEmail(recipients, ['pay_1']).map((r) => r.payeeId)).not.toContain(
+      'pay_3',
+    )
   })
 })
 

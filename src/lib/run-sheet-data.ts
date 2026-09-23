@@ -19,7 +19,14 @@ export async function runSheetFor(eventId: string, times: EventRunTimes): Promis
   })
   if (rows.length === 0) return seedRunSheetRows(times)
 
-  return rows.map((r) => ({ id: r.id, time: r.time, item: r.item, who: r.who, note: r.note, order: r.order }))
+  return rows.map((r) => ({
+    id: r.id,
+    time: r.time,
+    item: r.item,
+    who: r.who,
+    note: r.note,
+    order: r.order,
+  }))
 }
 
 /**

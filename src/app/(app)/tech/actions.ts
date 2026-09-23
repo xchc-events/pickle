@@ -220,7 +220,13 @@ export async function sendVenueSpec(
 
   const componentKeysSent = includedComponents(components, componentKeys).map((c) => c.key)
   await db.venueSpecSend.create({
-    data: { eventId: id, componentKeys: componentKeysSent, payeeIds, text, sentById: user.personId },
+    data: {
+      eventId: id,
+      componentKeys: componentKeysSent,
+      payeeIds,
+      text,
+      sentById: user.personId,
+    },
   })
 
   const names = going.map((r) => r.name).join(', ')
@@ -247,9 +253,7 @@ export async function saveRunSheet(
   const { user } = await requireModule('tech')
   const id = await requireEvent(user, eventId)
 
-  const cleaned = rows
-    .map((r) => ({ ...r, item: r.item.trim() }))
-    .filter((r) => r.item.length > 0)
+  const cleaned = rows.map((r) => ({ ...r, item: r.item.trim() })).filter((r) => r.item.length > 0)
 
   await saveRunSheetRows(id, cleaned)
   await record(id, user, 'updated the run sheet')
@@ -274,7 +278,14 @@ export async function sendRunSheet(eventId: string, actPayeeIds: string[]): Prom
   const [event, recipients] = await Promise.all([
     db.event.findUniqueOrThrow({
       where: { id },
-      select: { name: true, packIn: true, doors: true, barClose: true, allOut: true, packOut: true },
+      select: {
+        name: true,
+        packIn: true,
+        doors: true,
+        barClose: true,
+        allOut: true,
+        packOut: true,
+      },
     }),
     eventRecipients(id),
   ])
