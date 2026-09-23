@@ -48,16 +48,18 @@ model Person {
   /// the venue and pay them. See src/lib/finance.ts.
   employment Employment @default(CONTRACTOR)
 
-  user         User?
-  ownedEvents  Event[]       @relation("EventOwner")
-  shifts       Shift[]
-  hourEntries  HourEntry[]
-  availability Availability?
-  activity     Activity[]
-  leads        EventLead[]
-  channelPosts ChannelPush[]
-  uploads      StoredFile[]
-  grantsIssued AccessGrant[]
+  user           User?
+  ownedEvents    Event[]       @relation("EventOwner")
+  shifts         Shift[]
+  hourEntries    HourEntry[]
+  availability   Availability?
+  activity       Activity[]
+  leads          EventLead[]
+  channelPosts   ChannelPush[]
+  uploads        StoredFile[]
+  grantsIssued   AccessGrant[]
+  venueSpecsSent VenueSpecSend[]
+  runSheetsSent  RunSheetSend[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -537,25 +539,28 @@ model Event {
   depositRaisedAt DateTime?
   invoiceRaisedAt DateTime?
 
-  artists     EventArtist[]
-  shifts      Shift[]
-  tasks       Task[]
-  addons      Addon[]
-  activity    Activity[]
-  hours       HourEntry[]
-  review      FinanceReview?
-  actual      Actual?
-  leads       EventLead[]
-  assets      Asset[]
-  comments    Comment[]
-  channels    ChannelPush[]
-  beats       Beat[]
-  files       StoredFile[]
-  grants      AccessGrant[]
-  holds       Hold[]
-  barBudget   BarBudget?
-  barSales    BarSale[]
-  ticketSales TicketSaleDay[]
+  artists        EventArtist[]
+  shifts         Shift[]
+  tasks          Task[]
+  addons         Addon[]
+  activity       Activity[]
+  hours          HourEntry[]
+  review         FinanceReview?
+  actual         Actual?
+  leads          EventLead[]
+  assets         Asset[]
+  comments       Comment[]
+  channels       ChannelPush[]
+  beats          Beat[]
+  files          StoredFile[]
+  grants         AccessGrant[]
+  holds          Hold[]
+  barBudget      BarBudget?
+  barSales       BarSale[]
+  ticketSales    TicketSaleDay[]
+  venueSpecSends VenueSpecSend[]
+  runSheetItems  RunSheetItem[]
+  runSheetSends  RunSheetSend[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1200,4 +1205,114 @@ model Activity {
   at       DateTime @default(now())
 
   @@index([eventId, at])
+}
+
+// ------------------------------------------------------------ venue spec ---
+
+/// One section of the venue spec sheet sent to acts and promoters before a
+/// show — room dimensions, stage, PA, and so on. A house table: the text is
+/// written once in Admin ("Venue spec") and reused on every send, the same
+/// as everything else the product keeps as one record.
+///
+/// Connor, 23 Sep 2026: "It'd be better to have a more full-featured option
+/// where you can select which components of a venue spec sheet you're
+/// sending out, as not all of them are relevant to all people." `active`
+/// and `order` are what "which" and "in what order" mean here.
+model VenueSpecComponent {
+  id     String  @id @default(cuid())
+  /// Stable across a title edit — "stage", "backline" — so a component
+  /// already named in a past `VenueSpecSend.componentKeys` still means the
+  /// same thing after somebody rewords its title.
+  key    String  @unique
+  title  String
+  /// Plain text, loosely markdown-shaped — line breaks and the occasional
+  /// list. Never rendered as HTML beyond what the email's own template
+  /// wraps it in; see `assembleVenueSpecText` in src/lib/venue-spec.ts.
+  body   String
+  order  Int     @default(0)
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([order])
+}
+
+/// One venue spec actually sent: which components, to whom, by whom, when.
+///
+/// Connor, 23 Sep 2026: "It doesn't make sense that it says 'venue spec
+/// sent' and then 'add it yourself', because this will only be uploading on
+/// our end, whereas we want it to be emailed out." Sending this is what
+/// "sent" means now on Tech — the row reads "sent to … on …" off the most
+/// recent of these, in place of the `TECH_SPEC` upload wave one had.
+model VenueSpecSend {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// The components' own keys, in the order they were sent — not a
+  /// relation, so a component renamed or retired later does not change
+  /// what this row says went out.
+  componentKeys String[] @default([])
+  /// Payee ids of every recipient sent to — acts and/or the promoter.
+  payeeIds      String[] @default([])
+  /// What was actually sent, assembled at the moment of sending. Kept
+  /// verbatim rather than re-assembled from today's components, the same
+  /// reason an invoice does not recompute itself when a price changes.
+  text          String
+
+  sentById String?
+  sentBy   Person?  @relation(fields: [sentById], references: [id])
+  sentAt   DateTime @default(now())
+
+  @@index([eventId, sentAt])
+}
+
+// ------------------------------------------------------------- run sheet ---
+
+/// One row of a tech run sheet — pack-in through pack-out, and whatever the
+/// tech lead adds between them.
+///
+/// Connor, 23 Sep 2026: "A section here which allows you to fill in a run
+/// sheet, like a tech run sheet, would be really helpful. And then sending
+/// that to the promoter." A new event's sheet starts from its own run
+/// times (see src/lib/run-times.ts) as rows the tech lead edits from there —
+/// see `seedRunSheetRows` in src/lib/run-sheet.ts.
+model RunSheetItem {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// A clock string, '8:00pm'-shaped, the same as `Event.doors` and its
+  /// siblings — see src/lib/run-times.ts. Null for a row not pinned to a
+  /// time.
+  time  String?
+  item  String
+  who   String?
+  note  String?
+  order Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, order])
+}
+
+/// One run sheet sent to the promoter, and any act ticked alongside them.
+model RunSheetSend {
+  id      String @id @default(cuid())
+  eventId String
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// Payee ids sent to — the promoter, plus any act ticked.
+  payeeIds String[] @default([])
+  /// What was actually sent, assembled at the moment of sending — the same
+  /// reasoning as `VenueSpecSend.text`.
+  text     String
+
+  sentById String?
+  sentBy   Person?  @relation(fields: [sentById], references: [id])
+  sentAt   DateTime @default(now())
+
+  @@index([eventId, sentAt])
 }
