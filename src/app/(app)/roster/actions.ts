@@ -133,7 +133,10 @@ export async function confirmOffer(eventId: string, shiftId: string): Promise<Sa
   if (user.external) return said('Not something an external account can do.', 'stop')
   const id = await requireEvent(user, eventId)
 
-  const shift = await db.shift.findFirst({ where: { id: shiftId, eventId: id }, select: { id: true } })
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    select: { id: true },
+  })
   if (!shift) return said('That shift is not on this event.', 'stop')
 
   const out = await confirmOfferedShift(shiftId, { personId: user.personId, who: user.initials })
@@ -147,7 +150,10 @@ export async function declineOffer(eventId: string, shiftId: string): Promise<Sa
   if (user.external) return said('Not something an external account can do.', 'stop')
   const id = await requireEvent(user, eventId)
 
-  const shift = await db.shift.findFirst({ where: { id: shiftId, eventId: id }, select: { id: true } })
+  const shift = await db.shift.findFirst({
+    where: { id: shiftId, eventId: id },
+    select: { id: true },
+  })
   if (!shift) return said('That shift is not on this event.', 'stop')
 
   const out = await declineOfferedShift(shiftId, { personId: user.personId, who: user.initials })
@@ -215,7 +221,9 @@ export async function emailOffer(eventId: string, shiftId: string): Promise<Said
 
   await record(id, user, `emailed the offer for ${shift.role} to ${shift.person.name}`)
   refresh()
-  return said(`Offer emailed to ${shift.person.name}. It stops working in 7 days if nobody answers it.`)
+  return said(
+    `Offer emailed to ${shift.person.name}. It stops working in 7 days if nobody answers it.`,
+  )
 }
 
 /**

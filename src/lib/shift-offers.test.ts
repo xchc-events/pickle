@@ -39,15 +39,17 @@ describe('shiftOfferOutcome', () => {
   })
 
   it('is not live once it has been responded to, and says confirmed', () => {
-    expect(
-      shiftOfferOutcome({ ...base, respondedAt: NOW, response: 'CONFIRMED' }, NOW),
-    ).toEqual({ live: false, reason: 'confirmed' })
+    expect(shiftOfferOutcome({ ...base, respondedAt: NOW, response: 'CONFIRMED' }, NOW)).toEqual({
+      live: false,
+      reason: 'confirmed',
+    })
   })
 
   it('is not live once it has been responded to, and says declined', () => {
-    expect(
-      shiftOfferOutcome({ ...base, respondedAt: NOW, response: 'DECLINED' }, NOW),
-    ).toEqual({ live: false, reason: 'declined' })
+    expect(shiftOfferOutcome({ ...base, respondedAt: NOW, response: 'DECLINED' }, NOW)).toEqual({
+      live: false,
+      reason: 'declined',
+    })
   })
 
   it('a response wins even if the expiry has also passed', () => {
@@ -88,9 +90,10 @@ describe('shiftOfferOutcome', () => {
   })
 
   it('is superseded when the shift was cleared back to open', () => {
-    expect(
-      shiftOfferOutcome({ ...base, shiftState: 'OPEN', shiftPersonId: null }, NOW),
-    ).toEqual({ live: false, reason: 'superseded' })
+    expect(shiftOfferOutcome({ ...base, shiftState: 'OPEN', shiftPersonId: null }, NOW)).toEqual({
+      live: false,
+      reason: 'superseded',
+    })
   })
 })
 

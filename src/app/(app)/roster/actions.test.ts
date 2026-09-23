@@ -375,7 +375,9 @@ describe('emailOffer', () => {
   })
 
   it('falls back to the hours alone when doors is not decided yet', async () => {
-    shiftFindFirst.mockResolvedValue(offeredShift({ event: { name: 'Static Bloom', date: NIGHT, doors: null } }))
+    shiftFindFirst.mockResolvedValue(
+      offeredShift({ event: { name: 'Static Bloom', date: NIGHT, doors: null } }),
+    )
 
     await emailOffer(EVENT, 'shift_door')
 
@@ -392,7 +394,9 @@ describe('emailOffer', () => {
 
     await emailOffer(EVENT, 'shift_door')
 
-    expect(shiftOfferEmail).toHaveBeenCalledWith(expect.objectContaining({ times: '11:30pm–5:30am' }))
+    expect(shiftOfferEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ times: '11:30pm–5:30am' }),
+    )
   })
 
   it('writes an activity line naming who it was emailed to', async () => {
@@ -404,7 +408,9 @@ describe('emailOffer', () => {
   })
 
   it('refuses, naming them, when the person has no email on file', async () => {
-    shiftFindFirst.mockResolvedValue(offeredShift({ person: { id: 'person_ari', name: 'Ari Ngata', email: null } }))
+    shiftFindFirst.mockResolvedValue(
+      offeredShift({ person: { id: 'person_ari', name: 'Ari Ngata', email: null } }),
+    )
 
     const out = await emailOffer(EVENT, 'shift_door')
 

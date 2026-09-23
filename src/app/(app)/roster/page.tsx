@@ -215,9 +215,9 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
           </ul>
 
           <p className={styles.footnote}>
-            Every confirmed shift above wrote an hour entry against this event at that person’s
-            rate — an offer on its own books nothing. The figure in Finance and the figure here are
-            the same number read twice, not two numbers kept in step.
+            Every confirmed shift above wrote an hour entry against this event at that person’s rate
+            — an offer on its own books nothing. The figure in Finance and the figure here are the
+            same number read twice, not two numbers kept in step.
           </p>
         </div>
       )}
