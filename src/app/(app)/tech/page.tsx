@@ -6,12 +6,17 @@ import { SectionHeading } from '@/components/SectionHeading'
 import { OpenFile } from './FileRowActions'
 import { FileSlot } from './FileSlot'
 import { AttachFile } from './AttachFile'
+import { SendVenueSpec } from './SendVenueSpec'
+import { RunSheet } from './RunSheet'
 import {
   assignFileToArtist,
   beginPromoterUpload,
   beginTechUpload,
   finishTechUpload,
   linkToFile,
+  saveRunSheet,
+  sendRunSheet,
+  sendVenueSpec,
 } from './actions'
 import styles from './tech.module.css'
 
@@ -144,21 +149,24 @@ export default async function TechPage({ searchParams }: PageProps<'/tech'>) {
             Venue spec
           </SectionHeading>
 
-          <ul className={styles.acts}>
-            <li className={styles.act}>
-              <span className={styles.actName}>{NAME_OF.TECH_SPEC}</span>
-              <div className={styles.actSlots}>
-                <FileSlot
-                  label={NAME_OF.TECH_SPEC}
-                  file={event.venueSpec}
-                  storageReady={storageReady}
-                  begin={beginTechUpload.bind(null, event.id, 'TECH_SPEC', null)}
-                  finish={finishTechUpload.bind(null, event.id)}
-                  link={linkToFile.bind(null, event.id)}
-                />
-              </div>
-            </li>
-          </ul>
+          <SendVenueSpec
+            components={event.venueSpecComponents}
+            recipients={event.recipients}
+            latestSend={event.latestVenueSpecSend}
+            send={sendVenueSpec.bind(null, event.id)}
+          />
+
+          <SectionHeading note="starts from pack-in, doors, bar close, everyone out, pack-out">
+            Run sheet
+          </SectionHeading>
+
+          <RunSheet
+            rows={event.runSheet}
+            recipients={event.recipients}
+            latestSend={event.latestRunSheetSend}
+            save={saveRunSheet.bind(null, event.id)}
+            send={sendRunSheet.bind(null, event.id)}
+          />
 
           {event.unassigned.length > 0 ? (
             <>
