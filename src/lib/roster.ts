@@ -209,9 +209,16 @@ export function fitFor(
   return { tone: 'plain', why: 'No view either way on this slot.' }
 }
 
-/** What is still uncovered, in the coordinator's own words, or nothing. */
+/**
+ * What is still uncovered, in the coordinator's own words, or nothing.
+ *
+ * Written as what is *not* covered rather than a list of the states that
+ * are not — `OFFERED` counts as uncovered too, same as `OPEN` and `ASKED`:
+ * nobody has actually said yes until it is `ASSIGNED`, and the hours are not
+ * booked until then either.
+ */
 export function shortfall(shifts: readonly { state: string }[]): string | null {
-  const open = shifts.filter((s) => s.state === 'OPEN' || s.state === 'ASKED').length
+  const open = shifts.filter((s) => s.state !== 'ASSIGNED' && s.state !== 'DONE').length
   if (open === 0) return null
   return `${open} shift${open === 1 ? '' : 's'} unfilled`
 }

@@ -195,6 +195,12 @@ export interface RosterShift {
   personId: string | null
   personName: string | null
   personInitials: string | null
+  /** For the contact popover on the shift row's avatar. Null when there is
+   *  no person, or the person has none on file. */
+  personEmail: string | null
+  /** From the linked User, where the person has one — `Person` itself
+   *  carries no phone number. */
+  personPhone: string | null
   /** Everyone who could take it, best fit first. */
   candidates: Candidate[]
   /** This shift's start and end as `<input type="time">` values, derived
@@ -270,7 +276,11 @@ export async function loadRoster(
   })
 
   const queue: RosterQueueRow[] = events.map((e) => {
-    const open = e.shifts.filter((s) => s.state === 'OPEN' || s.state === 'ASKED').length
+    // Not yet truly filled: OPEN and ASKED, same as before, plus OFFERED —
+    // nobody has said yes until a shift is ASSIGNED, and the hours are not
+    // booked until then either. See shortfall() in src/lib/roster.ts, which
+    // this mirrors for the same reason.
+    const open = e.shifts.filter((s) => s.state !== 'ASSIGNED' && s.state !== 'DONE').length
     return {
       id: e.id,
       name: e.name,
@@ -292,7 +302,17 @@ export async function loadRoster(
       space: { select: { name: true, capacity: true, seatedCapacity: true } },
       shifts: {
         orderBy: [{ start: 'asc' }, { role: 'asc' }],
-        include: { person: { select: { id: true, name: true, initials: true } } },
+        include: {
+          person: {
+            select: {
+              id: true,
+              name: true,
+              initials: true,
+              email: true,
+              user: { select: { phone: true } },
+            },
+          },
+        },
       },
     },
   })
@@ -326,6 +346,8 @@ export async function loadRoster(
     personId: s.personId,
     personName: s.person?.name ?? null,
     personInitials: s.person?.initials ?? null,
+    personEmail: s.person?.email ?? null,
+    personPhone: s.person?.user?.phone ?? null,
     startInput: clockInputFor(row.doors, s.start),
     endInput: clockInputFor(row.doors, s.start + s.hours),
     candidates: people
