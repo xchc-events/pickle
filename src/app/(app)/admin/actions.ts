@@ -468,3 +468,51 @@ export async function setExternalDetails(
   refresh()
   return said('Saved. This is the name and number the venue contacts them on.')
 }
+
+/**
+ * Rewrite one venue spec component's title and body.
+ *
+ * Connor, 23 Sep 2026: "It'd be better to have a more full-featured option
+ * where you can select which components of a venue spec sheet you're
+ * sending out." The set itself is seeded; this is where its wording is
+ * kept current. `key` and `order` are not editable here — reordering the
+ * seeded set is not something this round asked for.
+ */
+export async function updateVenueSpecComponent(
+  id: string,
+  title: string,
+  body: string,
+): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.role !== 'ADMIN') return said('Only an administrator can edit the venue spec.', 'stop')
+
+  const trimmedTitle = title.trim()
+  if (!trimmedTitle) return said('Give it a title.', 'stop')
+
+  const row = await db.venueSpecComponent.findUnique({ where: { id }, select: { id: true } })
+  if (!row) return said('No such component.', 'stop')
+
+  await db.venueSpecComponent.update({
+    where: { id },
+    data: { title: trimmedTitle, body },
+  })
+
+  refresh()
+  return said('Saved. Tech reads this section however it is worded here.')
+}
+
+/** Take a component out of what Tech offers to send, or put it back. */
+export async function setVenueSpecComponentActive(id: string, active: boolean): Promise<Said> {
+  const { user } = await requireModule('admin')
+  if (user.role !== 'ADMIN') return said('Only an administrator can edit the venue spec.', 'stop')
+
+  const row = await db.venueSpecComponent.findUnique({ where: { id }, select: { id: true } })
+  if (!row) return said('No such component.', 'stop')
+
+  await db.venueSpecComponent.update({ where: { id }, data: { active } })
+
+  refresh()
+  return said(
+    active ? 'Back on — Tech can tick it again.' : 'Off — Tech will not offer it to send.',
+  )
+}
