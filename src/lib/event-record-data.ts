@@ -554,6 +554,8 @@ export async function loadEventRecord(
         note: c.note,
         byName: null,
         when: null,
+        // Not selected above — this summary shows state, not the link itself.
+        url: null,
       })),
     ).map((c) => ({
       key: c.key,
