@@ -19,6 +19,27 @@ export async function loadVenueSpecComponents(): Promise<VenueSpecComponentRow[]
   }))
 }
 
+export interface VenueSpecComponentAdminRow extends VenueSpecComponentRow {
+  /** The row's own id — what `updateVenueSpecComponent` and
+   *  `setVenueSpecComponentActive` in src/app/(app)/admin/actions.ts edit
+   *  by. Left off `VenueSpecComponentRow` itself: everywhere else reads a
+   *  component by its stable `key`, never its row id. */
+  id: string
+}
+
+/** Every component, with its row id — what Admin edits by. */
+export async function loadVenueSpecComponentsForAdmin(): Promise<VenueSpecComponentAdminRow[]> {
+  const rows = await db.venueSpecComponent.findMany({ orderBy: { order: 'asc' } })
+  return rows.map((r) => ({
+    id: r.id,
+    key: r.key,
+    title: r.title,
+    body: r.body,
+    order: r.order,
+    active: r.active,
+  }))
+}
+
 export interface VenueSpecSendSummary {
   recipientNames: string[]
   sentByName: string | null

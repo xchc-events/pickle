@@ -1,10 +1,12 @@
 import { requireModule } from '@/lib/permissions'
 import { loadAdmin } from '@/lib/admin-data'
+import { loadVenueSpecComponentsForAdmin } from '@/lib/venue-spec-data'
 import { stubAllowed } from '@/lib/session'
 import { emailConfigured } from '@/lib/email'
 import { SectionHeading } from '@/components/SectionHeading'
 import { UserRow } from './UserRow'
 import { AddUser } from './AddUser'
+import { VenueSpecComponentRow } from './VenueSpecComponentRow'
 import {
   addUser,
   endSessionsFor,
@@ -15,6 +17,8 @@ import {
   setOrganisation,
   setPhone,
   setRole,
+  setVenueSpecComponentActive,
+  updateVenueSpecComponent,
 } from './actions'
 import styles from './admin.module.css'
 
@@ -28,7 +32,8 @@ import styles from './admin.module.css'
  */
 export default async function AdminPage() {
   const { user } = await requireModule('admin')
-  const { users, people, roles, activeAdmins, organisations } = await loadAdmin()
+  const [{ users, people, roles, activeAdmins, organisations }, venueSpecComponents] =
+    await Promise.all([loadAdmin(), loadVenueSpecComponentsForAdmin()])
 
   return (
     <div>
@@ -96,6 +101,26 @@ export default async function AdminPage() {
           ever sees or sets it. After that they sign in with their address and password, or ask for
           a link by email — staff and outside coordinators alike. Anybody who forgets their password
           sets a new one from the sign-in page without needing you.
+        </p>
+
+        <SectionHeading note="what Tech can tick to send an act or a promoter">
+          Venue spec
+        </SectionHeading>
+
+        <ul className={styles.specRows}>
+          {venueSpecComponents.map((c) => (
+            <VenueSpecComponentRow
+              key={c.id}
+              component={c}
+              update={updateVenueSpecComponent.bind(null, c.id)}
+              setActive={setVenueSpecComponentActive.bind(null, c.id)}
+            />
+          ))}
+        </ul>
+
+        <p className={styles.footnote}>
+          A component taken off here stops being offered on Tech, even if a past send still names it
+          — see docs/design-handoff/README.md, &ldquo;Tech production&rdquo;.
         </p>
       </div>
     </div>
