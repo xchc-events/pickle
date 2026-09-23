@@ -17,6 +17,14 @@ import { readSales, salesHistory } from './gather'
 import { earliestSaleDay } from './sales-chart'
 import { bookingStep, type BookingStatus } from './parts'
 import type { SessionUser } from './session'
+import {
+  compsCountFor,
+  groupDoorList,
+  totalPeople,
+  type DoorListGroup,
+  type DoorListRow,
+} from './door-list'
+import { CODE_STATE_LABELS, codeState, codeValueLabel, type TicketCodeState } from './ticket-codes'
 
 /**
  * Loads Ticketing.
@@ -101,6 +109,39 @@ export interface TicketEvent {
    * that. Shown for "how much has this made", not reconciled against the P&L.
    */
   revenue: string
+
+  /** T6 — the list with state, newest first. */
+  codes: TicketCodeRow[]
+  /** T7 — grouped by kind, with the section's own running total. */
+  doorList: DoorListSection
+}
+
+/** One code, as the Codes section shows it — T6. */
+export interface TicketCodeRow {
+  id: string
+  code: string
+  kind: string
+  /** "10% off", "$5 off", "Free ticket", "Unlocks sup" — `codeValueLabel`. */
+  valueLabel: string
+  tierKey: string | null
+  useLimit: number | null
+  uses: number
+  state: TicketCodeState
+  stateLabel: string
+  who: string
+  whenLabel: string
+}
+
+/** The door list, grouped and totalled — T7. */
+export interface DoorListSection {
+  groups: DoorListGroup[]
+  totalPeople: number
+  /**
+   * Whether the comps P&L line is currently reading this list rather than
+   * the event record's typed crew figure — see `compsCountFor` in
+   * src/lib/door-list.ts, and the note the section shows underneath it.
+   */
+  compsFromList: boolean
 }
 
 export interface TicketingLoad {
@@ -173,8 +214,20 @@ export async function loadTicketing(
   // other projection uses. See src/lib/finance-input.ts.
   const orgShareHours = await orgShareFor(row.date)
 
+  // The door list's own COMP entries, party sizes summed, stand in for the
+  // typed crew figure once any exist for this event — `compsCountFor` in
+  // src/lib/door-list.ts. `financeInputFor` still reads everything else off
+  // `row`; only the one field is overridden, the same way this loader has
+  // always been the place that decides what `financeVals` is handed. See
+  // src/lib/finance.ts, which is untouched.
+  const doorListRows = await db.doorListEntry.findMany({
+    where: { eventId: row.id },
+    orderBy: { name: 'asc' },
+  })
+  const compsCrew = compsCountFor(doorListRows, row.crew)
+
   const scen = scenarioOf(row.scen)
-  const vals = financeVals(financeInputFor(row, scen, orgShareHours))
+  const vals = financeVals({ ...financeInputFor(row, scen, orgShareHours), crew: compsCrew })
   const capacity = capacityOf(row.space, row.format)
 
   const table = tierTable(row.std, row.door, normaliseMix(row.mix))
@@ -194,6 +247,45 @@ export async function loadTicketing(
   }))
   const gatherPush = row.channels[0]
   const onSaleAt = gatherPush?.at ?? earliestSaleDay(salesPoints) ?? row.date
+
+  // T6 — the list with state, newest first.
+  const codeRows = await db.ticketCode.findMany({
+    where: { eventId: row.id },
+    orderBy: { createdAt: 'desc' },
+  })
+  const codes: TicketCodeRow[] = codeRows.map((c) => {
+    const state = codeState(c, today)
+    return {
+      id: c.id,
+      code: c.code,
+      kind: c.kind,
+      valueLabel: codeValueLabel(c.kind, c.value, c.tierKey),
+      tierKey: c.tierKey,
+      useLimit: c.useLimit,
+      uses: c.uses,
+      state,
+      stateLabel: CODE_STATE_LABELS[state],
+      who: c.who,
+      whenLabel: `${dateLabel(c.createdAt)}, ${timeLabel(c.createdAt)}`,
+    }
+  })
+
+  // T7 — grouped by kind, from the same rows `compsCrew` above was read from.
+  const doorListEntryRows: DoorListRow[] = doorListRows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    partySize: d.partySize,
+    kind: d.kind,
+    note: d.note,
+    who: d.who,
+    addedAt: d.addedAt,
+    checkedIn: d.checkedIn,
+  }))
+  const doorList: DoorListSection = {
+    groups: groupDoorList(doorListEntryRows),
+    totalPeople: totalPeople(doorListEntryRows),
+    compsFromList: doorListEntryRows.some((r) => r.kind === 'COMP'),
+  }
 
   return {
     queue,
@@ -234,6 +326,9 @@ export async function loadTicketing(
       projectedTotal: pace.projected,
 
       revenue: money(sales.sold * vals.avg),
+
+      codes,
+      doorList,
     },
   }
 }
