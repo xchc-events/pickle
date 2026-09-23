@@ -220,6 +220,52 @@
   margin-bottom: 6px;
 }
 
+/* --- the live link -------------------------------------------------------- */
+
+.urlRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+.urlOpen {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--color-neutral-500);
+}
+
+.urlOpen:hover {
+  color: var(--color-accent-300);
+}
+
+.urlText {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--color-neutral-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.urlCopy {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-neutral-500);
+  cursor: pointer;
+}
+
+.urlCopy:hover {
+  color: var(--color-accent-300);
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -231,6 +277,34 @@
 .act {
   font-size: 10.5px;
   padding: 4px 10px;
+}
+
+/* --- a manual push's link field ------------------------------------------- */
+
+.pushWithUrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pushUrlInput {
+  font: inherit;
+  font-size: 10.5px;
+  width: 128px;
+  padding: 4px 7px;
+  border: 1px solid var(--color-neutral-800);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-neutral-200);
+}
+
+.pushUrlInput::placeholder {
+  color: var(--color-neutral-700);
+}
+
+.pushUrlInput:disabled {
+  opacity: 0.5;
 }
 
 .spacer {
