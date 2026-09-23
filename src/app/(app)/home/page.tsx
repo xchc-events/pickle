@@ -12,6 +12,8 @@ import {
 } from '@/lib/home'
 import { loadHome, type HomeLoad } from '@/lib/home-data'
 import { SectionHeading } from '@/components/SectionHeading'
+import { ActionButton } from '@/components/ActionButton'
+import { confirmMyOffer, declineMyOffer } from './actions'
 import styles from './home.module.css'
 
 /**
@@ -48,6 +50,19 @@ export default async function HomePage() {
 
       <div className={styles.body}>
         <section className={styles.main}>
+          {home.offers.length > 0 ? (
+            <div>
+              <SectionHeading note={needsCount(home.offers.length)}>
+                Shifts offered to you
+              </SectionHeading>
+              <ul className={styles.offers}>
+                {home.offers.map((o) => (
+                  <OfferRow key={o.shiftId} offer={o} />
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <div>
             <SectionHeading note={needsCount(yours.length)}>Needs you</SectionHeading>
             {yours.length > 0 ? (
@@ -93,6 +108,43 @@ function NeedRow({ need: n }: { need: Need }) {
         </span>
         <span className={`${styles.needWhen} ${styles[n.tone]} tabular`}>{n.when}</span>
       </Link>
+    </li>
+  )
+}
+
+/**
+ * A shift offered to the reader themself — R6. Confirming books the hours
+ * at the reader's own rate; declining clears them and reopens the shift.
+ * `confirmMyOffer`/`declineMyOffer` re-check that the shift is still theirs
+ * to answer, so this is a convenience, not the permission.
+ */
+function OfferRow({ offer: o }: { offer: HomeLoad['offers'][number] }) {
+  return (
+    <li className={styles.offer}>
+      <span className={styles.offerText}>
+        <span className={styles.offerTitle}>
+          {o.role} — {o.eventName}
+        </span>
+        <span className={styles.offerSub}>
+          {o.when} · {o.hours}h
+        </span>
+      </span>
+      <span className={styles.offerActions}>
+        <ActionButton
+          className={styles.offerConfirm}
+          action={confirmMyOffer.bind(null, o.shiftId)}
+          title="Say yes to this shift"
+        >
+          Confirm
+        </ActionButton>
+        <ActionButton
+          className={styles.offerDecline}
+          action={declineMyOffer.bind(null, o.shiftId)}
+          title="Say you can't make this one"
+        >
+          Decline
+        </ActionButton>
+      </span>
     </li>
   )
 }

@@ -3,7 +3,7 @@ import { db } from './db'
 import { eventScope } from './scope'
 import { dateLabel, hrs } from './format'
 import { dayPeriod, fitFor, shiftPlan, shortfall, type FitTone } from './roster'
-import { minutesOfDay } from './run-times'
+import { clockFromInput, minutesOfDay } from './run-times'
 import { PLANNED_HOUR_COST } from './finance'
 import { capacityOf, type SpaceCapacity } from './ticketing'
 import { readSales } from './gather'
@@ -144,6 +144,19 @@ export function offsetFromClock(
 }
 
 /**
+ * A shift's call as clock times — "11:30pm–5:30am" — for whoever reads it
+ * outside the roster's own doors-relative shorthand: the offer email and the
+ * offer page both use this, so a crew member is never asked to work out
+ * "doors +3.5h" for themself. Null while doors is not decided yet, the same
+ * case `clockInputFor` and `crewCallStart` both fall back on.
+ */
+export function callTimes(doors: string | null, start: number, hours: number): string | null {
+  const startClock = clockFromInput(clockInputFor(doors, start))
+  const endClock = clockFromInput(clockInputFor(doors, start + hours))
+  return startClock && endClock ? `${startClock}–${endClock}` : null
+}
+
+/**
  * The sales strip's four figures: what has sold, the likely turnout the
  * event is staffed to, what the room holds, and how many shifts the
  * standard plan wants at that turnout. A pure composition over exactly the
@@ -195,6 +208,12 @@ export interface RosterShift {
   personId: string | null
   personName: string | null
   personInitials: string | null
+  /** For the contact popover on the shift row's avatar. Null when there is
+   *  no person, or the person has none on file. */
+  personEmail: string | null
+  /** From the linked User, where the person has one — `Person` itself
+   *  carries no phone number. */
+  personPhone: string | null
   /** Everyone who could take it, best fit first. */
   candidates: Candidate[]
   /** This shift's start and end as `<input type="time">` values, derived
@@ -270,7 +289,11 @@ export async function loadRoster(
   })
 
   const queue: RosterQueueRow[] = events.map((e) => {
-    const open = e.shifts.filter((s) => s.state === 'OPEN' || s.state === 'ASKED').length
+    // Not yet truly filled: OPEN and ASKED, same as before, plus OFFERED —
+    // nobody has said yes until a shift is ASSIGNED, and the hours are not
+    // booked until then either. See shortfall() in src/lib/roster.ts, which
+    // this mirrors for the same reason.
+    const open = e.shifts.filter((s) => s.state !== 'ASSIGNED' && s.state !== 'DONE').length
     return {
       id: e.id,
       name: e.name,
@@ -292,7 +315,17 @@ export async function loadRoster(
       space: { select: { name: true, capacity: true, seatedCapacity: true } },
       shifts: {
         orderBy: [{ start: 'asc' }, { role: 'asc' }],
-        include: { person: { select: { id: true, name: true, initials: true } } },
+        include: {
+          person: {
+            select: {
+              id: true,
+              name: true,
+              initials: true,
+              email: true,
+              user: { select: { phone: true } },
+            },
+          },
+        },
       },
     },
   })
@@ -326,6 +359,8 @@ export async function loadRoster(
     personId: s.personId,
     personName: s.person?.name ?? null,
     personInitials: s.person?.initials ?? null,
+    personEmail: s.person?.email ?? null,
+    personPhone: s.person?.user?.phone ?? null,
     startInput: clockInputFor(row.doors, s.start),
     endInput: clockInputFor(row.doors, s.start + s.hours),
     candidates: people

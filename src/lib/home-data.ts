@@ -2,6 +2,7 @@ import 'server-only'
 import { db } from './db'
 import { financeVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, orgShareFor, scenarioOf } from './finance-input'
+import { dateLabel } from './format'
 import { PARTS_SELECT, partsInputFor } from './parts-input'
 import { halvesOf, takenOf } from './actuals'
 import { eventScope, modulesOpenByRole } from './scope'
@@ -38,6 +39,15 @@ import {
  * shows it, and the hours are only ever the reader's own.
  */
 
+/** A shift offered to the reader themself, waiting on their own yes or no. */
+export interface OfferedShiftRow {
+  shiftId: string
+  eventName: string
+  when: string
+  role: string
+  hours: number
+}
+
 export interface HomeLoad {
   needs: Need[]
   /** Events not yet put to bed. */
@@ -50,6 +60,9 @@ export interface HomeLoad {
    * it; null when the reader cannot open Hours.
    */
   hours: MyHours | 'unlinked' | null
+  /** Shifts offered to the reader themself — R6. Empty for an account with
+   *  no linked person, same as `hours`. */
+  offers: OfferedShiftRow[]
 }
 
 const HOME_SELECT = {
@@ -81,7 +94,7 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
   const now = new Date()
   const viewer: Viewer = { personId: user.personId, modules }
 
-  const [rows, promoters, accounts, permissions, countedRows] = await Promise.all([
+  const [rows, promoters, accounts, permissions, countedRows, offeredShifts] = await Promise.all([
     db.event.findMany({
       where: { AND: [eventScope(user), { concluded: false }] },
       select: HOME_SELECT,
@@ -113,6 +126,21 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
       select: { date: true, actual: true },
       orderBy: { date: 'desc' },
     }),
+    // Shifts offered to the reader themself — R6. Scoped to their own
+    // personId, same as `hoursOf` below; an account with none linked is
+    // never asked a database question it cannot answer.
+    user.personId
+      ? db.shift.findMany({
+          where: { personId: user.personId, state: 'OFFERED', event: { concluded: false } },
+          select: {
+            id: true,
+            role: true,
+            hours: true,
+            event: { select: { name: true, date: true } },
+          },
+          orderBy: { event: { date: 'asc' } },
+        })
+      : Promise.resolve([]),
   ])
 
   const actors = actorsOf(accounts, modulesOpenByRole(permissions))
@@ -192,6 +220,13 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
     tiles: homeTiles(events, counted, projected, viewer),
     next,
     hours: modules.includes('hours') ? await hoursOf(user.personId, now) : null,
+    offers: offeredShifts.map((s) => ({
+      shiftId: s.id,
+      eventName: s.event.name,
+      when: dateLabel(s.event.date),
+      role: s.role,
+      hours: s.hours,
+    })),
   }
 }
 

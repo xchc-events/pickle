@@ -125,12 +125,21 @@ describe('partsInputFor', () => {
     ])
   })
 
-  it('reads a shift as assigned by its person, and pencilled by its state', () => {
+  /**
+   * "Assigned" is a state, not merely a person on the shift — R6 (23 Sep
+   * 2026) put a shift through OFFERED, person set, before ASSIGNED, and
+   * nobody has said yes until it gets there. A reading keyed off `personId`
+   * alone would count an offered-but-unconfirmed shift as filled on the
+   * Pipeline's roster part and on Home; it must not.
+   */
+  it('reads a shift as assigned by its state, not merely by having a person on it', () => {
     const e = partsInputFor(
       row({
         shifts: [
           { personId: 'p1', state: 'ASSIGNED' },
-          { personId: 'p2', state: 'ASKED' },
+          { personId: 'p1', state: 'DONE' },
+          { personId: 'p2', state: 'OFFERED' },
+          { personId: 'p3', state: 'ASKED' },
           { personId: null, state: 'OPEN' },
         ],
       }),
@@ -138,7 +147,9 @@ describe('partsInputFor', () => {
     )
     expect(e.shifts).toEqual([
       { assigned: true, pencilled: false },
-      { assigned: true, pencilled: true },
+      { assigned: true, pencilled: false },
+      { assigned: false, pencilled: false },
+      { assigned: false, pencilled: true },
       { assigned: false, pencilled: false },
     ])
   })

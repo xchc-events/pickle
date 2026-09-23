@@ -193,6 +193,10 @@ describe('shortfall', () => {
     expect(shortfall([{ state: 'ASKED' }])).toMatch(/1 shift/)
   })
 
+  it('counts an offered-but-unconfirmed shift as still open — nobody has said yes yet', () => {
+    expect(shortfall([{ state: 'OFFERED' }])).toMatch(/1 shift/)
+  })
+
   it('reads as one shift, not 1 shifts', () => {
     expect(shortfall([{ state: 'OPEN' }])).toMatch(/1 shift[^s]/)
   })

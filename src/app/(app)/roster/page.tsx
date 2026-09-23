@@ -3,15 +3,18 @@ import { requireModule } from '@/lib/permissions'
 import { loadRoster, fiveTimesLine } from '@/lib/roster-data'
 import { money } from '@/lib/format'
 import { SectionHeading } from '@/components/SectionHeading'
-import { Avatar } from '@/components/Avatar'
 import { ActionButton } from '@/components/ActionButton'
+import { ContactAvatar } from './ContactAvatar'
 import { ShiftPicker } from './ShiftPicker'
 import { ShiftEditor } from './ShiftEditor'
 import {
   askAgain,
-  assignShift,
+  confirmOffer,
+  declineOffer,
   deleteShift,
   duplicateShift,
+  emailOffer,
+  offerShift,
   renameShift,
   retimeShift,
 } from './actions'
@@ -35,7 +38,7 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
         <div>
           <h1 className={styles.title}>Roster</h1>
           <p className={styles.sub}>
-            assigning a shift books the hours · nobody types a timesheet twice
+            confirming a shift books the hours · nobody types a timesheet twice
           </p>
         </div>
       </header>
@@ -112,8 +115,10 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
           <ul className={styles.shifts}>
             {event.shifts.map((s) => {
               const open = s.state === 'OPEN' || s.state === 'ASKED'
+              const offered = s.state === 'OFFERED'
+              const rowTone = offered ? styles.shiftOffered : open ? styles.shiftOpen : ''
               return (
-                <li key={s.id} className={`${styles.shift} ${open ? styles.shiftOpen : ''}`}>
+                <li key={s.id} className={`${styles.shift} ${rowTone}`}>
                   <div className={styles.shiftMain}>
                     <div className={styles.role}>
                       <span className={styles.roleName}>{s.role}</span>
@@ -123,22 +128,53 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
                     </div>
 
                     <div className={styles.who}>
-                      <Avatar
-                        initials={s.personInitials ?? '?'}
-                        title={s.personName ?? 'Unfilled'}
-                        accent={s.personInitials !== null}
+                      <ContactAvatar
+                        initials={s.personInitials}
+                        name={s.personName}
+                        email={s.personEmail}
+                        phone={s.personPhone}
+                        canEmailOffer={offered}
+                        // Bound, not wrapped: a closure created here cannot
+                        // cross into a client component.
+                        emailOffer={emailOffer.bind(null, event.id, s.id)}
                       />
                       <ShiftPicker
                         value={s.personId ?? ''}
                         candidates={s.candidates}
-                        // Bound, not wrapped: a closure created here cannot
-                        // cross into a client component.
-                        assign={assignShift.bind(null, event.id, s.id)}
+                        assign={offerShift.bind(null, event.id, s.id)}
                       />
                     </div>
 
                     <div className={styles.state}>
-                      {open ? (
+                      {offered ? (
+                        <>
+                          <span className={styles.offered}>
+                            <i className="ph ph-hourglass-medium" aria-hidden="true" />
+                            offered
+                          </span>
+                          <ActionButton
+                            className={styles.confirmButton}
+                            action={confirmOffer.bind(null, event.id, s.id)}
+                            title="They said yes in the room"
+                          >
+                            Confirm now
+                          </ActionButton>
+                          <ActionButton
+                            className={styles.askButton}
+                            action={emailOffer.bind(null, event.id, s.id)}
+                            title="Email them a link to confirm or decline"
+                          >
+                            Email offer
+                          </ActionButton>
+                          <ActionButton
+                            className={styles.declineButton}
+                            action={declineOffer.bind(null, event.id, s.id)}
+                            title="Record that they said no"
+                          >
+                            Decline
+                          </ActionButton>
+                        </>
+                      ) : open ? (
                         <>
                           <span className={styles.asked}>
                             {s.asked === 0 ? 'not asked yet' : `asked ${s.asked}`}
@@ -179,9 +215,9 @@ export default async function RosterPage({ searchParams }: PageProps<'/roster'>)
           </ul>
 
           <p className={styles.footnote}>
-            Every assignment above wrote an hour entry against this event at that person’s rate. The
-            figure in Finance and the figure here are the same number read twice, not two numbers
-            kept in step.
+            Every confirmed shift above wrote an hour entry against this event at that person’s rate
+            — an offer on its own books nothing. The figure in Finance and the figure here are the
+            same number read twice, not two numbers kept in step.
           </p>
         </div>
       )}

@@ -169,7 +169,10 @@ export function partsInputFor(row: PartsRow, x: PartsExtras): PartsEvent {
     capacity: capacityOf(row.space, row.format),
 
     shifts: row.shifts.map((s) => ({
-      assigned: s.personId !== null,
+      // A state, not merely a person on the shift — R6 put a shift through
+      // OFFERED, person set, before ASSIGNED, and nobody has said yes until
+      // it gets there.
+      assigned: s.state === 'ASSIGNED' || s.state === 'DONE',
       pencilled: s.state === 'ASKED',
     })),
 

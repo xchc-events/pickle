@@ -44,6 +44,7 @@ const personFindFirst = vi.fn()
 const entryCreate = vi.fn((a: unknown) => ({ op: 'hourEntry.create', a }))
 const entryUpdate = vi.fn((a: unknown) => ({ op: 'hourEntry.update', a }))
 const entryDelete = vi.fn((a: unknown) => ({ op: 'hourEntry.delete', a }))
+const offerCreate = vi.fn()
 const transaction = vi.fn(async (ops: unknown[]) => ops)
 vi.mock('@/lib/db', () => ({
   db: {
@@ -59,21 +60,64 @@ vi.mock('@/lib/db', () => ({
       update: (a: unknown) => entryUpdate(a),
       delete: (a: unknown) => entryDelete(a),
     },
+    shiftOffer: { create: (a: unknown) => offerCreate(a) },
     $transaction: (ops: unknown[]) => transaction(ops),
   },
 }))
 
 const record = vi.fn()
 vi.mock('@/lib/activity', () => ({ record: (...a: unknown[]) => record(...a) }))
-vi.mock('next/cache', () => ({ refresh: vi.fn() }))
 
-const { assignShift, renameShift, retimeShift, duplicateShift, deleteShift } =
-  await import('./actions')
+const refresh = vi.fn()
+vi.mock('next/cache', () => ({ refresh: () => refresh() }))
+
+const confirmOfferedShift = vi.fn()
+const declineOfferedShift = vi.fn()
+vi.mock('@/lib/shift-offers-data', () => ({
+  confirmOfferedShift: (...a: unknown[]) => confirmOfferedShift(...a),
+  declineOfferedShift: (...a: unknown[]) => declineOfferedShift(...a),
+}))
+
+vi.mock('@/lib/shift-offers', () => ({
+  shiftOfferExpiryFrom: () => new Date('2026-09-30T00:00:00Z'),
+}))
+
+vi.mock('@/lib/grants', () => ({
+  mintToken: () => 'raw-token-value',
+  hashToken: (t: string) => `hashed:${t}`,
+}))
+
+const shiftOfferEmail = vi.fn<(a: unknown) => { subject: string; text: string; html: string }>(
+  () => ({ subject: 's', text: 't', html: 'h' }),
+)
+vi.mock('@/lib/shift-offer-email', () => ({
+  shiftOfferEmail: (a: unknown) => shiftOfferEmail(a),
+}))
+
+const sendMail = vi.fn()
+vi.mock('@/lib/email', () => ({ sendMail: (...a: unknown[]) => sendMail(...a) }))
+
+const linkBase = vi.fn<(...a: unknown[]) => string | null>(() => 'https://pickle.example')
+vi.mock('@/lib/auth-rules', () => ({ linkBase: (...a: unknown[]) => linkBase(...a) }))
+
+vi.mock('@/lib/format', () => ({ dateLabel: () => '10 October 2026' }))
+
+const {
+  askAgain,
+  confirmOffer,
+  declineOffer,
+  deleteShift,
+  duplicateShift,
+  emailOffer,
+  offerShift,
+  renameShift,
+  retimeShift,
+} = await import('./actions')
 
 const EVENT = 'evt_static_bloom'
 const NIGHT = new Date(2026, 9, 10, 12)
 
-const shift = (over: { hourEntry?: { id: string } | null } = {}) => ({
+const shift = (over: { hourEntry?: { id: string; paid?: boolean } | null } = {}) => ({
   id: 'shift_door',
   eventId: EVENT,
   role: 'Door',
@@ -88,69 +132,76 @@ beforeEach(() => {
   personFindFirst.mockResolvedValue({ id: 'person_ari', name: 'Ari Ngata' })
   requireModuleMock.mockResolvedValue({ user: mere, modules: ['roster'] })
   requireEventMock.mockImplementation(async (_: unknown, id: string) => id)
+  shiftOfferEmail.mockReturnValue({ subject: 's', text: 't', html: 'h' })
+  linkBase.mockReturnValue('https://pickle.example')
 })
 
-describe('assignShift', () => {
-  it('reads the night along with the shift', async () => {
+const external = {
+  ...mere,
+  id: 'user_amy',
+  external: true,
+  initials: 'AP',
+} satisfies SessionUser
+
+describe('offerShift', () => {
+  it('reads the shift, scoped to the event', async () => {
     shiftFindFirst.mockResolvedValue(shift())
 
-    await assignShift(EVENT, 'shift_door', 'person_ari')
+    await offerShift(EVENT, 'shift_door', 'person_ari')
 
     expect(shiftFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'shift_door', eventId: EVENT },
-        include: expect.objectContaining({ event: { select: { date: true } } }),
-      }),
+      expect.objectContaining({ where: { id: 'shift_door', eventId: EVENT } }),
     )
   })
 
-  it('stamps the hours with the night they are worked, not the moment of assigning', async () => {
+  it('offers no hours — the shift moves to OFFERED with nothing booked', async () => {
     shiftFindFirst.mockResolvedValue(shift())
 
-    const out = await assignShift(EVENT, 'shift_door', 'person_ari')
+    const out = await offerShift(EVENT, 'shift_door', 'person_ari')
 
     expect(out.kind).toBe('good')
-    expect(entryCreate).toHaveBeenCalledWith({
-      data: {
-        personId: 'person_ari',
-        eventId: EVENT,
-        shiftId: 'shift_door',
-        hours: 6,
-        note: 'Door',
-        workedOn: NIGHT,
-      },
+    expect(shiftUpdate).toHaveBeenCalledWith({
+      where: { id: 'shift_door' },
+      data: { personId: 'person_ari', state: 'OFFERED' },
     })
-    expect(record).toHaveBeenCalledWith(EVENT, mere, 'Ari Ngata on Door')
-  })
-
-  it('moves the hours to the new person and keeps them on the night', async () => {
-    shiftFindFirst.mockResolvedValue(shift({ hourEntry: { id: 'entry_1' } }))
-
-    await assignShift(EVENT, 'shift_door', 'person_ari')
-
     expect(entryCreate).not.toHaveBeenCalled()
-    expect(entryUpdate).toHaveBeenCalledWith({
-      where: { id: 'entry_1' },
-      data: { personId: 'person_ari', hours: 6, eventId: EVENT, workedOn: NIGHT },
-    })
+    expect(entryUpdate).not.toHaveBeenCalled()
   })
 
-  it('writes the shift and its hours in one transaction', async () => {
+  it('writes an activity line naming who it was offered to', async () => {
     shiftFindFirst.mockResolvedValue(shift())
 
-    await assignShift(EVENT, 'shift_door', 'person_ari')
+    await offerShift(EVENT, 'shift_door', 'person_ari')
+
+    expect(record).toHaveBeenCalledWith(EVENT, mere, 'offered Door to Ari Ngata')
+  })
+
+  it('clears any hold-over hour entry rather than moving it — an offer starts clean', async () => {
+    shiftFindFirst.mockResolvedValue(shift({ hourEntry: { id: 'entry_1' } }))
+
+    await offerShift(EVENT, 'shift_door', 'person_ari')
+
+    expect(entryDelete).toHaveBeenCalledWith({ where: { id: 'entry_1' } })
+    expect(entryUpdate).not.toHaveBeenCalled()
+    expect(entryCreate).not.toHaveBeenCalled()
+  })
+
+  it('writes the shift update and the hour entry delete in one transaction', async () => {
+    shiftFindFirst.mockResolvedValue(shift({ hourEntry: { id: 'entry_1' } }))
+
+    await offerShift(EVENT, 'shift_door', 'person_ari')
 
     expect(transaction).toHaveBeenCalledTimes(1)
     expect(transaction.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ op: 'hourEntry.delete' }),
       expect.objectContaining({ op: 'shift.update' }),
-      expect.objectContaining({ op: 'hourEntry.create' }),
     ])
   })
 
   it('takes the hours off the event when the shift goes back to open', async () => {
     shiftFindFirst.mockResolvedValue(shift({ hourEntry: { id: 'entry_1' } }))
 
-    const out = await assignShift(EVENT, 'shift_door', '')
+    const out = await offerShift(EVENT, 'shift_door', '')
 
     expect(entryDelete).toHaveBeenCalledWith({ where: { id: 'entry_1' } })
     expect(shiftUpdate).toHaveBeenCalledWith({
@@ -161,10 +212,21 @@ describe('assignShift', () => {
     expect(record).toHaveBeenCalledWith(EVENT, mere, 'took Door back to open')
   })
 
+  it('refuses to move a paid wage by picking somebody else, and writes nothing', async () => {
+    shiftFindFirst.mockResolvedValue(shift({ hourEntry: { id: 'entry_1', paid: true } }))
+
+    const out = await offerShift(EVENT, 'shift_door', 'person_ari')
+
+    expect(out.kind).toBe('stop')
+    expect(out.text).toMatch(/already paid/)
+    expect(transaction).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+
   it('refuses a shift that is not on this event, and writes nothing', async () => {
     shiftFindFirst.mockResolvedValue(null)
 
-    const out = await assignShift(EVENT, 'shift_elsewhere', 'person_ari')
+    const out = await offerShift(EVENT, 'shift_elsewhere', 'person_ari')
 
     expect(out.kind).toBe('stop')
     expect(transaction).not.toHaveBeenCalled()
@@ -175,20 +237,231 @@ describe('assignShift', () => {
     shiftFindFirst.mockResolvedValue(shift())
     personFindFirst.mockResolvedValue(null)
 
-    const out = await assignShift(EVENT, 'shift_door', 'person_gone')
+    const out = await offerShift(EVENT, 'shift_door', 'person_gone')
 
     expect(out.kind).toBe('stop')
     expect(transaction).not.toHaveBeenCalled()
     expect(record).not.toHaveBeenCalled()
   })
+
+  it('refuses an external account, and writes nothing', async () => {
+    requireModuleMock.mockResolvedValueOnce({ user: external, modules: ['roster'] })
+
+    const out = await offerShift(EVENT, 'shift_door', 'person_ari')
+
+    expect(out.kind).toBe('stop')
+    expect(shiftFindFirst).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+
+  it('propagates the module gate refusing anyone without the roster module', async () => {
+    requireModuleMock.mockRejectedValueOnce(new Error('not found'))
+
+    await expect(offerShift(EVENT, 'shift_door', 'person_ari')).rejects.toThrow()
+    expect(shiftFindFirst).not.toHaveBeenCalled()
+  })
 })
 
-const external = {
-  ...mere,
-  id: 'user_amy',
-  external: true,
-  initials: 'AP',
-} satisfies SessionUser
+describe('confirmOffer — the duty manager confirming in the room', () => {
+  it('scopes the shift to the event before handing off, and delegates the actual confirm', async () => {
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door' })
+    confirmOfferedShift.mockResolvedValue({ kind: 'good', text: 'Ari Ngata is on Door.' })
+
+    const out = await confirmOffer(EVENT, 'shift_door')
+
+    expect(shiftFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'shift_door', eventId: EVENT } }),
+    )
+    expect(confirmOfferedShift).toHaveBeenCalledWith('shift_door', {
+      personId: mere.personId,
+      who: mere.initials,
+    })
+    expect(out.text).toBe('Ari Ngata is on Door.')
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('refuses a shift that is not on this event, without calling through', async () => {
+    shiftFindFirst.mockResolvedValue(null)
+
+    const out = await confirmOffer(EVENT, 'shift_elsewhere')
+
+    expect(out.kind).toBe('stop')
+    expect(confirmOfferedShift).not.toHaveBeenCalled()
+  })
+
+  it('refuses an external account', async () => {
+    requireModuleMock.mockResolvedValueOnce({ user: external, modules: ['roster'] })
+
+    const out = await confirmOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(shiftFindFirst).not.toHaveBeenCalled()
+    expect(confirmOfferedShift).not.toHaveBeenCalled()
+  })
+
+  it('propagates the module gate refusing anyone without the roster module', async () => {
+    requireModuleMock.mockRejectedValueOnce(new Error('not found'))
+
+    await expect(confirmOffer(EVENT, 'shift_door')).rejects.toThrow()
+    expect(confirmOfferedShift).not.toHaveBeenCalled()
+  })
+})
+
+describe('declineOffer — the duty manager recording a no', () => {
+  it('scopes the shift to the event before handing off, and delegates the actual decline', async () => {
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door' })
+    declineOfferedShift.mockResolvedValue({ kind: 'warn', text: 'Door is open again.' })
+
+    const out = await declineOffer(EVENT, 'shift_door')
+
+    expect(declineOfferedShift).toHaveBeenCalledWith('shift_door', {
+      personId: mere.personId,
+      who: mere.initials,
+    })
+    expect(out.text).toBe('Door is open again.')
+    expect(refresh).toHaveBeenCalled()
+  })
+
+  it('refuses a shift that is not on this event, without calling through', async () => {
+    shiftFindFirst.mockResolvedValue(null)
+
+    const out = await declineOffer(EVENT, 'shift_elsewhere')
+
+    expect(out.kind).toBe('stop')
+    expect(declineOfferedShift).not.toHaveBeenCalled()
+  })
+
+  it('refuses an external account', async () => {
+    requireModuleMock.mockResolvedValueOnce({ user: external, modules: ['roster'] })
+
+    const out = await declineOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(declineOfferedShift).not.toHaveBeenCalled()
+  })
+})
+
+describe('emailOffer', () => {
+  const offeredShift = (over: Record<string, unknown> = {}) => ({
+    id: 'shift_door',
+    eventId: EVENT,
+    role: 'Door',
+    hours: 6,
+    start: 3.5,
+    state: 'OFFERED',
+    person: { id: 'person_ari', name: 'Ari Ngata', email: 'ari@xchc.test' },
+    event: { name: 'Static Bloom', date: NIGHT, doors: null },
+    ...over,
+  })
+
+  it('mints a token, stores only its hash, and mails the live one', async () => {
+    shiftFindFirst.mockResolvedValue(offeredShift())
+
+    const out = await emailOffer(EVENT, 'shift_door')
+
+    expect(offerCreate).toHaveBeenCalledWith({
+      data: {
+        shiftId: 'shift_door',
+        personId: 'person_ari',
+        tokenHash: 'hashed:raw-token-value',
+        expires: new Date('2026-09-30T00:00:00Z'),
+      },
+    })
+    expect(sendMail).toHaveBeenCalledWith('ari@xchc.test', { subject: 's', text: 't', html: 'h' })
+    expect(shiftOfferEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://pickle.example/s/raw-token-value' }),
+    )
+    expect(out.kind).toBe('good')
+  })
+
+  it('falls back to the hours alone when doors is not decided yet', async () => {
+    shiftFindFirst.mockResolvedValue(
+      offeredShift({ event: { name: 'Static Bloom', date: NIGHT, doors: null } }),
+    )
+
+    await emailOffer(EVENT, 'shift_door')
+
+    expect(shiftOfferEmail).toHaveBeenCalledWith(expect.objectContaining({ times: null, hours: 6 }))
+  })
+
+  it('carries clock times once doors is decided', async () => {
+    // Doors 8pm, start 3.5h on (11:30pm), runs 6h — the same doors/start
+    // fixture retimeShift's own tests use, so the conversion is already
+    // proven correct; only the length differs (6h here, ending 5:30am).
+    shiftFindFirst.mockResolvedValue(
+      offeredShift({ event: { name: 'Static Bloom', date: NIGHT, doors: '8:00pm' } }),
+    )
+
+    await emailOffer(EVENT, 'shift_door')
+
+    expect(shiftOfferEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ times: '11:30pm–5:30am' }),
+    )
+  })
+
+  it('writes an activity line naming who it was emailed to', async () => {
+    shiftFindFirst.mockResolvedValue(offeredShift())
+
+    await emailOffer(EVENT, 'shift_door')
+
+    expect(record).toHaveBeenCalledWith(EVENT, mere, 'emailed the offer for Door to Ari Ngata')
+  })
+
+  it('refuses, naming them, when the person has no email on file', async () => {
+    shiftFindFirst.mockResolvedValue(
+      offeredShift({ person: { id: 'person_ari', name: 'Ari Ngata', email: null } }),
+    )
+
+    const out = await emailOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(out.text).toMatch(/Ari Ngata/)
+    expect(out.text).toMatch(/no email/)
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(offerCreate).not.toHaveBeenCalled()
+  })
+
+  it('refuses a shift that is not OFFERED', async () => {
+    shiftFindFirst.mockResolvedValue(offeredShift({ state: 'ASSIGNED' }))
+
+    const out = await emailOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(sendMail).not.toHaveBeenCalled()
+  })
+
+  it('refuses when the app has no configured address to send a link to', async () => {
+    linkBase.mockReturnValue(null)
+    shiftFindFirst.mockResolvedValue(offeredShift())
+
+    const out = await emailOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(sendMail).not.toHaveBeenCalled()
+    expect(offerCreate).not.toHaveBeenCalled()
+  })
+
+  it('refuses an external account, and writes nothing', async () => {
+    requireModuleMock.mockResolvedValueOnce({ user: external, modules: ['roster'] })
+
+    const out = await emailOffer(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('stop')
+    expect(shiftFindFirst).not.toHaveBeenCalled()
+  })
+})
+
+describe('askAgain, once a shift has been offered', () => {
+  it('refuses to ask around again while somebody specific is offered it', async () => {
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door', asked: 0, state: 'OFFERED' })
+
+    const out = await askAgain(EVENT, 'shift_door')
+
+    expect(out.kind).toBe('warn')
+    expect(shiftUpdate).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
+  })
+})
 
 describe('renameShift', () => {
   it('renames the role and writes an activity line', async () => {
