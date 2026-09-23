@@ -145,9 +145,16 @@ export async function askAgain(eventId: string, shiftId: string): Promise<Said> 
 /**
  * Rename a shift's role.
  *
- * Touches the role only — the start, hours, person, state and any linked
- * hour entry are exactly as they were. Retiming lives in `retimeShift`
- * below; a single save that changes both calls each in turn.
+ * Touches the shift's own start, hours, person and state not at all — those
+ * are exactly as they were. Retiming lives in `retimeShift` below; a single
+ * save that changes both calls each in turn.
+ *
+ * The linked hour entry's `note` carries the role name too, written once
+ * when `assignShift` created it. If nobody has touched it since — it still
+ * reads exactly the old role — the rename carries it forward in the same
+ * transaction, so Hours does not go on showing a name the roster dropped. A
+ * note somebody has hand-edited (to say who they're covering for, say) is
+ * left alone: that wording is theirs, not a copy of the role.
  */
 export async function renameShift(eventId: string, shiftId: string, role: string): Promise<Said> {
   const { user } = await requireModule('roster')
@@ -159,12 +166,19 @@ export async function renameShift(eventId: string, shiftId: string, role: string
 
   const shift = await db.shift.findFirst({
     where: { id: shiftId, eventId: id },
-    select: { id: true, role: true },
+    include: { hourEntry: { select: { id: true, note: true } } },
   })
   if (!shift) return said('That shift is not on this event.', 'stop')
   if (name === shift.role) return said('Nothing changed.', 'warn')
 
-  await db.shift.update({ where: { id: shift.id }, data: { role: name } })
+  const followNote = shift.hourEntry != null && shift.hourEntry.note === shift.role
+
+  await db.$transaction([
+    db.shift.update({ where: { id: shift.id }, data: { role: name } }),
+    ...(followNote
+      ? [db.hourEntry.update({ where: { id: shift.hourEntry!.id }, data: { note: name } })]
+      : []),
+  ])
   await record(id, user, `renamed ${shift.role} to ${name}`)
 
   refresh()
@@ -191,9 +205,19 @@ export async function retimeShift(
 
   const shift = await db.shift.findFirst({
     where: { id: shiftId, eventId: id },
-    include: { hourEntry: { select: { id: true } }, event: { select: { doors: true } } },
+    include: {
+      hourEntry: { select: { id: true, paid: true } },
+      event: { select: { doors: true } },
+    },
   })
   if (!shift) return said('That shift is not on this event.', 'stop')
+
+  if (shift.hourEntry?.paid) {
+    return said(
+      `${shift.role}’s hours are already paid — a paid wage cannot be moved from the roster; Finance reverses a payment first.`,
+      'stop',
+    )
+  }
 
   const startLabel = clockFromInput(input.start)
   const endLabel = clockFromInput(input.end)

@@ -192,7 +192,7 @@ const external = {
 
 describe('renameShift', () => {
   it('renames the role and writes an activity line', async () => {
-    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door' })
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door', hourEntry: null })
 
     const out = await renameShift(EVENT, 'shift_door', 'Door (extra)')
 
@@ -204,24 +204,62 @@ describe('renameShift', () => {
     expect(out.kind).toBe('good')
   })
 
-  it('keeps everything else, only the role is in the update', async () => {
-    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door' })
+  it('keeps everything else on the shift, only the role is in the shift update', async () => {
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door', hourEntry: null })
 
     await renameShift(EVENT, 'shift_door', 'Front door')
 
     // toHaveBeenCalledWith is an exact match, so this alone proves the
-    // update data carries nothing besides the new role.
+    // shift's own update data carries nothing besides the new role.
     expect(shiftUpdate).toHaveBeenCalledWith({
       where: { id: 'shift_door' },
       data: { role: 'Front door' },
     })
     expect(entryUpdate).not.toHaveBeenCalled()
     expect(entryDelete).not.toHaveBeenCalled()
-    expect(transaction).not.toHaveBeenCalled()
+    expect(transaction).toHaveBeenCalledTimes(1)
+    expect(transaction.mock.calls[0][0]).toHaveLength(1)
+  })
+
+  it("moves the linked hour entry's note when it still matched the old role", async () => {
+    shiftFindFirst.mockResolvedValue({
+      id: 'shift_door',
+      role: 'Door',
+      hourEntry: { id: 'entry_1', note: 'Door' },
+    })
+
+    await renameShift(EVENT, 'shift_door', 'Front door')
+
+    expect(entryUpdate).toHaveBeenCalledWith({
+      where: { id: 'entry_1' },
+      data: { note: 'Front door' },
+    })
+    expect(transaction).toHaveBeenCalledTimes(1)
+    expect(transaction.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ op: 'shift.update' }),
+      expect.objectContaining({ op: 'hourEntry.update' }),
+    ])
+  })
+
+  it('leaves a hand-edited note alone', async () => {
+    shiftFindFirst.mockResolvedValue({
+      id: 'shift_door',
+      role: 'Door',
+      hourEntry: { id: 'entry_1', note: 'Door (covering for Amy)' },
+    })
+
+    const out = await renameShift(EVENT, 'shift_door', 'Front door')
+
+    expect(entryUpdate).not.toHaveBeenCalled()
+    expect(shiftUpdate).toHaveBeenCalledWith({
+      where: { id: 'shift_door' },
+      data: { role: 'Front door' },
+    })
+    expect(out.kind).toBe('good')
   })
 
   it('trims the name and does nothing when it has not actually changed', async () => {
-    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door' })
+    shiftFindFirst.mockResolvedValue({ id: 'shift_door', role: 'Door', hourEntry: null })
 
     const out = await renameShift(EVENT, 'shift_door', '  Door  ')
 
@@ -293,7 +331,7 @@ describe('retimeShift', () => {
   })
 
   it("moves the linked hour entry's hours in the same transaction", async () => {
-    shiftFindFirst.mockResolvedValue(barStaff({ hourEntry: { id: 'entry_1' } }))
+    shiftFindFirst.mockResolvedValue(barStaff({ hourEntry: { id: 'entry_1', paid: false } }))
 
     await retimeShift(EVENT, 'shift_bar', { start: '23:30', end: '05:00' })
 
@@ -312,6 +350,19 @@ describe('retimeShift', () => {
 
     expect(entryUpdate).not.toHaveBeenCalled()
     expect(transaction.mock.calls[0][0]).toHaveLength(1)
+  })
+
+  it('refuses when the linked hour entry is already paid, and writes nothing', async () => {
+    shiftFindFirst.mockResolvedValue(barStaff({ hourEntry: { id: 'entry_1', paid: true } }))
+
+    const out = await retimeShift(EVENT, 'shift_bar', { start: '23:30', end: '05:00' })
+
+    expect(out.kind).toBe('stop')
+    expect(out.text).toMatch(/already paid/)
+    expect(shiftUpdate).not.toHaveBeenCalled()
+    expect(entryUpdate).not.toHaveBeenCalled()
+    expect(transaction).not.toHaveBeenCalled()
+    expect(record).not.toHaveBeenCalled()
   })
 
   it('refuses when the end resolves before the start, and writes nothing', async () => {
