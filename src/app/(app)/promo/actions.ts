@@ -4,7 +4,7 @@ import { refresh } from 'next/cache'
 import { db } from '@/lib/db'
 import { record } from '@/lib/activity'
 import { requireEvent, requireModule } from '@/lib/permissions'
-import { BEATS, platformSpec } from '@/lib/promo'
+import { BEATS, isHttpUrl, platformSpec, stubPushUrl } from '@/lib/promo'
 import { canGoOnSale, type BookingStatus } from '@/lib/parts'
 import { budgetToLock } from '@/lib/bar-data'
 import { nightFromBudget } from '@/lib/bar'
@@ -34,12 +34,25 @@ import { said, type Said } from '@/lib/toast'
  * Its first push is also the moment the event goes on sale, which is when the
  * bar budget locks. That used to happen on the move to the On sale stage;
  * with the stages gone, it happens here, in the same transaction as the push.
+ *
+ * `url` is what a manual channel's tick-off form types in — optional, and
+ * refused if it is not `http:`/`https:`. An auto-sync channel ignores it and
+ * records what its client hands back instead; see `stubPushUrl`.
  */
-export async function pushChannel(eventId: string, channel: string): Promise<Said> {
+export async function pushChannel(eventId: string, channel: string, url?: string): Promise<Said> {
   const { user } = await requireModule('promo')
   const id = await requireEvent(user, eventId)
   const spec = platformSpec(channel)
   if (!spec) return said('We do not post to that.', 'stop')
+
+  const manual = spec.kind === 'manual'
+  const typedUrl = url?.trim() ?? ''
+  if (manual && typedUrl && !isHttpUrl(typedUrl)) {
+    return said(
+      'That does not look like a link. Paste the http:// or https:// address of what you posted, or leave it blank.',
+      'stop',
+    )
+  }
 
   const tickets =
     channel === 'gather'
@@ -59,13 +72,16 @@ export async function pushChannel(eventId: string, channel: string): Promise<Sai
     where: { eventId_channel: { eventId: id, channel } },
   })
   const first = !existing?.live
-  const manual = spec.kind === 'manual'
   const data = {
     live: true,
     stale: false,
     note: first ? 'created just now' : 'updated just now',
     byId: manual ? user.personId : null,
     at: new Date(),
+    // A manual channel keeps its last link when the form is left blank rather
+    // than losing it — retyping the same address on every re-post is the
+    // kind of thing nobody does, and then nobody has it.
+    url: manual ? typedUrl || (existing?.url ?? null) : stubPushUrl(channel, id),
   }
 
   const push = db.channelPush.upsert({
@@ -132,7 +148,7 @@ export async function unpushChannel(eventId: string, channel: string): Promise<S
   await db.channelPush.upsert({
     where: { eventId_channel: { eventId: id, channel } },
     create: { eventId: id, channel, live: false },
-    update: { live: false, stale: false, note: null, byId: null, at: null },
+    update: { live: false, stale: false, note: null, byId: null, at: null, url: null },
   })
   await record(id, user, `marked ${spec.name} not out yet`)
 
@@ -164,10 +180,21 @@ export async function pushStale(eventId: string): Promise<Said> {
     )
   }
 
-  await db.channelPush.updateMany({
-    where: { id: { in: auto.map((c) => c.id) } },
-    data: { stale: false, note: 'updated just now', at: new Date() },
-  })
+  // Each channel gets its own stub URL back, so `updateMany` (one data
+  // object for every row) will not do here.
+  await db.$transaction(
+    auto.map((c) =>
+      db.channelPush.update({
+        where: { id: c.id },
+        data: {
+          stale: false,
+          note: 'updated just now',
+          at: new Date(),
+          url: stubPushUrl(c.channel, id),
+        },
+      }),
+    ),
+  )
   await record(
     id,
     user,

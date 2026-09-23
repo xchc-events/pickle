@@ -5,6 +5,7 @@ import { COPY_LIMITS } from '@/lib/design'
 import { SectionHeading } from '@/components/SectionHeading'
 import { ActionButton } from '@/components/ActionButton'
 import { CopyButton } from '@/components/CopyButton'
+import { PushWithUrl } from './PushWithUrl'
 import { pushChannel, pushStale, toggleBeat, unpushChannel } from './actions'
 import styles from './promo.module.css'
 
@@ -105,13 +106,40 @@ export default async function PromoPage({ searchParams }: PageProps<'/promo'>) {
 
                   {c.by ? <div className={styles.by}>ticked off by {c.by}</div> : null}
 
+                  {c.url ? (
+                    <div className={styles.urlRow}>
+                      <a
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.urlOpen}
+                        title={`Open on ${c.name} in a new tab`}
+                      >
+                        <i className="ph ph-arrow-square-out" aria-hidden="true" />
+                      </a>
+                      <span className={styles.urlText}>{c.url}</span>
+                      <CopyButton className={styles.urlCopy} text={c.url} message="Link copied.">
+                        <i className="ph ph-copy" aria-hidden="true" />
+                      </CopyButton>
+                    </div>
+                  ) : null}
+
                   <div className={styles.actions}>
-                    <ActionButton
-                      className={`btn ${c.actionPrimary ? 'btn-primary' : 'btn-ghost'} ${styles.act}`}
-                      action={pushChannel.bind(null, event.id, c.key)}
-                    >
-                      {c.actionLabel}
-                    </ActionButton>
+                    {c.kind === 'manual' ? (
+                      <PushWithUrl
+                        className={`btn ${c.actionPrimary ? 'btn-primary' : 'btn-ghost'} ${styles.act}`}
+                        action={pushChannel.bind(null, event.id, c.key)}
+                      >
+                        {c.actionLabel}
+                      </PushWithUrl>
+                    ) : (
+                      <ActionButton
+                        className={`btn ${c.actionPrimary ? 'btn-primary' : 'btn-ghost'} ${styles.act}`}
+                        action={pushChannel.bind(null, event.id, c.key)}
+                      >
+                        {c.actionLabel}
+                      </ActionButton>
+                    )}
 
                     {c.showCaption ? (
                       <CopyButton

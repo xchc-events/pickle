@@ -74,6 +74,9 @@ export async function beginViaGrant(
     size,
     eventId: grant.eventId,
     payeeId: grant.payeeId,
+    // Lands the file on the act's own row on Tech, when the payee this link
+    // was sent to is linked as a live act on the event it was sent about.
+    artistId: grant.artistId,
     grantId: grant.id,
   })
 

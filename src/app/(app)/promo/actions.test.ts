@@ -133,6 +133,56 @@ describe('pushing any other channel', () => {
 })
 
 /**
+ * Connor, 23 Sep 2026: "It would be good to have the links in here — the
+ * actual links for Facebook and the others — so if you need to copy them and
+ * send them to anyone, you can easily grab them from here."
+ */
+describe('the link a push carries', () => {
+  it('stores what a manual channel typed in', async () => {
+    const out = await pushChannel(EVENT, 'instagram', 'https://instagram.com/p/abc123')
+    expect(out.kind).toBe('good')
+    expect(upsertPush.mock.calls[0]![0]).toMatchObject({
+      create: { url: 'https://instagram.com/p/abc123' },
+    })
+  })
+
+  it('refuses a link that is not http or https, and writes nothing', async () => {
+    const out = await pushChannel(EVENT, 'instagram', 'not-a-link')
+    expect(out.kind).toBe('stop')
+    expect(out.text).toMatch(/does not look like a link/)
+    expect(upsertPush).not.toHaveBeenCalled()
+  })
+
+  it('leaves a first post with no link when the field is left blank', async () => {
+    const out = await pushChannel(EVENT, 'instagram', '')
+    expect(out.kind).toBe('good')
+    expect(upsertPush.mock.calls[0]![0]).toMatchObject({ create: { url: null } })
+  })
+
+  it('keeps a manual channel’s last link on a re-post left blank, rather than losing it', async () => {
+    findPush.mockResolvedValue({ live: true, url: 'https://instagram.com/p/old' })
+    const out = await pushChannel(EVENT, 'instagram', '')
+    expect(out.kind).toBe('good')
+    expect(upsertPush.mock.calls[0]![0]).toMatchObject({
+      update: { url: 'https://instagram.com/p/old' },
+    })
+  })
+
+  it('records the placeholder link an auto-sync channel’s client hands back', async () => {
+    const out = await pushChannel(EVENT, 'facebook-event')
+    expect(out.kind).toBe('good')
+    const written = upsertPush.mock.calls[0]![0] as { create: { url: string } }
+    expect(written.create.url).toMatch(/^https:\/\/example\.com\/facebook-event\//)
+  })
+
+  it('ignores whatever url an auto-sync channel is called with — its client is the source', async () => {
+    await pushChannel(EVENT, 'facebook-event', 'https://not-the-real-client.example/whatever')
+    const written = upsertPush.mock.calls[0]![0] as { create: { url: string } }
+    expect(written.create.url).not.toBe('https://not-the-real-client.example/whatever')
+  })
+})
+
+/**
  * The bar budget is frozen at what was believed when tickets went on sale, so
  * the night's bar can be measured against it afterwards. Going on sale used to
  * be a move between stages; it is now Gather.rsvp going live, so the lock

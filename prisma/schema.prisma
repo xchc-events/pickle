@@ -591,6 +591,9 @@ model EventArtist {
   paid    Boolean      @default(false)
   order   Int          @default(0)
 
+  /// This act's own rider and stage plot on this event. See StoredFile.artistId.
+  files StoredFile[]
+
   @@index([payeeId])
 }
 
@@ -797,6 +800,10 @@ model ChannelPush {
   byId    String?
   by      Person?   @relation(fields: [byId], references: [id])
   at      DateTime?
+  /// What went out — typed by hand on a manual channel, or handed back by the
+  /// client on an auto-sync one. Nullable: a push recorded before this
+  /// existed, or a client that returns nothing, is still a push.
+  url     String?
 
   @@unique([eventId, channel])
 }
@@ -1104,6 +1111,13 @@ model StoredFile {
   /// Set when this file is a piece of the house asset set.
   assetId String?
   asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Which act's slot this is — a rider or stage plot that belongs to one
+  /// act on this event, not the event generally. Null for a file no one has
+  /// attached to an act yet; Tech shows those under "unassigned". Cascades
+  /// with the act: a file scoped to a slot that no longer exists is not a
+  /// file scoped to anything.
+  artistId String?
+  artist   EventArtist? @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   /// Who put it there. Null when it came in through a grant, in which case
   /// `grantId` names the link it arrived on.
@@ -1122,6 +1136,7 @@ model StoredFile {
   @@index([eventId, kind])
   @@index([payeeId, kind])
   @@index([assetId])
+  @@index([artistId])
 }
 
 // ---------------------------------------------------------------- access ---

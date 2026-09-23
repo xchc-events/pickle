@@ -23,6 +23,12 @@ export interface OpenGrant {
   eventId: string | null
   eventName: string | null
   eventDate: Date | null
+  /** The act this grant is for, when the payee is linked as a live act on
+   *  this event — a rider uploaded through the grant lands on this act, and
+   *  the page says whose it is asking for. Null off an event-less grant, or
+   *  one whose payee is not (yet) linked as an act here. */
+  artistId: string | null
+  artistName: string | null
   expires: Date
   /** True the first time this link is followed. */
   firstUse: boolean
@@ -57,6 +63,16 @@ export async function resolveGrant(token: string, now = new Date()): Promise<Ope
     await db.accessGrant.update({ where: { id: row.id }, data: { usedAt: now } })
   }
 
+  // Which act this grant is for, if any — the payee linked as a live act on
+  // the event the grant was issued about. A grant with no event, or whose
+  // payee has not been added as an act here, simply has no act to carry.
+  const artist = row.event
+    ? await db.eventArtist.findFirst({
+        where: { eventId: row.event.id, payeeId: row.payee.id },
+        select: { id: true, name: true },
+      })
+    : null
+
   return {
     id: row.id,
     scope: row.scope,
@@ -66,6 +82,8 @@ export async function resolveGrant(token: string, now = new Date()): Promise<Ope
     eventId: row.event?.id ?? null,
     eventName: row.event?.name ?? null,
     eventDate: row.event?.date ?? null,
+    artistId: artist?.id ?? null,
+    artistName: artist?.name ?? null,
     expires: row.expires,
     firstUse,
   }

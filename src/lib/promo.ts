@@ -134,6 +134,33 @@ export const platformSpec = (key: string): PlatformSpec | undefined => PLATFORM_
 
 export const platformName = (key: string): string => PLATFORM_BY_KEY.get(key)?.name ?? key
 
+/**
+ * Whether a string is a usable link — one an "open" button can follow and a
+ * copy button can hand to somebody else. Refuses anything that is not
+ * `http:`/`https:` (a bare string, `javascript:`, a mistyped scheme), which is
+ * also what keeps a pasted `<a href>` from becoming a script sink.
+ */
+export function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * What an auto-sync channel's push hands back today.
+ *
+ * There is no real client for any of these yet — see PLATFORMS — so this is a
+ * placeholder shaped like the real thing: a scheme, a host, a path that names
+ * the channel and the event. It says "example" rather than guessing at a
+ * real-looking address, so nobody mistakes a stub for a listing that exists.
+ */
+export function stubPushUrl(channel: string, eventId: string): string {
+  return `https://example.com/${channel}/${eventId}`
+}
+
 export interface BeatSpec {
   key: string
   name: string
@@ -201,6 +228,9 @@ export interface EventChannel {
   byName: string | null
   /** Already formatted for display — "2 days ago". */
   when: string | null
+  /** What went out. Typed by a person on a manual channel, handed back by
+   *  the client on an auto-sync one. Null until the first push. */
+  url: string | null
 }
 
 export type ChannelState = 'not out' | 'out of date' | 'in sync'
@@ -218,6 +248,8 @@ export interface ChannelCard extends PlatformSpec {
    */
   note: string | null
   by: string | null
+  /** What went out, for the copy button and the "open" link. */
+  url: string | null
   /** "Push it live" / "Mark as posted" / "Re-push" / "Re-post" / "Push again". */
   actionLabel: string
   /** Primary while something is owed, ghost once it is only a re-push. */
@@ -260,6 +292,7 @@ export function channelCards(channels: EventChannel[]): ChannelCard[] {
             : 'never pushed'
           : null,
       by: c?.byName ? `${c.byName}${c.when ? ` · ${c.when}` : ''}` : null,
+      url: c?.url ?? null,
       actionLabel:
         state === 'not out'
           ? manual
