@@ -282,7 +282,7 @@ export async function loadEventRecord(
           },
         },
       },
-      assets: { select: { key: true, state: true, promoterSigned: true } },
+      assets: { select: { key: true, state: true, promoterSigned: true, signedById: true } },
       channels: { select: { channel: true, live: true, stale: true, note: true } },
       beats: { select: { done: true } },
       activity: { orderBy: { at: 'desc' }, take: 20, select: { who: true, text: true, at: true } },

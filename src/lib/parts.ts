@@ -338,8 +338,14 @@ function design(e: PartsEvent): PartState {
 
   const hero = tierKeys('hero')
   const lead = tierKeys('lead')
-  // Hero and lead pieces are the ones a promoter signs, approved or not.
-  const unsigned = [...hero, ...lead].filter((k) => !row(k)?.promoterSigned).length
+  // Hero and lead pieces are the ones that need a signature, approved or
+  // not. Signed means APPROVED with a recorded signer — the owner's or the
+  // promoter's, whichever it was (D6, 23 Sep 2026) — not `promoterSigned`,
+  // which only says which side signed and stays false for an owner's
+  // sign-off. See `maySignOff` in design.ts.
+  const unsigned = [...hero, ...lead].filter(
+    (k) => !(state(k) === 'approved' && row(k)?.signedById),
+  ).length
   const missingBios = liveActs(e).filter((a) => !a.hasPromo || !a.hasBio).length
 
   const checks = [
@@ -372,9 +378,12 @@ function design(e: PartsEvent): PartState {
       'design',
     ),
     g(
-      'Promoter signed off the creative',
-      !e.hasPortal || unsigned === 0,
-      `${unsigned} ${plural(unsigned, 'piece', 'pieces')} not signed off in their portal`,
+      'Signed off by the owner or the promoter',
+      // Escaped only when nobody could sign at all — no portal to chase a
+      // promoter in, and no owner named. The owner can sign a piece off
+      // now too, so having no portal no longer excuses an in-house event.
+      (!e.hasPortal && !e.hasOwner) || unsigned === 0,
+      `${unsigned} ${plural(unsigned, 'piece', 'pieces')} not signed off yet`,
       'design',
     ),
   ]

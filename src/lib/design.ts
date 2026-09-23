@@ -16,6 +16,7 @@
 
 import { tiers } from './finance'
 import { hrs } from './format'
+import type { CommentRow } from './comments-data'
 
 export type AssetTier = 'hero' | 'lead' | 'support'
 export type AssetState = 'draft' | 'review' | 'approved'
@@ -126,6 +127,50 @@ export interface EventAsset {
   state: AssetState
   /** Given in the promoter's portal, never by the venue. */
   promoterSigned: boolean
+  /**
+   * Who signed this piece off — the event's owner or a promoter, whichever
+   * pressed Approve. Null until it has been through that decision, or after
+   * a Reopen clears it. See `maySignOff`.
+   */
+  signedById: string | null
+}
+
+// --------------------------------------------------------------- sign-off ---
+
+/** The parts of a session user that decide whether they may sign a piece off. */
+export interface SignOffActor {
+  external: boolean
+  /** Set on an internal account with a Person behind it; null otherwise. */
+  personId: string | null
+  /** The organisation an external promoter belongs to. */
+  organisationId: string | null
+}
+
+/** The parts of an event that decide who may sign its pieces off. */
+export interface SignOffEvent {
+  ownerId: string | null
+  promoterId: string | null
+}
+
+/**
+ * Who may press Approve, Ask for a change, or Reopen on a piece of design.
+ *
+ * Connor, 23 Sep 2026: "sign-off can happen from either the external
+ * promoter or the internal event owner" — and nobody else. Design staff put
+ * a piece up for review; they do not decide whether it is right, however
+ * many modules their own account happens to carry. An admin is deliberately
+ * not a signer here: an admin can grant themselves the owner's role, so
+ * treating the permission as if it already covered them would have been a
+ * decision made by accident rather than the one Connor made on purpose. See
+ * docs/design-handoff/README.md under "Design".
+ *
+ * A promoter with no organisation, or an event with no owner and no
+ * promoter, matches nobody — the same "match nothing rather than
+ * everything" rule `eventScope` follows in src/lib/scope.ts.
+ */
+export function maySignOff(user: SignOffActor, event: SignOffEvent): boolean {
+  if (user.external) return user.organisationId !== null && user.organisationId === event.promoterId
+  return user.personId !== null && user.personId === event.ownerId
 }
 
 export type Tone = 'good' | 'warn' | 'stop' | 'plain'
@@ -162,6 +207,13 @@ export interface AssetCard extends AssetSpec {
    * is the load-bearing statement of intent, so the line follows it.
    */
   needsPromoterSignOff: boolean
+  /**
+   * D5 — the comment thread under this piece.
+   *
+   * Left off by `assetCards`, the same way `file` is, and attached in
+   * design-data.ts and portal-data.ts from `commentsFor` in comments-data.ts.
+   */
+  comments?: CommentRow[]
 }
 
 const LABEL: Record<AssetState, string> = {
