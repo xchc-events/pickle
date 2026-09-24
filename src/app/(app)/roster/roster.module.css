@@ -619,10 +619,15 @@
   flex: 0 0 var(--roster-timeline-label-w);
 }
 
+/* Tall enough for the tick label's full line box, not just the 5px tick
+   mark -- .timelineScroll's overflow-x: auto computes its overflow-y to
+   auto too (the CSS rule for a visible/non-visible pair), so anything
+   taller than this track was getting its top clipped off instead of
+   showing above the row. */
 .timelineTicksTrack {
   position: relative;
   flex: 1 1 auto;
-  height: 14px;
+  height: var(--space-8);
 }
 
 .timelineTick {
@@ -634,9 +639,13 @@
   transform: translateX(-0.5px);
 }
 
+/* Anchored from the top, not the tick's own bottom -- the label's line box
+   then always sits inside .timelineTicksTrack's height, whatever its exact
+   line-height turns out to be, rather than relying on the track being
+   taller than a bottom-anchored offset plus that line box. */
 .timelineTickLabel {
   position: absolute;
-  bottom: 8px;
+  top: 0;
   left: 0;
   transform: translateX(-50%);
   font-size: 9.5px;
