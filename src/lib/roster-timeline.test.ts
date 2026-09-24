@@ -5,9 +5,11 @@ import {
   clockLabelForOffset,
   fractionForOffset,
   hoursToClockInput,
+  layoutMarkRows,
   offsetForFraction,
   snapQuarterHour,
   type TimelineEventInput,
+  type TimelineMark,
   type TimelineShiftInput,
 } from './roster-timeline'
 
@@ -94,15 +96,17 @@ describe('clockLabelForOffset', () => {
   })
 })
 
-describe('buildRosterTimeline', () => {
-  const fullEvent: TimelineEventInput = {
-    packIn: '7:00pm',
-    doors: '8:00pm',
-    barClose: '1:00am',
-    allOut: '4:00am',
-    packOut: '4:30am',
-  }
+// Shared by buildRosterTimeline and layoutMarkRows below: pack-in 7pm,
+// doors 8pm, bar close 1am, everyone out 4am, pack-out 4:30am.
+const fullEvent: TimelineEventInput = {
+  packIn: '7:00pm',
+  doors: '8:00pm',
+  barClose: '1:00am',
+  allOut: '4:00am',
+  packOut: '4:30am',
+}
 
+describe('buildRosterTimeline', () => {
   const shifts: TimelineShiftInput[] = [
     {
       id: 'covered',
@@ -250,6 +254,124 @@ describe('buildRosterTimeline', () => {
       { id: 'b', role: 'Bar staff', start: 5, hours: 1, state: 'OPEN', personInitials: null },
     ])
     expect(t.axisStart).toBeCloseTo(-1, 5)
-    expect(t.axisEnd).toBeCloseTo(7, 5) // max shift end (6) + 1
+    expect(t.axisEnd).toBeCloseTo(6.5, 5) // max shift end (6) + 30 minutes, no pack-out/everyone-out to compare against
+  })
+
+  // Sunday Slow Roast, seeded (Connor, 24 Sep 2026): doors 7pm, everyone out
+  // 10:30pm, no pack-out set. The old axis stopped an hour after everyone
+  // out (offset 4.5 -> 11:30pm), so the clean-up crew's 2:30am-3:15am shift
+  // (doors + 7.5h, 0.75h long) had no bar at all, and several others were
+  // clipped at the right edge.
+  const slowRoast: TimelineEventInput = {
+    packIn: null,
+    doors: '7:00pm',
+    barClose: null,
+    allOut: '10:30pm',
+    packOut: null,
+  }
+
+  it('widens the axis end when a shift runs past pack-out/everyone-out', () => {
+    const cleanUp: TimelineShiftInput = {
+      id: 'cleanup',
+      role: 'Clean-up crew',
+      start: 7.5,
+      hours: 0.75,
+      state: 'ASSIGNED',
+      personInitials: 'JD',
+    }
+    const withoutShift = buildRosterTimeline(slowRoast, [])
+    expect(withoutShift.axisEnd).toBeCloseTo(4.5, 5) // old bound: everyone-out (3.5) + 1h -- would clip the shift
+
+    const t = buildRosterTimeline(slowRoast, [cleanUp])
+    // The shift ends at offset 8.25 (3:15am); the axis must reach at least
+    // 30 minutes past that, wider than the 4.5 the marks alone would give.
+    expect(t.axisEnd).toBeCloseTo(8.75, 5)
+    expect(t.bars[0].endFraction).toBeLessThanOrEqual(1)
+  })
+
+  it('widens the axis start when a shift starts before pack-in/doors', () => {
+    const early: TimelineShiftInput = {
+      id: 'early',
+      role: 'Set-up crew',
+      start: -3,
+      hours: 1,
+      state: 'ASSIGNED',
+      personInitials: 'MT',
+    }
+    const withoutShift = buildRosterTimeline(slowRoast, [])
+    expect(withoutShift.axisStart).toBeCloseTo(-1, 5) // doors (0) - 1h -- would clip the shift
+
+    const t = buildRosterTimeline(slowRoast, [early])
+    expect(t.axisStart).toBeCloseTo(-3, 5)
+    expect(t.bars[0].startFraction).toBeGreaterThanOrEqual(0)
+  })
+
+  it('leaves the axis unchanged when every shift already sits inside the marks', () => {
+    const withoutShifts = buildRosterTimeline(fullEvent, [])
+    const withShifts = buildRosterTimeline(fullEvent, shifts) // all within -2..9.5
+    expect(withShifts.axisStart).toBe(withoutShifts.axisStart)
+    expect(withShifts.axisEnd).toBe(withoutShifts.axisEnd)
+  })
+})
+
+describe('layoutMarkRows', () => {
+  // Sunday Slow Roast, seeded (Connor, 24 Sep 2026): "Bar close 11:00pm" and
+  // "Everyone out 11:30pm" overlap -- 30 minutes apart is not enough room
+  // for both labels at a typical track width.
+  const doorsOnly: TimelineEventInput = {
+    packIn: null,
+    doors: '7:00pm',
+    barClose: '11:00pm',
+    allOut: '11:30pm',
+    packOut: null,
+  }
+
+  it('stacks the later of two marks onto a second row once they are closer than ~70px', () => {
+    const { marks } = buildRosterTimeline(doorsOnly, [])
+    const rows = layoutMarkRows(marks, 700)
+
+    expect(rows.find((m) => m.key === 'doors')!.row).toBe(0)
+    expect(rows.find((m) => m.key === 'barClose')!.row).toBe(0)
+    // 30 minutes apart on a 6.5h axis at 700px is ~54px -- under the ~70px
+    // threshold, so the later mark (everyone out) is pushed to row 1.
+    expect(rows.find((m) => m.key === 'allOut')!.row).toBe(1)
+  })
+
+  it('leaves marks on row 0 when nothing is close enough to collide', () => {
+    // Evenly spread across the axis -- each pair well over 70px apart at a
+    // typical track width, unlike fullEvent's own marks (30 minutes apart
+    // between everyone-out and pack-out, which does collide at this width).
+    const spread: TimelineMark[] = [
+      { key: 'packIn', label: 'Pack-in', fraction: 0 },
+      { key: 'doors', label: 'Doors', fraction: 0.3 },
+      { key: 'barClose', label: 'Bar close', fraction: 0.6 },
+      { key: 'allOut', label: 'Everyone out', fraction: 0.8 },
+      { key: 'packOut', label: 'Pack-out', fraction: 1 },
+    ]
+    const rows = layoutMarkRows(spread, 700)
+    expect(rows.every((m) => m.row === 0)).toBe(true)
+  })
+
+  it('does not stagger anything before the track width is measured', () => {
+    const { marks } = buildRosterTimeline(doorsOnly, [])
+    expect(layoutMarkRows(marks, 0).every((m) => m.row === 0)).toBe(true)
+  })
+
+  it('treats the ~70px threshold as a strict less-than', () => {
+    const a: TimelineMark = { key: 'doors', label: 'Doors', fraction: 0 }
+    const b: TimelineMark = { key: 'barClose', label: 'Bar close', fraction: 0.1 }
+    // Exactly 70px apart -> not a collision.
+    expect(layoutMarkRows([a, b], 700).map((m) => m.row)).toEqual([0, 0])
+    // A hair under 70px -> collides, the later one moves to row 1.
+    const c: TimelineMark = { ...b, fraction: 0.098 }
+    expect(layoutMarkRows([a, c], 700).map((m) => m.row)).toEqual([0, 1])
+  })
+
+  it('sorts by fraction first, so row order does not depend on input order', () => {
+    const { marks } = buildRosterTimeline(doorsOnly, [])
+    const reversed = [...marks].reverse()
+    const rows = layoutMarkRows(reversed, 700)
+    expect(rows.map((m) => m.key)).toEqual(['doors', 'barClose', 'allOut'])
+    expect(rows.map((m) => m.row)).toEqual([0, 0, 1])
   })
 })
