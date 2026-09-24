@@ -1,0 +1,25 @@
+-- Retire `User.promoter`, the free-text organisation name.
+--
+-- Superseded by `User.organisationId` in 20260903005538_promoter_organisations,
+-- which added the column and backfilled it from this one by exact name. This
+-- was kept for one release so that backfill could be checked against it.
+--
+-- It has been dead for longer than that. Nothing has *written* it since that
+-- migration — `addUser` and `setOrganisation` both set `organisationId` alone —
+-- so every account created since carried null here. What still read it were
+-- four copies of a "has this promoter got a portal?" check that matched the
+-- organisation's name as a substring of `Event.promoter`; with the column
+-- null, they silently answered false for every modern account, and
+-- `needsPromoterSignOff` hangs off that answer — so hero and lead artwork
+-- quietly stopped waiting for the promoter's sign-off. Only the seed still
+-- filled the column, which is why no test caught it.
+--
+-- Those readers are now one rule in src/lib/portal-access.ts, matching
+-- `User.organisationId` against `Event.promoterId` — ids, not names, the same
+-- comparison `eventScope` already trusted to decide what a promoter may read.
+--
+-- `Event.promoter` is a different column and stays: it holds the free-text
+-- promoter name staff type and the Pipeline shows, and it decides nothing.
+
+-- AlterTable
+ALTER TABLE "User" DROP COLUMN "promoter";

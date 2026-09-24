@@ -690,7 +690,6 @@ async function main() {
         email: `${u.id}@xchc.test`,
         name: u.n,
         role: u.role.toUpperCase() as Role,
-        promoter: u.org ?? null,
         personId: personByInitials.get(u.i) ?? null,
         // Hashed per user rather than once and reused: password.ts's own
         // invariant is that even a password shared on purpose still gets a

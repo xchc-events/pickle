@@ -127,10 +127,6 @@ model User {
   organisationId String?
   organisation   Payee?  @relation("OrgMembers", fields: [organisationId], references: [id])
 
-  /// Superseded by `organisationId`. Kept for one release so the backfill can
-  /// be checked against it, then dropped.
-  promoter String?
-
   personId String? @unique
   person   Person? @relation(fields: [personId], references: [id])
 
