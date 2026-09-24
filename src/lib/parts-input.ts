@@ -62,6 +62,11 @@ export const PARTS_SELECT = {
   kind: true,
   format: true,
   promoter: true,
+  // `internal` and `promoterId` are what `hasPortalFor` reads — see
+  // src/lib/portal-access.ts. They travel with the parts select so every
+  // screen that computes `hasPortal` has the columns to do it.
+  internal: true,
+  promoterId: true,
   ownerId: true,
   split: true,
   deal: true,

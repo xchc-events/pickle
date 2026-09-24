@@ -3,12 +3,12 @@ import { db } from './db'
 import { financeVals } from './finance'
 import { FINANCE_SELECT, financeInputFor, scenarioOf } from './finance-input'
 import type { PipelineEvent } from './pipeline'
-import { initialsOf } from './format'
 import { eventScope } from './scope'
 import { halvesOf, takenOf } from './actuals'
 import { partsFor } from './parts'
 import { PARTS_SELECT, partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
+import { hasPortalFor, portalCoordinatorsByOrganisation } from './portal-access'
 
 /**
  * Loads the pipeline.
@@ -77,12 +77,10 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
     eventsByMonth.set(k, (eventsByMonth.get(k) ?? 0) + 1)
   }
 
-  // External promoter users, so a row can show who is coordinating from
-  // outside the venue.
-  const externals = await db.user.findMany({
-    where: { role: 'PROMOTER', promoter: { not: null } },
-    include: { person: true },
-  })
+  // The outside coordinator for each organisation — the row's avatar, and
+  // the same map the portal gates are answered from, so this screen asks the
+  // question once. See src/lib/portal-access.ts.
+  const coordinators = await portalCoordinatorsByOrganisation()
 
   const now = new Date()
 
@@ -94,14 +92,10 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
     // that prices a night uses — see src/lib/finance-input.ts.
     const v = financeVals(financeInputFor(e, scenarioOf(e.scen), orgShareHours))
 
-    const ext = externals.find((u) => u.promoter && (e.promoter ?? '').includes(u.promoter))
-
-    // The portal rule the event record words its gates off, kept identical to
-    // it — an outside promoter with an active account can be chased in it —
-    // so a part cannot read differently here from how it reads there.
-    const hasPortal =
-      !e.internal &&
-      externals.some((u) => u.active && u.promoter && (e.promoter ?? '').includes(u.promoter))
+    // One decision, read twice: the row's avatar cannot name a coordinator
+    // the gates below have already decided there is no portal for.
+    const hasPortal = hasPortalFor(e, coordinators)
+    const ext = hasPortal && e.promoterId ? coordinators.get(e.promoterId) : undefined
 
     const input = partsInputFor(e, {
       hasPortal,
@@ -132,8 +126,8 @@ export async function loadPipeline(user: SessionUser): Promise<PipelineEvent[]> 
       ownerName: e.owner?.name ?? null,
       // The prototype accents exactly one avatar: the coordinator's.
       ownerAccent: e.owner?.initials === 'MT',
-      extCoordInitials: ext ? (ext.person?.initials ?? initialsOf(ext.name ?? ext.email)) : null,
-      extCoordName: ext?.name ?? ext?.person?.name ?? null,
+      extCoordInitials: ext?.initials ?? null,
+      extCoordName: ext?.name ?? null,
       surplus: v.ours,
       // Only true of a whole night — see takenOf.
       actualTotal: takenOf(halvesOf(e.actual)),

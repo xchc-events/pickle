@@ -27,6 +27,7 @@ import {
   type Tile,
   type Viewer,
 } from './home'
+import { hasPortalFor, organisationsWithPortal } from './portal-access'
 
 /**
  * Loads Home.
@@ -94,16 +95,13 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
   const now = new Date()
   const viewer: Viewer = { personId: user.personId, modules }
 
-  const [rows, promoters, accounts, permissions, countedRows, offeredShifts] = await Promise.all([
+  const [rows, portalOrgs, accounts, permissions, countedRows, offeredShifts] = await Promise.all([
     db.event.findMany({
       where: { AND: [eventScope(user), { concluded: false }] },
       select: HOME_SELECT,
       orderBy: { date: 'asc' },
     }),
-    db.user.findMany({
-      where: { role: 'PROMOTER', active: true, promoter: { not: null } },
-      select: { promoter: true },
-    }),
+    organisationsWithPortal(),
     // Everybody who could act on something. An outside account never can —
     // the event record refuses them — so none is counted, whatever it is linked to.
     db.user.findMany({
@@ -146,11 +144,8 @@ export async function loadHome(user: SessionUser, modules: ModuleKey[]): Promise
   const actors = actorsOf(accounts, modulesOpenByRole(permissions))
 
   const events: HomeEvent[] = rows.map((row) => {
-    // The portal rule the event record and the Pipeline word their gates off:
-    // an outside promoter with an active account can be chased in it.
-    const hasPortal =
-      !row.internal &&
-      promoters.some((u) => u.promoter && (row.promoter ?? '').includes(u.promoter))
+    // The portal rule the event record, the Pipeline and Design share.
+    const hasPortal = hasPortalFor(row, portalOrgs)
 
     // The fee floor and ceiling are the acts' own ranges; the org-wide share
     // does not touch them, so it is not worked out for every event here.
