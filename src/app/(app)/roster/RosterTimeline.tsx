@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { useToast } from '@/components/Toast'
 import type { Said } from '@/lib/toast'
@@ -10,6 +10,7 @@ import {
   clockLabelForOffset,
   fractionForOffset,
   hoursToClockInput,
+  layoutMarkRows,
   snapQuarterHour,
   type TimelineBar,
 } from '@/lib/roster-timeline'
@@ -80,6 +81,21 @@ export function RosterTimeline({
   const [pending, startTransition] = useTransition()
   const [drag, setDrag] = useState<DragState | null>(null)
   const trackRef = useRef<HTMLDivElement>(null)
+  const [trackWidthPx, setTrackWidthPx] = useState(0)
+
+  // The same track drag math already measures on demand; kept as state too
+  // so the mark labels below can react to it at render time (a resize, or
+  // the sidebar collapsing, changes how many of them fit before colliding).
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track) return
+    setTrackWidthPx(track.getBoundingClientRect().width)
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setTrackWidthPx(entry.contentRect.width)
+    })
+    observer.observe(track)
+    return () => observer.disconnect()
+  }, [])
 
   const timeline = useMemo(
     () =>
@@ -98,6 +114,11 @@ export function RosterTimeline({
   )
 
   const byId = useMemo(() => new Map(shifts.map((s) => [s.id, s] as const)), [shifts])
+
+  const markRows = useMemo(
+    () => layoutMarkRows(timeline.marks, trackWidthPx),
+    [timeline.marks, trackWidthPx],
+  )
 
   function commit(id: string, startHours: number, endHours: number) {
     const shift = byId.get(id)
@@ -213,96 +234,111 @@ export function RosterTimeline({
             </div>
           </div>
 
-          <div className={styles.timelineMarks} aria-hidden="true">
-            {timeline.marks.map((m) => (
-              <span
-                key={m.key}
-                className={styles.timelineMark}
-                style={{ left: `${m.fraction * 100}%` }}
-              >
-                <span className={styles.timelineMarkLabel}>{m.label}</span>
-              </span>
-            ))}
-          </div>
+          <div className={styles.timelineMarkArea}>
+            <div className={styles.timelineMarkLabelsRow} aria-hidden="true">
+              <div className={styles.timelineMarkLabelsSpacer} aria-hidden="true" />
+              <div className={styles.timelineMarkLabelsTrack}>
+                {markRows.map((m) => (
+                  <span
+                    key={m.key}
+                    className={`${styles.timelineMarkLabel} ${m.row === 1 ? styles.timelineMarkLabelRow1 : ''}`}
+                    style={{ left: `${m.fraction * 100}%` }}
+                  >
+                    {m.label}
+                  </span>
+                ))}
+              </div>
+            </div>
 
-          <div className={`${styles.timelineRows} ${pending ? styles.timelineRowsPending : ''}`}>
-            {timeline.bars.map((bar) => {
-              const isDragging = drag?.id === bar.id
-              const startFraction = isDragging
-                ? fractionForOffset(drag.liveStart, timeline.axisStart, timeline.axisEnd)
-                : bar.startFraction
-              const endFraction = isDragging
-                ? fractionForOffset(drag.liveEnd, timeline.axisStart, timeline.axisEnd)
-                : bar.endFraction
-              const startHours = isDragging ? drag.liveStart : bar.startHours
-              const endHours = isDragging ? drag.liveEnd : bar.endHours
-              const toneClass =
-                bar.tone === 'open'
-                  ? styles.timelineBar_open
-                  : bar.tone === 'offered'
-                    ? styles.timelineBar_offered
-                    : styles.timelineBar_covered
+            <div className={styles.timelineMarkLines} aria-hidden="true">
+              {timeline.marks.map((m) => (
+                <span
+                  key={m.key}
+                  className={styles.timelineMarkLine}
+                  style={{ left: `${m.fraction * 100}%` }}
+                />
+              ))}
+            </div>
 
-              return (
-                <div key={bar.id} className={styles.timelineRow}>
-                  <span className={styles.timelineRowLabel}>{bar.role}</span>
-                  <div className={styles.timelineRowTrack}>
-                    <div
-                      className={`${styles.timelineBar} ${toneClass} ${isDragging ? styles.timelineBarDragging : ''}`}
-                      style={{
-                        left: `${startFraction * 100}%`,
-                        width: `${Math.max(0, endFraction - startFraction) * 100}%`,
-                      }}
-                      onPointerDown={(e) => beginDrag(e, bar, 'move')}
-                      onPointerMove={onDragMove}
-                      onPointerUp={endDrag}
-                      onPointerCancel={endDrag}
-                      title={`${bar.role}: drag to move`}
-                    >
-                      <span
-                        role="slider"
-                        tabIndex={0}
-                        className={styles.timelineHandleStart}
-                        aria-label={`${bar.role} start time`}
-                        aria-orientation="horizontal"
-                        aria-valuemin={timeline.axisStart}
-                        aria-valuemax={endHours}
-                        aria-valuenow={startHours}
-                        aria-valuetext={clockLabelForOffset(doors, startHours) || undefined}
-                        onPointerDown={(e) => beginDrag(e, bar, 'start')}
+            <div className={`${styles.timelineRows} ${pending ? styles.timelineRowsPending : ''}`}>
+              {timeline.bars.map((bar) => {
+                const isDragging = drag?.id === bar.id
+                const startFraction = isDragging
+                  ? fractionForOffset(drag.liveStart, timeline.axisStart, timeline.axisEnd)
+                  : bar.startFraction
+                const endFraction = isDragging
+                  ? fractionForOffset(drag.liveEnd, timeline.axisStart, timeline.axisEnd)
+                  : bar.endFraction
+                const startHours = isDragging ? drag.liveStart : bar.startHours
+                const endHours = isDragging ? drag.liveEnd : bar.endHours
+                const toneClass =
+                  bar.tone === 'open'
+                    ? styles.timelineBar_open
+                    : bar.tone === 'offered'
+                      ? styles.timelineBar_offered
+                      : styles.timelineBar_covered
+
+                return (
+                  <div key={bar.id} className={styles.timelineRow}>
+                    <span className={styles.timelineRowLabel}>{bar.role}</span>
+                    <div className={styles.timelineRowTrack}>
+                      <div
+                        className={`${styles.timelineBar} ${toneClass} ${isDragging ? styles.timelineBarDragging : ''}`}
+                        style={{
+                          left: `${startFraction * 100}%`,
+                          width: `${Math.max(0, endFraction - startFraction) * 100}%`,
+                        }}
+                        onPointerDown={(e) => beginDrag(e, bar, 'move')}
                         onPointerMove={onDragMove}
                         onPointerUp={endDrag}
                         onPointerCancel={endDrag}
-                        onKeyDown={(e) => onHandleKeyDown(e, bar, 'start')}
-                      />
-                      <span className={styles.timelineBarLabel}>{bar.label}</span>
-                      <span
-                        role="slider"
-                        tabIndex={0}
-                        className={styles.timelineHandleEnd}
-                        aria-label={`${bar.role} end time`}
-                        aria-orientation="horizontal"
-                        aria-valuemin={startHours}
-                        aria-valuemax={timeline.axisEnd}
-                        aria-valuenow={endHours}
-                        aria-valuetext={clockLabelForOffset(doors, endHours) || undefined}
-                        onPointerDown={(e) => beginDrag(e, bar, 'end')}
-                        onPointerMove={onDragMove}
-                        onPointerUp={endDrag}
-                        onPointerCancel={endDrag}
-                        onKeyDown={(e) => onHandleKeyDown(e, bar, 'end')}
-                      />
+                        title={`${bar.role}: drag to move`}
+                      >
+                        <span
+                          role="slider"
+                          tabIndex={0}
+                          className={styles.timelineHandleStart}
+                          aria-label={`${bar.role} start time`}
+                          aria-orientation="horizontal"
+                          aria-valuemin={timeline.axisStart}
+                          aria-valuemax={endHours}
+                          aria-valuenow={startHours}
+                          aria-valuetext={clockLabelForOffset(doors, startHours) || undefined}
+                          onPointerDown={(e) => beginDrag(e, bar, 'start')}
+                          onPointerMove={onDragMove}
+                          onPointerUp={endDrag}
+                          onPointerCancel={endDrag}
+                          onKeyDown={(e) => onHandleKeyDown(e, bar, 'start')}
+                        />
+                        <span className={styles.timelineBarLabel}>{bar.label}</span>
+                        <span
+                          role="slider"
+                          tabIndex={0}
+                          className={styles.timelineHandleEnd}
+                          aria-label={`${bar.role} end time`}
+                          aria-orientation="horizontal"
+                          aria-valuemin={startHours}
+                          aria-valuemax={timeline.axisEnd}
+                          aria-valuenow={endHours}
+                          aria-valuetext={clockLabelForOffset(doors, endHours) || undefined}
+                          onPointerDown={(e) => beginDrag(e, bar, 'end')}
+                          onPointerMove={onDragMove}
+                          onPointerUp={endDrag}
+                          onPointerCancel={endDrag}
+                          onKeyDown={(e) => onHandleKeyDown(e, bar, 'end')}
+                        />
+                      </div>
                     </div>
+                    {isDragging ? (
+                      <span className={styles.timelineLiveLabel}>
+                        {clockLabelForOffset(doors, drag.liveStart)}–
+                        {clockLabelForOffset(doors, drag.liveEnd)}
+                      </span>
+                    ) : null}
                   </div>
-                  {isDragging ? (
-                    <span className={styles.timelineLiveLabel}>
-                      {clockLabelForOffset(doors, drag.liveStart)}–
-                      {clockLabelForOffset(doors, drag.liveEnd)}
-                    </span>
-                  ) : null}
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
