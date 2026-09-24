@@ -12,6 +12,7 @@ import { halvesOf, type BarClose, type DoorCount } from './actuals'
 import {
   gatesDoneLabel,
   isLate,
+  withoutVenueLabour,
   type DealState,
   type LeadKey,
   type LicenceState,
@@ -27,6 +28,7 @@ import {
 } from './parts'
 import { partsInputFor } from './parts-input'
 import type { SessionUser } from './session'
+import { hasPortalFor, organisationsWithPortal } from './portal-access'
 
 /**
  * Loads the event record — the hub the handoff calls it.
@@ -262,6 +264,7 @@ export async function loadEventRecord(
       format: true,
       promoter: true,
       internal: true,
+      promoterId: true,
       sold: true,
       space: { select: { name: true, capacity: true, seatedCapacity: true } },
       owner: {
@@ -333,18 +336,9 @@ export async function loadEventRecord(
 
   // An external promoter with an account is somebody the venue can chase in a
   // portal rather than by email — several gates word themselves off that.
-  //
-  // Matched the way `promUser` does in the prototype: the org name is a
-  // substring of the event's promoter field. That is a comparison Postgres
-  // cannot express against a column, so the candidates come back and the
-  // match happens in memory — exactly as pipeline-data matches it, so a part
-  // reads the same on both screens.
-  const externals = await db.user.findMany({
-    where: { role: 'PROMOTER', active: true, promoter: { not: null } },
-    select: { promoter: true },
-  })
-  const hasPortal =
-    !row.internal && externals.some((u) => u.promoter && (row.promoter ?? '').includes(u.promoter))
+  // One rule, shared with the Pipeline, Design and Home, matched on the
+  // organisation's id rather than its name. See src/lib/portal-access.ts.
+  const hasPortal = hasPortalFor(row, await organisationsWithPortal())
 
   // Per-act file presence. A file counts whether it arrived on the event or on
   // the payee record — an act that sent their bio last time has sent their
@@ -433,7 +427,10 @@ export async function loadEventRecord(
 
   const step = bookingStep(input.booking)
 
-  return {
+  // An outside promoter reads their own show's record, so what goes back is
+  // filtered before it leaves here rather than hidden by the page — the same
+  // rule as `eventScope`. See `withoutVenueLabour` in event-record.ts.
+  const record: EventRecord = {
     id: row.id,
     name: row.name,
     date: dateLabel(row.date),
@@ -582,4 +579,6 @@ export async function loadEventRecord(
       when: ago(a.at, now),
     })),
   }
+
+  return withoutVenueLabour(record, user)
 }

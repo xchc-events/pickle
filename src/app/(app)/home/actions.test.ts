@@ -61,10 +61,14 @@ describe('confirmMyOffer', () => {
       where: { id: 'shift_bar', personId: 'person_ari', state: 'OFFERED' },
       select: { id: true },
     })
-    expect(confirmOfferedShift).toHaveBeenCalledWith('shift_bar', {
-      personId: 'person_ari',
-      who: 'AN',
-    })
+    expect(confirmOfferedShift).toHaveBeenCalledWith(
+      'shift_bar',
+      { personId: 'person_ari', who: 'AN' },
+      // Re-stated inside the transaction's own read, so a shift re-offered
+      // between the lookup above and the write is refused, not confirmed
+      // onto whoever holds it by then.
+      { offeredTo: 'person_ari' },
+    )
     expect(out.text).toBe('Ari Ngata is on Bar staff.')
     expect(refresh).toHaveBeenCalled()
   })
@@ -109,10 +113,14 @@ describe('declineMyOffer', () => {
 
     const out = await declineMyOffer('shift_bar')
 
-    expect(declineOfferedShift).toHaveBeenCalledWith('shift_bar', {
-      personId: 'person_ari',
-      who: 'AN',
-    })
+    expect(declineOfferedShift).toHaveBeenCalledWith(
+      'shift_bar',
+      { personId: 'person_ari', who: 'AN' },
+      // Re-stated inside the transaction's own read, so a shift re-offered
+      // between the lookup above and the write is refused, not confirmed
+      // onto whoever holds it by then.
+      { offeredTo: 'person_ari' },
+    )
     expect(out.text).toBe('Bar staff is open again.')
     expect(refresh).toHaveBeenCalled()
   })

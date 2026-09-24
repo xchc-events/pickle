@@ -96,7 +96,10 @@ export default async function SignIn() {
 async function RolePicker() {
   const users = await db.user.findMany({
     where: { active: true },
-    include: { person: true },
+    // The organisation, not the superseded `promoter` text beside it: nothing
+    // has written that column since the promoter-organisations migration, so
+    // the picker stopped naming the organisation for every account made since.
+    include: { person: true, organisation: { select: { name: true } } },
     orderBy: { createdAt: 'asc' },
   })
 
@@ -131,7 +134,7 @@ async function RolePicker() {
                   <span className={styles.name}>{u.name}</span>
                   <span className={styles.role}>
                     {ROLE_LABEL[roleKey]}
-                    {u.promoter ? ` · ${u.promoter}` : ''}
+                    {u.organisation ? ` · ${u.organisation.name}` : ''}
                   </span>
                 </span>
                 <span className={styles.mods}>{labels}</span>

@@ -28,20 +28,33 @@ async function myOfferedShift(shiftId: string, personId: string | null) {
 
 export async function confirmMyOffer(shiftId: string): Promise<Said> {
   const { user } = await requireModule('home')
-  const mine = await myOfferedShift(shiftId, user.personId)
-  if (!mine) return said('That is not one of your offered shifts.', 'stop')
+  const personId = user.personId
+  const mine = await myOfferedShift(shiftId, personId)
+  if (!mine || !personId) return said('That is not one of your offered shifts.', 'stop')
 
-  const out = await confirmOfferedShift(shiftId, { personId: user.personId, who: user.initials })
+  // `offeredTo` re-states the check the lookup above just made, inside the
+  // transaction's own read: a shift re-offered to somebody else in between
+  // is refused rather than confirmed onto them.
+  const out = await confirmOfferedShift(
+    shiftId,
+    { personId, who: user.initials },
+    { offeredTo: personId },
+  )
   refresh()
   return out
 }
 
 export async function declineMyOffer(shiftId: string): Promise<Said> {
   const { user } = await requireModule('home')
-  const mine = await myOfferedShift(shiftId, user.personId)
-  if (!mine) return said('That is not one of your offered shifts.', 'stop')
+  const personId = user.personId
+  const mine = await myOfferedShift(shiftId, personId)
+  if (!mine || !personId) return said('That is not one of your offered shifts.', 'stop')
 
-  const out = await declineOfferedShift(shiftId, { personId: user.personId, who: user.initials })
+  const out = await declineOfferedShift(
+    shiftId,
+    { personId, who: user.initials },
+    { offeredTo: personId },
+  )
   refresh()
   return out
 }

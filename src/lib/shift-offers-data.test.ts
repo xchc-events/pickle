@@ -281,3 +281,56 @@ describe('resolveShiftOfferToken', () => {
     expect(view?.message).toMatch(/expired/i)
   })
 })
+
+/**
+ * The shift moving on between an offer going out and somebody answering it.
+ *
+ * `state === 'OFFERED'` alone does not say the offer is still *this* one. A
+ * coordinator who re-offers an unanswered shift to somebody else leaves it
+ * OFFERED the whole time, so the stale link's holder would otherwise fall
+ * through the state check and confirm the new person onto the shift — booking
+ * hours in their name that they never agreed to, from a click by somebody
+ * else. `offeredTo` is what the emailed link and Home pin that down with;
+ * Roster's duty manager deliberately passes none, since confirming on
+ * somebody's behalf in the room is the whole point of that button.
+ */
+describe('an offer the shift has moved on from', () => {
+  it('confirmOfferedShift refuses when the shift is now offered to somebody else', async () => {
+    shiftFindUnique.mockResolvedValue(offeredShift({ personId: 'person_hana' }))
+
+    const out = await confirmOfferedShift('shift_door', ACTOR, { offeredTo: 'person_ari' })
+
+    expect(out.kind).toBe('stop')
+    expect(transaction).not.toHaveBeenCalled()
+    expect(entryCreate).not.toHaveBeenCalled()
+    expect(recordAs).not.toHaveBeenCalled()
+  })
+
+  it('declineOfferedShift refuses too, so a stale link cannot reopen somebody else’s shift', async () => {
+    shiftFindUnique.mockResolvedValue(offeredShift({ personId: 'person_hana' }))
+
+    const out = await declineOfferedShift('shift_door', ACTOR, { offeredTo: 'person_ari' })
+
+    expect(out.kind).toBe('stop')
+    expect(transaction).not.toHaveBeenCalled()
+    expect(recordAs).not.toHaveBeenCalled()
+  })
+
+  it('still confirms when the shift is offered to the person the link names', async () => {
+    shiftFindUnique.mockResolvedValue(offeredShift({ personId: 'person_ari' }))
+
+    const out = await confirmOfferedShift('shift_door', ACTOR, { offeredTo: 'person_ari' })
+
+    expect(out.kind).toBe('good')
+    expect(transaction).toHaveBeenCalled()
+  })
+
+  it('Roster passes no expectation, so the duty manager still confirms whoever holds it', async () => {
+    shiftFindUnique.mockResolvedValue(offeredShift({ personId: 'person_hana' }))
+
+    const out = await confirmOfferedShift('shift_door', ACTOR)
+
+    expect(out.kind).toBe('good')
+    expect(transaction).toHaveBeenCalled()
+  })
+})

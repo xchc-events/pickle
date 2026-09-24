@@ -102,6 +102,28 @@ export interface OfferActor {
   who: string
 }
 
+/**
+ * What the caller believes it is answering.
+ *
+ * `state === 'OFFERED'` says an offer is open; it does not say it is *this*
+ * one. Re-offering an unanswered shift to somebody else leaves it OFFERED
+ * throughout, so without this a stale link would pass the state check and
+ * confirm whoever holds the shift now — booking hours in a name its holder
+ * never clicked for, from an activity line attributed to somebody else.
+ *
+ * The emailed link and Home both pin it down, because both act on behalf of
+ * one named person. Roster passes none on purpose: confirming on somebody's
+ * behalf in the room is exactly what that button is for.
+ */
+export interface OfferGuard {
+  /** Act only while the shift is still the one offered to this person. */
+  offeredTo?: string
+}
+
+/** Whether the shift is still the one this caller meant to answer. */
+const stillTheirs = (shiftPersonId: string | null, guard: OfferGuard) =>
+  !guard.offeredTo || shiftPersonId === guard.offeredTo
+
 async function offeredShift(shiftId: string) {
   return db.shift.findUnique({
     where: { id: shiftId },
@@ -122,9 +144,16 @@ async function offeredShift(shiftId: string) {
  * after the duty manager already confirmed it in the room — finds a shift
  * that is no longer OFFERED and stops there.
  */
-export async function confirmOfferedShift(shiftId: string, actor: OfferActor): Promise<Said> {
+export async function confirmOfferedShift(
+  shiftId: string,
+  actor: OfferActor,
+  guard: OfferGuard = {},
+): Promise<Said> {
   const shift = await offeredShift(shiftId)
   if (!shift || shift.state !== 'OFFERED' || !shift.personId || !shift.person) {
+    return said('That offer is no longer live.', 'stop')
+  }
+  if (!stillTheirs(shift.personId, guard)) {
     return said('That offer is no longer live.', 'stop')
   }
 
@@ -172,9 +201,16 @@ export async function confirmOfferedShift(shiftId: string, actor: OfferActor): P
  * that name only survives in the audit trail if this writes it down now.
  * Books nothing: an offer that was never confirmed never had hours.
  */
-export async function declineOfferedShift(shiftId: string, actor: OfferActor): Promise<Said> {
+export async function declineOfferedShift(
+  shiftId: string,
+  actor: OfferActor,
+  guard: OfferGuard = {},
+): Promise<Said> {
   const shift = await offeredShift(shiftId)
   if (!shift || shift.state !== 'OFFERED' || !shift.personId || !shift.person) {
+    return said('That offer is no longer live.', 'stop')
+  }
+  if (!stillTheirs(shift.personId, guard)) {
     return said('That offer is no longer live.', 'stop')
   }
 

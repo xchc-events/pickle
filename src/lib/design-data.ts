@@ -28,6 +28,7 @@ import {
   type MissingBioRow,
 } from './design'
 import { CONTENT_RULES } from './design'
+import { hasPortalFor, organisationsWithPortal } from './portal-access'
 
 /** The design team's own name, as it is written onto an `HourEntry.role`. */
 const DESIGN_TEAM = ROLE_LABEL.design
@@ -139,13 +140,11 @@ export async function loadDesign(
     orderBy: { date: 'asc' },
   })
 
-  // Whether this event's promoter has a portal to sign the creative off in.
-  const externals = await db.user.findMany({
-    where: { role: 'PROMOTER', promoter: { not: null } },
-    select: { promoter: true },
-  })
-  const hasPortal = (promoter: string | null) =>
-    externals.some((u) => u.promoter && (promoter ?? '').includes(u.promoter))
+  // Whether this event's promoter has a portal to sign the creative off in —
+  // the one rule the Pipeline, Home and the event record share. This screen
+  // used to run its own copy, which counted a switched-off account as a live
+  // portal and asked in-house events for an outside sign-off.
+  const portalOrgs = await organisationsWithPortal()
 
   const designLead = (e: (typeof events)[number]) => e.leads.find((l) => l.role === 'DESIGN')
 
@@ -178,7 +177,7 @@ export async function loadDesign(
   if (!row) return { queue, event: null, leadOptions, rules: CONTENT_RULES, storageReady }
 
   const assets = flatten(row.assets)
-  const portal = hasPortal(row.promoter)
+  const portal = hasPortalFor(row, portalOrgs)
 
   // The artwork attached to each piece, the hours the design team has logged
   // against this event, and its comment threads — independent queries,
