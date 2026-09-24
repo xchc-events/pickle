@@ -593,78 +593,84 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         )}
 
         {/* ------------------------------------------------------ labour --- */}
-        <section id="labour">
-          <SectionHeading note={`${ev.onSiteHours + ev.offSiteHours}h · ${ev.ourPeople}`}>
-            Labour
-          </SectionHeading>
-          <p className={styles.note}>
-            Two tables, one record. On-site shifts <em>are</em> the roster — assign someone in
-            Roster and they appear here. Off-site tasks carry a predicted figure and the hours
-            actually worked.
-          </p>
+        {/* The venue's own staffing and its wage cost, and the internal
+            record of everything done to this event. `loadEventRecord` already
+            empties both for an outside account — this is what keeps the
+            headings and the empty tables from showing up for them too. */}
+        {user.external ? null : (
+          <section id="labour">
+            <SectionHeading note={`${ev.onSiteHours + ev.offSiteHours}h · ${ev.ourPeople}`}>
+              Labour
+            </SectionHeading>
+            <p className={styles.note}>
+              Two tables, one record. On-site shifts <em>are</em> the roster — assign someone in
+              Roster and they appear here. Off-site tasks carry a predicted figure and the hours
+              actually worked.
+            </p>
 
-          <div className={styles.table}>
-            <div className={styles.tableHead}>
-              <span>Role</span>
-              <span>Who is on it</span>
-              <span className={styles.right}>Hours</span>
-              <span className={styles.right}>Cost</span>
-            </div>
-            {ev.roleRows.length === 0 ? (
-              <p className={styles.none}>No shifts generated yet.</p>
-            ) : (
-              ev.roleRows.map((r) => (
-                <div key={r.role} className={styles.tableRow}>
-                  <span>{r.role}</span>
-                  <span className={styles.who}>
-                    {r.people.map((p) => (
-                      <span key={p.name} className={styles.person}>
-                        <Avatar initials={p.initials} title={p.name} />
-                        {p.name}
-                      </span>
-                    ))}
-                    {r.open > 0 ? <span className={styles.warn}>{r.open} open</span> : null}
-                  </span>
-                  <span className={`${styles.right} tabular`}>{r.hours}h</span>
-                  <span className={`${styles.right} tabular`}>{r.cost}</span>
-                </div>
-              ))
-            )}
-          </div>
-
-          {ev.tasks.length > 0 ? (
             <div className={styles.table}>
               <div className={styles.tableHead}>
-                <span>Off-site task</span>
-                <span className={styles.right}>Predicted</span>
-                <span className={styles.right}>Actual</span>
-                <span className={styles.right}>Variance</span>
+                <span>Role</span>
+                <span>Who is on it</span>
+                <span className={styles.right}>Hours</span>
                 <span className={styles.right}>Cost</span>
               </div>
-              {ev.tasks.map((t) => (
-                <div key={t.id} className={styles.tableRow}>
-                  <span>{t.name}</span>
-                  <span className={`${styles.right} tabular`}>{t.est}h</span>
-                  <span className={`${styles.right} tabular`}>
-                    {t.actual === null ? '—' : `${t.actual}h`}
-                  </span>
-                  <span className={`${styles.right} tabular`}>{t.variance}</span>
-                  <span className={`${styles.right} tabular`}>{t.cost}</span>
-                </div>
-              ))}
+              {ev.roleRows.length === 0 ? (
+                <p className={styles.none}>No shifts generated yet.</p>
+              ) : (
+                ev.roleRows.map((r) => (
+                  <div key={r.role} className={styles.tableRow}>
+                    <span>{r.role}</span>
+                    <span className={styles.who}>
+                      {r.people.map((p) => (
+                        <span key={p.name} className={styles.person}>
+                          <Avatar initials={p.initials} title={p.name} />
+                          {p.name}
+                        </span>
+                      ))}
+                      {r.open > 0 ? <span className={styles.warn}>{r.open} open</span> : null}
+                    </span>
+                    <span className={`${styles.right} tabular`}>{r.hours}h</span>
+                    <span className={`${styles.right} tabular`}>{r.cost}</span>
+                  </div>
+                ))
+              )}
             </div>
-          ) : null}
 
-          <p className={styles.orgLine}>
-            <i className="ph ph-clock" aria-hidden="true" />
-            Org-wide labour adds {ev.orgHours} to this event — {ev.orgCost} — its share of that
-            month&rsquo;s admin, grants and maintenance across every event in it. Logged in Hours,
-            never typed here.
-          </p>
-          <p className={styles.factNote}>
-            {ev.loggedHours} logged against this event from timesheets.
-          </p>
-        </section>
+            {ev.tasks.length > 0 ? (
+              <div className={styles.table}>
+                <div className={styles.tableHead}>
+                  <span>Off-site task</span>
+                  <span className={styles.right}>Predicted</span>
+                  <span className={styles.right}>Actual</span>
+                  <span className={styles.right}>Variance</span>
+                  <span className={styles.right}>Cost</span>
+                </div>
+                {ev.tasks.map((t) => (
+                  <div key={t.id} className={styles.tableRow}>
+                    <span>{t.name}</span>
+                    <span className={`${styles.right} tabular`}>{t.est}h</span>
+                    <span className={`${styles.right} tabular`}>
+                      {t.actual === null ? '—' : `${t.actual}h`}
+                    </span>
+                    <span className={`${styles.right} tabular`}>{t.variance}</span>
+                    <span className={`${styles.right} tabular`}>{t.cost}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <p className={styles.orgLine}>
+              <i className="ph ph-clock" aria-hidden="true" />
+              Org-wide labour adds {ev.orgHours} to this event — {ev.orgCost} — its share of that
+              month&rsquo;s admin, grants and maintenance across every event in it. Logged in Hours,
+              never typed here.
+            </p>
+            <p className={styles.factNote}>
+              {ev.loggedHours} logged against this event from timesheets.
+            </p>
+          </section>
+        )}
 
         {/* ------------------------------------------------ distribution --- */}
         <section id="spread">
@@ -689,22 +695,26 @@ export default async function EventPage({ params }: PageProps<'/events/[id]'>) {
         </section>
 
         {/* ---------------------------------------------------- activity --- */}
-        <section id="activity">
-          <SectionHeading note="append-only — nothing here is ever edited">Activity</SectionHeading>
-          {ev.activity.length === 0 ? (
-            <p className={styles.none}>Nothing has happened to this event yet.</p>
-          ) : (
-            <ul className={styles.activity}>
-              {ev.activity.map((a, i) => (
-                <li key={i} className={styles.beat}>
-                  <Avatar initials={a.who} title={a.who} />
-                  <span className={styles.beatText}>{a.text}</span>
-                  <span className={styles.beatWhen}>{a.when}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {user.external ? null : (
+          <section id="activity">
+            <SectionHeading note="append-only — nothing here is ever edited">
+              Activity
+            </SectionHeading>
+            {ev.activity.length === 0 ? (
+              <p className={styles.none}>Nothing has happened to this event yet.</p>
+            ) : (
+              <ul className={styles.activity}>
+                {ev.activity.map((a, i) => (
+                  <li key={i} className={styles.beat}>
+                    <Avatar initials={a.who} title={a.who} />
+                    <span className={styles.beatText}>{a.text}</span>
+                    <span className={styles.beatWhen}>{a.when}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
     </div>
   )

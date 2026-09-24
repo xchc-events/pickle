@@ -12,6 +12,7 @@ import { halvesOf, type BarClose, type DoorCount } from './actuals'
 import {
   gatesDoneLabel,
   isLate,
+  withoutVenueLabour,
   type DealState,
   type LeadKey,
   type LicenceState,
@@ -426,7 +427,10 @@ export async function loadEventRecord(
 
   const step = bookingStep(input.booking)
 
-  return {
+  // An outside promoter reads their own show's record, so what goes back is
+  // filtered before it leaves here rather than hidden by the page — the same
+  // rule as `eventScope`. See `withoutVenueLabour` in event-record.ts.
+  const record: EventRecord = {
     id: row.id,
     name: row.name,
     date: dateLabel(row.date),
@@ -575,4 +579,6 @@ export async function loadEventRecord(
       when: ago(a.at, now),
     })),
   }
+
+  return withoutVenueLabour(record, user)
 }

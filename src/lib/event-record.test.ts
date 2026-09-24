@@ -7,6 +7,7 @@ import {
   headsLine,
   isLate,
   timeMinutes,
+  withoutVenueLabour,
   type Gate,
 } from './event-record'
 
@@ -119,5 +120,56 @@ describe('how many through the door', () => {
     expect(headsLine(Infinity, Infinity)).toBe(unpriced)
     expect(headsLine(186, Infinity)).toBe(unpriced)
     expect(headsLine(NaN, 94)).toBe(unpriced)
+  })
+})
+
+/**
+ * What an outside promoter is handed with the record.
+ *
+ * They can open it — `eventScope` gives them their own organisation's events
+ * and Pipeline is one of their two modules — and `canChangeEventRecord`
+ * already stops them changing anything. Reading was the part left open: the
+ * Labour table names each staff member on each shift beside that role's wage
+ * cost, so an outside party could read the venue's staffing and divide one by
+ * the other to get an individual's rate. The activity feed carries every
+ * internal note on the event beside it.
+ *
+ * Raised as a high in the security audit of 22 September 2026 and fixed here.
+ * The aggregates stay: what a night's labour costs in total is part of the
+ * deal a promoter is splitting, and their own settlement is worked out from
+ * it. What goes is anything naming a person or itemising their time.
+ */
+describe('withoutVenueLabour', () => {
+  const full = {
+    name: 'Static Bloom',
+    roleRows: [{ role: 'Door', hours: 6, cost: '$210', people: [{ name: 'Ari Ngata' }], open: 0 }],
+    tasks: [{ id: 't1', name: 'Poster run', est: 2, actual: 3, variance: '+1h', cost: '$105' }],
+    activity: [{ who: 'MT', text: 'flagged the settlement for review', when: 'Tue' }],
+  }
+
+  it('takes the named shift rows away from an outside account', () => {
+    expect(withoutVenueLabour(full, { external: true }).roleRows).toEqual([])
+  })
+
+  it('takes the off-site task breakdown away — it is priced per person too', () => {
+    expect(withoutVenueLabour(full, { external: true }).tasks).toEqual([])
+  })
+
+  it('takes the activity feed away', () => {
+    expect(withoutVenueLabour(full, { external: true }).activity).toEqual([])
+  })
+
+  it('leaves everything else on the record alone', () => {
+    expect(withoutVenueLabour(full, { external: true }).name).toBe('Static Bloom')
+  })
+
+  it('hands the venue its own record untouched', () => {
+    expect(withoutVenueLabour(full, { external: false })).toEqual(full)
+  })
+
+  it('does not mutate what it was given', () => {
+    withoutVenueLabour(full, { external: true })
+    expect(full.roleRows).toHaveLength(1)
+    expect(full.activity).toHaveLength(1)
   })
 })

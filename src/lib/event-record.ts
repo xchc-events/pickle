@@ -158,3 +158,36 @@ export function canChangeEventRecord(user: { external: boolean }): Verdict {
   }
   return { ok: true }
 }
+
+/**
+ * The record as an outside account may read it.
+ *
+ * `canChangeEventRecord` above settles what a promoter may *do*. This settles
+ * what they are handed, which was the half left open: the Labour table names
+ * every staff member on every shift beside that role's wage cost, so an
+ * outside party could read the venue's staffing off it and divide the cost by
+ * the hours to get an individual's rate. The off-site task table is priced the
+ * same way. The activity feed carries every internal note on the event —
+ * who flagged a settlement, who chased whom.
+ *
+ * None of that is the promoter's business, and none of it is needed for what
+ * they open the record to do: see where their show is up to, and what their
+ * own split comes to.
+ *
+ * The aggregates are deliberately left: what a night's labour costs in total
+ * is a term of the deal they are splitting, and their settlement is worked
+ * out from it. What goes is anything naming a person or itemising their time.
+ *
+ * Pure, and it copies rather than edits, so the venue's own record cannot be
+ * emptied by having been read once on a request that also served a promoter.
+ */
+export interface VenueLabour {
+  roleRows: readonly unknown[]
+  tasks: readonly unknown[]
+  activity: readonly unknown[]
+}
+
+export function withoutVenueLabour<T extends VenueLabour>(ev: T, user: { external: boolean }): T {
+  if (!user.external) return ev
+  return { ...ev, roleRows: [], tasks: [], activity: [] }
+}
